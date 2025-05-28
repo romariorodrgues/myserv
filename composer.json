@@ -1,0 +1,14 @@
+{
+    "name": "myserv/booking-platform",
+    "description": "A complete booking system for professionals and service providers",
+    "type": "wordpress-plugin",
+    "require": {
+        "mercadopago/dx-php": "^2.5",
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "psr-4": {
+            "MyServ\\": "includes/"
+        }
+    }
+}

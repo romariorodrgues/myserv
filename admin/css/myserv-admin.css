@@ -1,0 +1,52 @@
+/**
+ * All of the CSS for your admin-specific functionality should be
+ * included in this file.
+ */
+
+.myserv-admin-header {
+    margin: 20px 0;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.myserv-admin-content {
+    margin: 20px 0;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    box-shadow: 0 1px 1px rgba(0,0,0,.04);
+}
+
+.myserv-settings-section {
+    margin-bottom: 30px;
+}
+
+.myserv-settings-section h2 {
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.myserv-form-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.myserv-form-table th {
+    text-align: left;
+    padding: 15px 10px;
+    width: 200px;
+}
+
+.myserv-form-table td {
+    padding: 15px 10px;
+}
+
+.myserv-form-table input[type="text"],
+.myserv-form-table input[type="number"],
+.myserv-form-table select {
+    width: 300px;
+    max-width: 100%;
+}

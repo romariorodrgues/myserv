@@ -1,0 +1,99 @@
+# WordPress specific files
+*.log
+*.sql
+*.sqlite
+wp-config.php
+.htaccess
+
+# Composer
+/vendor/
+composer.phar
+composer.lock
+composer-setup.php
+php.zip
+Composer-Setup.exe
+
+# Node modules & build files
+/node_modules/
+package-lock.json
+yarn.lock
+/build/
+/dist/
+
+# IDE specific files
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+*.komodoproject
+.komodotools/
+*.code-workspace
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+
+# MercadoPago credentials and sensitive data
+mercadopago-credentials.json
+chatpro-credentials.json
+google-maps-api-key.json
+
+# Plugin specific
+/languages/*.mo
+/languages/*.po~
+/languages/backup/
+
+# Backup files
+*.bak
+*.backup
+*.old
+*.orig
+
+# Test and documentation
+/tests/coverage/
+/docs/build/
+phpunit.xml
+.phpunit.result.cache
+
+# Debug files
+debug.log
+error_log
+php_error.log
+
+# Development specific
+TODO.md
+NOTES.md
+/*.todo
+
+# Certificates and keys
+*.pem
+*.key
+*.crt
+*.csr
+*.der
+*.priv
+
+# Cache and temporary directories
+/cache/
+/tmp/
+.sass-cache/
+*.css.map
+*.js.map

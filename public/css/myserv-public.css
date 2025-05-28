@@ -1,0 +1,148 @@
+/**
+ * All of the CSS for your public-facing functionality should be
+ * included in this file.
+ */
+
+.myserv-search-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.myserv-search-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.myserv-search-form input,
+.myserv-search-form select {
+    flex: 1;
+    min-width: 200px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.myserv-search-form button {
+    padding: 10px 20px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.myserv-search-form button:hover {
+    background: #005177;
+}
+
+.myserv-providers-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.myserv-provider-card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    overflow: hidden;
+}
+
+.myserv-provider-card img {
+    width: 100%;
+    height: 200px;
+    object-fit: cover;
+}
+
+.myserv-provider-info {
+    padding: 15px;
+}
+
+.myserv-provider-name {
+    font-size: 1.2em;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.myserv-provider-category {
+    color: #666;
+    margin-bottom: 10px;
+}
+
+.myserv-provider-rating {
+    color: #ffc107;
+    margin-bottom: 15px;
+}
+
+.myserv-book-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background: #0073aa;
+    color: #fff;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.myserv-book-button:hover {
+    background: #005177;
+    color: #fff;
+}
+
+/* Calendar Styles */
+.myserv-calendar-container {
+    margin: 20px 0;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* Booking Form Styles */
+.myserv-booking-form {
+    max-width: 600px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.myserv-booking-form .form-row {
+    margin-bottom: 15px;
+}
+
+.myserv-booking-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+}
+
+.myserv-booking-form input,
+.myserv-booking-form select,
+.myserv-booking-form textarea {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.myserv-booking-form button {
+    width: 100%;
+    padding: 12px;
+    background: #0073aa;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1.1em;
+}
+
+.myserv-booking-form button:hover {
+    background: #005177;
+}
