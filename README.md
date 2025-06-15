@@ -23,15 +23,36 @@ MyServ é uma plataforma de marketplace de serviços moderna que conecta prestad
 - ❤️ **Sistema de Favoritos** - Salve prestadores favoritos
 - 📱 **Design Responsivo** - Interface otimizada para todos os dispositivos
 
-## 🚀 Instalação e Configuração
+## 🚀 Setup Rápido para Desenvolvedores
+
+### ⚡ Setup Automático (Recomendado)
+
+```bash
+# 1. Clone o repositório
+git clone https://github.com/romariorodrgues/myserv.git
+cd myserv
+
+# 2. Execute o setup automático
+node scripts/setup-developer.js
+
+# 3. Inicie o servidor
+npm run dev
+
+# 4. Acesse http://localhost:3000
+# Login: admin@myserv.com | Senha: admin123
+```
+
+### 📚 Setup Manual Detalhado
+
+Para instruções completas, veja: [**GUIA_SETUP_DESENVOLVEDOR.md**](./GUIA_SETUP_DESENVOLVEDOR.md)
 
 ### Pré-requisitos
 
 - Node.js 18+ 
 - npm, yarn, pnpm ou bun
-- PostgreSQL
-- Conta Google (para Maps API)
-- Conta MercadoPago/Pagar.me (para pagamentos)
+- SQLite (incluído no projeto)
+- Conta Google (opcional - para Maps API)
+- Conta MercadoPago/Pagar.me (opcional - para pagamentos)
 
 ### 1. Clone o repositório
 
