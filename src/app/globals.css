@@ -1,26 +1,101 @@
-@import "tailwindcss";
+/**
+ * Global styles for MyServ platform
+ * Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
+ */
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Suppress Tailwind CSS at-rule warnings */
+/* stylelint-disable at-rule-no-unknown */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* stylelint-enable at-rule-no-unknown */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* MyServ Brand Colors */
+    --brand-navy: 211 100% 18%;       /* #001e5c */
+    --brand-cyan: 192 100% 41%;       /* #00a9d4 */
+    --brand-teal: 167 67% 52%;        /* #33d8b6 */
+    --brand-bg: 194 38% 95%;          /* #ecf4f6 */
+    
+    /* UI Colors */
+    --background: 194 38% 95%;        /* #ecf4f6 - brand background */
+    --foreground: 211 100% 18%;       /* #001e5c - navy text */
+    --card: 0 0% 100%;                /* white cards */
+    --card-foreground: 211 100% 18%;  /* navy text on cards */
+    --popover: 0 0% 100%;             /* white popovers */
+    --popover-foreground: 211 100% 18%; /* navy text on popovers */
+    --primary: 211 100% 18%;          /* #001e5c - navy primary */
+    --primary-foreground: 0 0% 100%;  /* white text on primary */
+    --secondary: 192 100% 41%;        /* #00a9d4 - cyan secondary */
+    --secondary-foreground: 0 0% 100%; /* white text on secondary */
+    --tertiary: 167 67% 52%;          /* #33d8b6 - teal tertiary */
+    --tertiary-foreground: 211 100% 18%; /* navy text on tertiary */
+    --muted: 195 16% 85%;             /* light gray-blue for muted elements */
+    --muted-foreground: 211 30% 40%;  /* medium navy for muted text */
+    --accent: 167 67% 92%;            /* very light teal for accent backgrounds */
+    --accent-foreground: 167 67% 30%; /* dark teal for accent text */
+    --destructive: 0 84% 60%;         /* red */
+    --destructive-foreground: 0 0% 100%; /* white on destructive */
+    --border: 194 28% 88%;            /* light blue-gray for borders */
+    --input: 194 28% 88%;             /* light blue-gray for inputs */
+    --ring: 192 100% 41%;             /* cyan for focus rings */
+    --radius: 0.75rem;                /* slightly larger border radius */
+  }
+
+  .dark {
+    --background: 211 80% 10%;        /* dark navy background */
+    --foreground: 0 0% 95%;           /* off-white text */
+    --card: 211 70% 16%;              /* slightly lighter navy for cards */
+    --card-foreground: 0 0% 95%;      /* off-white text on cards */
+    --popover: 211 70% 16%;           /* slightly lighter navy for popovers */
+    --popover-foreground: 0 0% 95%;   /* off-white text on popovers */
+    --primary: 192 100% 41%;          /* #00a9d4 - cyan as primary in dark mode */
+    --primary-foreground: 0 0% 95%;   /* off-white text on primary */
+    --secondary: 167 67% 42%;         /* darker teal for secondary in dark mode */
+    --secondary-foreground: 0 0% 95%; /* off-white text on secondary */
+    --tertiary: 167 67% 52%;          /* #33d8b6 - teal tertiary */
+    --tertiary-foreground: 0 0% 95%;  /* off-white on tertiary */
+    --muted: 211 50% 20%;             /* muted navy */
+    --muted-foreground: 210 20% 65%;  /* light blue-gray for muted text */
+    --accent: 192 50% 20%;            /* dark cyan accent */
+    --accent-foreground: 192 100% 80%; /* light cyan text on accent */
+    --destructive: 0 62.8% 30.6%;     /* dark red */
+    --destructive-foreground: 0 0% 95%; /* off-white on destructive */
+    --border: 211 50% 30%;            /* dark navy border */
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+@layer utilities {
+  .font-inter {
+    font-family: var(--font-inter), sans-serif;
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+  }
+  
+  .animate-pulse-slow {
+    animation: pulse 4s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

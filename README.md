@@ -1,14 +1,18 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# MyServ - Service Marketplace Platform
 
-## Getting Started
+[![Author](https://img.shields.io/badge/Author-Romário%20Rodrigues-blue?style=flat-square)](mailto:romariorodrigues.dev@gmail.com)
+[![Next.js](https://img.shields.io/badge/Next.js-14+-black?style=flat-square&logo=next.js)](https://nextjs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5+-blue?style=flat-square&logo=typescript)](https://typescriptlang.org)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind%20CSS-3+-blue?style=flat-square&logo=tailwindcss)](https://tailwindcss.com)
 
-First, run the development server:
+MyServ is a modern service marketplace platform that connects service providers with clients through location-based search and appointment scheduling. Inspired by GetNinjas, it features a clean, responsive interface and comprehensive functionality for both clients and service providers.
+
+## 🚀 Quick Start
+
+First, install dependencies and set up the environment:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
+npm install
 pnpm dev
 # or
 bun dev
