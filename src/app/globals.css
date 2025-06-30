@@ -73,9 +73,21 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
+  @media (max-width: 600px) {
+  body {
+    padding-bottom: 4rem;
+  }
+}
 }
 
 @layer utilities {
+  .animate-fade-slide-down {
+    animation: fadeSlideDown 0.3s ease forwards;
+  }
+
+  .animate-fade-slide-up {
+    animation: fadeSlideUp 0.2s ease forwards;
+  }
   .font-inter {
     font-family: var(--font-inter), sans-serif;
   }
@@ -97,5 +109,27 @@
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10%);
   }
 }

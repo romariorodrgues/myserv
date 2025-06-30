@@ -5,6 +5,7 @@
 
 'use client'
 
+import { getMyProfile } from '@/lib/api/get-my-profile'
 import { useState } from 'react'
 import { User, Phone, Mail, MapPin, Bell, Shield, CreditCard, Eye, EyeOff, Save } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -17,6 +18,8 @@ import { Separator } from '@/components/ui/separator'
 import { ProfileImageUploadCompact } from '@/components/upload/profile-image-upload'
 import { toast } from 'sonner'
 import Image from 'next/image'
+import { useEffect } from 'react'
+import { updateMyProfile } from '@/lib/api/update-my-profile'
 
 interface ClientProfileData {
   id: string
@@ -43,7 +46,7 @@ interface ClientProfileData {
     serviceReminders: boolean
     reviewRequests: boolean
   }
-  privacy: {
+  privacy?: {
     profileVisibility: 'PUBLIC' | 'PRIVATE'
     showPhone: boolean
     showEmail: boolean
@@ -62,40 +65,65 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  
+  const [profileData, setProfileData] = useState<ClientProfileData | null>({
+  id: '',
+  name: '',
+  email: '',
+  phone: '',
+  document: '',
+  bio: '',
+  profileImage: null,
+  address: {},
+  preferences: {
+    emailNotifications: false,
+    smsNotifications: false,
+    whatsappNotifications: false,
+    marketingEmails: false,
+    serviceReminders: false,
+    reviewRequests: false,
+  },
+  privacy: {
+    profileVisibility: 'PUBLIC',
+    showPhone: false,
+    showEmail: false,
+    showLocation: false,
+  },
+})
+
+
   // Mock data - replace with actual data fetching
-  const [profileData, setProfileData] = useState<ClientProfileData>({
-    id: 'client-1',
-    name: 'João Cliente',
-    email: 'joao.cliente@email.com',
-    phone: '(11) 99999-1234',
-    document: '123.456.789-00',
-    bio: 'Cliente satisfeito com os serviços da plataforma MyServ.',
-    profileImage: null,
-    address: {
-      street: 'Rua das Flores',
-      number: '123',
-      complement: 'Apto 45',
-      neighborhood: 'Vila Madalena',
-      city: 'São Paulo',
-      state: 'SP',
-      zipCode: '01234-567'
-    },
-    preferences: {
-      emailNotifications: true,
-      smsNotifications: false,
-      whatsappNotifications: true,
-      marketingEmails: false,
-      serviceReminders: true,
-      reviewRequests: true
-    },
-    privacy: {
-      profileVisibility: 'PUBLIC',
-      showPhone: true,
-      showEmail: false,
-      showLocation: true
-    }
-  })
+  // const [profileData, setProfileData] = useState<ClientProfileData>({
+  //   id: 'client-1',
+  //   name: 'João Cliente',
+  //   email: 'joao.cliente@email.com',
+  //   phone: '(11) 99999-1234',
+  //   document: '123.456.789-00',
+  //   bio: 'Cliente satisfeito com os serviços da plataforma MyServ.',
+  //   profileImage: null,
+  //   address: {
+  //     street: 'Rua das Flores',
+  //     number: '123',
+  //     complement: 'Apto 45',
+  //     neighborhood: 'Vila Madalena',
+  //     city: 'São Paulo',
+  //     state: 'SP',
+  //     zipCode: '01234-567'
+  //   },
+  //   preferences: {
+  //     emailNotifications: true,
+  //     smsNotifications: false,
+  //     whatsappNotifications: true,
+  //     marketingEmails: false,
+  //     serviceReminders: true,
+  //     reviewRequests: true
+  //   },
+  //   privacy: {
+  //     profileVisibility: 'PUBLIC',
+  //     showPhone: true,
+  //     showEmail: false,
+  //     showLocation: true
+  //   }
+  // })
 
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
@@ -106,9 +134,9 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
   const handleSaveProfile = async () => {
     try {
       setSaving(true)
-      
+      await updateMyProfile(profileData)
       // Mock API call - replace with actual implementation
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // await new Promise(resolve => setTimeout(resolve, 1000))
       
       toast.success('Perfil atualizado com sucesso!')
     } catch (error) {
@@ -163,10 +191,13 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
   }
 
   const handleImageUpload = (imagePath: string | null) => {
-    setProfileData(prev => ({
-      ...prev,
-      profileImage: imagePath
-    }))
+    setProfileData(prev => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        profileImage: imagePath
+      }
+    })
     toast.success('Foto de perfil atualizada!')
   }
 
@@ -176,6 +207,42 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
     { id: 'privacy', label: 'Privacidade', icon: Eye },
     { id: 'security', label: 'Segurança', icon: Shield }
   ]
+
+useEffect(() => {
+  const fetchProfile = async () => {
+    try {
+      setLoading(true)
+      const data = await getMyProfile()
+      setProfileData({
+        ...data,
+        preferences: data.preferences ?? {
+          emailNotifications: false,
+          smsNotifications: false,
+          whatsappNotifications: false,
+          marketingEmails: false,
+          serviceReminders: false,
+          reviewRequests: false
+        },
+        privacy: data.privacy ?? {
+          profileVisibility: 'PUBLIC',
+          showPhone: false,
+          showEmail: false,
+          showLocation: false
+        }
+      })
+    } catch (error) {
+      console.error('Erro ao carregar perfil:', error)
+      toast.error('Erro ao carregar perfil')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  fetchProfile()
+}, [])
+if (loading || !profileData) {
+  return <div className="p-4">Carregando perfil...</div>
+}
 
   return (
     <div className="space-y-6">
@@ -188,8 +255,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
               return (
                 <button
                   key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`flex items-center space-x-2 px-6 py-4 text-sm font-medium border-b-2 transition-colors ${
+                  onClick={() => setActiveTab(tab.id as 'profile' | 'preferences' | 'privacy' | 'security')}
+                  className={`flex flex-col items-center justify-center px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
                     activeTab === tab.id
                       ? 'border-blue-600 text-blue-600 bg-blue-50'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -218,7 +285,7 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
             <div className="flex items-center space-x-6">
               <div className="relative">
                 <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                  {profileData.profileImage ? (
+                  {profileData && profileData.profileImage ? (
                     <Image
                       src={profileData.profileImage}
                       alt="Profile"
@@ -231,8 +298,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   )}
                 </div>
                 <ProfileImageUploadCompact
-                  currentImage={profileData.profileImage}
-                  userName={profileData.name}
+                  currentImage={profileData?.profileImage}
+                  userName={profileData?.name ?? ''}
                   onImageUpdate={handleImageUpload}
                 />
               </div>
@@ -252,8 +319,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                 <Label htmlFor="name">Nome Completo</Label>
                 <Input
                   id="name"
-                  value={profileData.name}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, name: e.target.value }))}
+                  value={profileData?.name || ''}
+                  onChange={(e) => setProfileData(prev => prev ? { ...prev, name: e.target.value } : prev)}
                   placeholder="Seu nome completo"
                 />
               </div>
@@ -263,8 +330,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                 <Input
                   id="email"
                   type="email"
-                  value={profileData.email}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, email: e.target.value }))}
+                  value={profileData?.email || ''}
+                  onChange={(e) => setProfileData(prev => prev ? { ...prev, email: e.target.value } : prev)}
                   placeholder="seu@email.com"
                 />
               </div>
@@ -273,8 +340,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                 <Label htmlFor="phone">Telefone</Label>
                 <Input
                   id="phone"
-                  value={profileData.phone || ''}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                  value={profileData?.phone || ''}
+                  onChange={(e) => setProfileData(prev => prev ? { ...prev, phone: e.target.value } : prev)}
                   placeholder="(11) 99999-9999"
                 />
               </div>
@@ -283,8 +350,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                 <Label htmlFor="document">CPF</Label>
                 <Input
                   id="document"
-                  value={profileData.document || ''}
-                  onChange={(e) => setProfileData(prev => ({ ...prev, document: e.target.value }))}
+                  value={profileData?.document || ''}
+                  onChange={(e) => setProfileData(prev => prev ? { ...prev, document: e.target.value } : prev)}
                   placeholder="000.000.000-00"
                 />
               </div>
@@ -294,8 +361,8 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
               <Label htmlFor="bio">Sobre você</Label>
               <Textarea
                 id="bio"
-                value={profileData.bio || ''}
-                onChange={(e) => setProfileData(prev => ({ ...prev, bio: e.target.value }))}
+                value={profileData?.bio || ''}
+                onChange={(e) => setProfileData(prev => prev ? { ...prev, bio: e.target.value } : prev)}
                 placeholder="Conte um pouco sobre você..."
                 rows={3}
               />
@@ -315,11 +382,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="street">Rua</Label>
                   <Input
                     id="street"
-                    value={profileData.address?.street || ''}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      address: { ...prev.address, street: e.target.value }
-                    }))}
+                    value={profileData?.address?.street || ''}
+                    onChange={(e) =>
+                      setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              address: { ...prev.address, street: e.target.value }
+                            }
+                          : prev
+                      )
+                    }
                     placeholder="Nome da rua"
                   />
                 </div>
@@ -328,11 +401,11 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="number">Número</Label>
                   <Input
                     id="number"
-                    value={profileData.address?.number || ''}
-                    onChange={(e) => setProfileData(prev => ({
+                    value={profileData?.address?.number || ''}
+                    onChange={(e) => setProfileData(prev => prev ? ({
                       ...prev,
                       address: { ...prev.address, number: e.target.value }
-                    }))}
+                    }) : prev)}
                     placeholder="123"
                   />
                 </div>
@@ -341,11 +414,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="complement">Complemento</Label>
                   <Input
                     id="complement"
-                    value={profileData.address?.complement || ''}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      address: { ...prev.address, complement: e.target.value }
-                    }))}
+                    value={profileData?.address?.complement || ''}
+                    onChange={(e) =>
+                      setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              address: { ...prev.address, complement: e.target.value }
+                            }
+                          : prev
+                      )
+                    }
                     placeholder="Apto, sala..."
                   />
                 </div>
@@ -354,11 +433,11 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="neighborhood">Bairro</Label>
                   <Input
                     id="neighborhood"
-                    value={profileData.address?.neighborhood || ''}
-                    onChange={(e) => setProfileData(prev => ({
+                    value={profileData?.address?.neighborhood || ''}
+                    onChange={(e) => setProfileData(prev => prev ? ({
                       ...prev,
                       address: { ...prev.address, neighborhood: e.target.value }
-                    }))}
+                    }) : prev)}
                     placeholder="Nome do bairro"
                   />
                 </div>
@@ -367,11 +446,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="city">Cidade</Label>
                   <Input
                     id="city"
-                    value={profileData.address?.city || ''}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      address: { ...prev.address, city: e.target.value }
-                    }))}
+                    value={profileData?.address?.city || ''}
+                    onChange={(e) =>
+                      setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              address: { ...prev.address, city: e.target.value }
+                            }
+                          : prev
+                      )
+                    }
                     placeholder="Nome da cidade"
                   />
                 </div>
@@ -380,11 +465,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="state">Estado</Label>
                   <select
                     id="state"
-                    value={profileData.address?.state || ''}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      address: { ...prev.address, state: e.target.value }
-                    }))}
+                    value={profileData?.address?.state || ''}
+                    onChange={(e) =>
+                      setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              address: { ...prev.address, state: e.target.value }
+                            }
+                          : prev
+                      )
+                    }
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Selecione...</option>
@@ -399,11 +490,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label htmlFor="zipCode">CEP</Label>
                   <Input
                     id="zipCode"
-                    value={profileData.address?.zipCode || ''}
-                    onChange={(e) => setProfileData(prev => ({
-                      ...prev,
-                      address: { ...prev.address, zipCode: e.target.value }
-                    }))}
+                    value={profileData?.address?.zipCode || ''}
+                    onChange={(e) =>
+                      setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              address: { ...prev.address, zipCode: e.target.value }
+                            }
+                          : prev
+                      )
+                    }
                     placeholder="00000-000"
                   />
                 </div>
@@ -437,11 +534,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Receba atualizações importantes por e-mail</p>
                 </div>
                 <Switch
-                  checked={profileData.preferences.emailNotifications}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, emailNotifications: checked }
-                  }))}
+                  checked={profileData?.preferences.emailNotifications}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            preferences: { ...prev.preferences, emailNotifications: checked }
+                          }
+                        : prev
+                    )
+                  }
                 />
               </div>
 
@@ -451,11 +554,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Receba confirmações e lembretes por SMS</p>
                 </div>
                 <Switch
-                  checked={profileData.preferences.smsNotifications}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, smsNotifications: checked }
-                  }))}
+                  checked={profileData?.preferences.smsNotifications}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            preferences: { ...prev.preferences, smsNotifications: checked }
+                          }
+                        : prev
+                    )
+                  }
                 />
               </div>
 
@@ -465,11 +574,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Receba mensagens via WhatsApp</p>
                 </div>
                 <Switch
-                  checked={profileData.preferences.whatsappNotifications}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, whatsappNotifications: checked }
-                  }))}
+                  checked={profileData?.preferences.whatsappNotifications}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            preferences: { ...prev.preferences, whatsappNotifications: checked }
+                          }
+                        : prev
+                    )
+                  }
                 />
               </div>
 
@@ -480,12 +595,18 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <Label>E-mails de Marketing</Label>
                   <p className="text-sm text-gray-500">Receba ofertas e novidades da plataforma</p>
                 </div>
-                <Switch
-                  checked={profileData.preferences.marketingEmails}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, marketingEmails: checked }
-                  }))}
+                  <Switch
+                  checked={profileData?.preferences.marketingEmails}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            preferences: { ...prev.preferences, marketingEmails: checked }
+                          }
+                        : prev
+                    )
+                  }
                 />
               </div>
 
@@ -495,11 +616,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Receba lembretes sobre seus agendamentos</p>
                 </div>
                 <Switch
-                  checked={profileData.preferences.serviceReminders}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, serviceReminders: checked }
-                  }))}
+                  checked={profileData?.preferences.serviceReminders}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            preferences: { ...prev.preferences, serviceReminders: checked }
+                          }
+                        : prev
+                    )
+                  }
                 />
               </div>
 
@@ -509,11 +636,17 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Receba pedidos para avaliar serviços</p>
                 </div>
                 <Switch
-                  checked={profileData.preferences.reviewRequests}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    preferences: { ...prev.preferences, reviewRequests: checked }
-                  }))}
+                  checked={profileData?.preferences.reviewRequests || false}
+                  onCheckedChange={(checked) =>
+                    setProfileData(prev =>
+                      prev
+                        ? {
+                            ...prev,
+                            preferences: { ...prev.preferences, reviewRequests: checked }
+                          }
+                        : prev
+                    )
+                  }
                 />
               </div>
             </div>
@@ -546,11 +679,15 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                     <input
                       type="radio"
                       value="PUBLIC"
-                      checked={profileData.privacy.profileVisibility === 'PUBLIC'}
-                      onChange={() => setProfileData(prev => ({
-                        ...prev,
-                        privacy: { ...prev.privacy, profileVisibility: 'PUBLIC' }
-                      }))}
+                      checked={profileData?.privacy?.profileVisibility === 'PUBLIC' || false}
+                      onChange={() => setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              privacy: { ...prev.privacy, profileVisibility: 'PUBLIC' }
+                            }
+                          : prev
+                      )}
                       className="text-blue-600"
                     />
                     <span>Público - Qualquer pessoa pode ver seu perfil</span>
@@ -559,11 +696,15 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                     <input
                       type="radio"
                       value="PRIVATE"
-                      checked={profileData.privacy.profileVisibility === 'PRIVATE'}
-                      onChange={() => setProfileData(prev => ({
-                        ...prev,
-                        privacy: { ...prev.privacy, profileVisibility: 'PRIVATE' }
-                      }))}
+                      checked={profileData?.privacy?.profileVisibility === 'PRIVATE'}
+                      onChange={() => setProfileData(prev =>
+                        prev
+                          ? {
+                              ...prev,
+                              privacy: { ...prev.privacy, profileVisibility: 'PRIVATE' }
+                            }
+                          : prev
+                      )}
                       className="text-blue-600"
                     />
                     <span>Privado - Apenas profissionais podem ver</span>
@@ -579,11 +720,15 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Permita que profissionais vejam seu telefone</p>
                 </div>
                 <Switch
-                  checked={profileData.privacy.showPhone}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    privacy: { ...prev.privacy, showPhone: checked }
-                  }))}
+                  checked={profileData?.privacy.showPhone}
+                  onCheckedChange={(checked) => setProfileData(prev =>
+                    prev
+                      ? {
+                          ...prev,
+                          privacy: { ...prev.privacy, showPhone: checked }
+                        }
+                      : prev
+                  )}
                 />
               </div>
 
@@ -593,11 +738,15 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Permita que profissionais vejam seu e-mail</p>
                 </div>
                 <Switch
-                  checked={profileData.privacy.showEmail}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    privacy: { ...prev.privacy, showEmail: checked }
-                  }))}
+                  checked={profileData?.privacy.showEmail}
+                  onCheckedChange={(checked) => setProfileData(prev =>
+                    prev
+                      ? {
+                          ...prev,
+                          privacy: { ...prev.privacy, showEmail: checked }
+                        }
+                      : prev
+                  )}
                 />
               </div>
 
@@ -607,11 +756,15 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
                   <p className="text-sm text-gray-500">Permita que profissionais vejam sua localização</p>
                 </div>
                 <Switch
-                  checked={profileData.privacy.showLocation}
-                  onCheckedChange={(checked) => setProfileData(prev => ({
-                    ...prev,
-                    privacy: { ...prev.privacy, showLocation: checked }
-                  }))}
+                  checked={profileData?.privacy.showLocation}
+                  onCheckedChange={(checked) => setProfileData(prev =>
+                    prev
+                      ? {
+                          ...prev,
+                          privacy: { ...prev.privacy, showLocation: checked }
+                        }
+                      : prev
+                  )}
                 />
               </div>
             </div>

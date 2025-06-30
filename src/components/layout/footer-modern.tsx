@@ -85,7 +85,7 @@ export function FooterModern() {
                 />
               </div>
             </div>
-            <p className="text-gray-200 text-sm">
+            <p className="text-gray-50 text-sm">
               Conectamos você aos melhores profissionais da sua região. 
               Encontre o serviço que precisa de forma rápida e segura.
             </p>
@@ -123,20 +123,20 @@ export function FooterModern() {
           <FooterSection title="Contato">
             <div className="space-y-3 text-sm">
               <div className="flex items-center space-x-3">
-                <Mail className="w-5 h-5 text-secondary" />
-                <a href="mailto:contato@myserv.com.br" className="text-gray-200 hover:text-white transition-colors">
+                <Mail className="w-5 h-5  !text-brand-teal text-secondary" />
+                <a href="mailto:contato@myserv.com.br" className="text-gray-50 hover:text-white transition-colors">
                   contato@myserv.com.br
                 </a>
               </div>
               <div className="flex items-center space-x-3">
-                <Phone className="w-5 h-5 text-secondary" />
-                <a href="tel:+551199999999" className="text-gray-200 hover:text-white transition-colors">
+                <Phone className="w-5 h-5 !text-brand-teal text-secondary" />
+                <a href="tel:+551199999999" className="text-gray-50 hover:text-white transition-colors">
                   (11) 99999-9999
                 </a>
               </div>
               <div className="flex items-start space-x-3">
-                <MapPin className="w-5 h-5 text-secondary flex-shrink-0 mt-1" />
-                <span className="text-gray-200">
+                <MapPin className="w-5 h-5 text-secondary !text-brand-teal flex-shrink-0 mt-1" />
+                <span className="text-gray-50">
                   Av. Paulista, 1000 - Bela Vista<br />
                   São Paulo - SP, 01310-100
                 </span>
@@ -151,7 +151,7 @@ export function FooterModern() {
                   <input 
                     type="email" 
                     placeholder="Seu e-mail" 
-                    className="w-full bg-transparent border-none text-white px-3 py-2 text-sm focus:outline-none focus:ring-0 placeholder:text-gray-300"
+                    className="w-full bg-transparent border-none text-white px-3 py-2 text-sm focus:outline-none focus:ring-0 placeholder:text-gray-100"
                   />
                 </div>
                 <Button size="sm" variant="secondary" className="flex-shrink-0">

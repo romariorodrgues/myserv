@@ -13,6 +13,7 @@ import { FooterModern } from "@/components/layout/footer-modern";
 import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "sonner";
+import { ClientLayoutWrapper } from "@/components/layout/client-layout-wrapper";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -78,8 +79,10 @@ export default function RootLayout({
     <html lang="pt-BR" className={`${inter.variable} ${manrope.variable}`}> 
       <head>
         <link rel="icon" href="/brand/icone.png" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
-      <body className="font-sans antialiased bg-gradient-to-br from-brand-bg via-white to-brand-teal/10 min-h-screen text-primary transition-colors duration-300">
+      <body>
+         <ClientLayoutWrapper>
         <div className="relative min-h-screen flex flex-col">
           {/* Efeito visual de background animado */}
           <div className="pointer-events-none fixed inset-0 z-0 opacity-60 blur-2xl select-none" aria-hidden="true">
@@ -107,6 +110,7 @@ export default function RootLayout({
             />
           </AuthProvider>
         </div>
+         </ClientLayoutWrapper>
       </body>
     </html>
   )

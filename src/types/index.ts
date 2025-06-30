@@ -25,6 +25,32 @@ export interface User {
   clientProfile?: ClientProfile
 }
 
+// src/types/client.ts
+export type ClientProfileData = {
+  id: string
+  name: string
+  email: string
+  profileImage: string | null
+  phone: string
+  userType: string
+  address: {
+    street: string
+    number: string
+    city: string
+    state: string
+    zipCode: string
+    district: string
+  }
+}
+
+export interface ClientProfile {
+  id: string
+  userId: string
+  preferences?: Record<string, unknown>
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface ServiceProvider {
   id: string
   userId: string

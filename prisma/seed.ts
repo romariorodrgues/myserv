@@ -55,7 +55,30 @@ async function main() {
       userId: client.id,
     },
   })
+// Preferences
+await prisma.clientPreferences.upsert({
+  where: { clientProfileId: clientProfile.id },
+  update: {},
+  create: {
+    clientProfileId: clientProfile.id,
+    emailNotifications: true,
+    smsNotifications: false,
+    pushNotifications: true,
+  },
+})
 
+// Privacy
+await prisma.clientPrivacy.upsert({
+  where: { clientProfileId: clientProfile.id },
+  update: {},
+  create: {
+    clientProfileId: clientProfile.id,
+    profileVisibility: 'PUBLIC',
+    showEmail: false,
+    showPhone: true,
+    showLocation: true,
+  },
+})
   // Create sample service provider
   const providerPassword = await bcrypt.hash('provider123', 12)
   const provider = await prisma.user.upsert({
