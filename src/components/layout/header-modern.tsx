@@ -128,67 +128,28 @@ export function Header() {
     <header className={`sticky top-0 z-50 w-full transition-all duration-300 shadow-lg bg-gradient-to-br from-brand-bg via-white to-brand-teal/10 ${
       isScrolled ? 'backdrop-blur-md' : ''
     }`}> 
-      <div className="container flex h-20 items-center justify-between px-2 md:px-6">
-        {/* Logo */}
-        <div className="flex items-center gap-3">
-          <Link href="/" className="flex items-center gap-2 group">
-            <div className="relative h-10 w-10 drop-shadow-lg">
-              <Image
-                src="/brand/icone.png"
-                alt="MyServ Logo"
-                fill
-                sizes="(max-width: 768px) 32px, 40px"
-                className="object-contain scale-100 group-hover:scale-110 transition-transform duration-300"
-                priority
-              />
-            </div>
-            <div className="relative h-8 w-32 hidden sm:block">
-              <Image
-                src="/brand/logotipo.png"
-                alt="MyServ"
-                fill
-                sizes="(max-width: 768px) 100px, 128px"
-                className="object-contain opacity-90 group-hover:opacity-100 transition-opacity duration-300"
-                priority
-              />
-            </div>
-          </Link>
-        </div>
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-2">
-          <DesktopNavItem href="/" active={activeTab === '/'}>
-            Início
-          </DesktopNavItem>
-          <DesktopNavItem href="/servicos" active={activeTab.startsWith('/servicos')}>
-            Serviços
-          </DesktopNavItem>
-          <DesktopNavItem href="/como-funciona" active={activeTab === '/como-funciona'}>
-            Como Funciona
-          </DesktopNavItem>
-          <DesktopNavItem href="/seja-profissional" active={activeTab === '/seja-profissional'}>
-            Seja um Profissional
-          </DesktopNavItem>
-        </nav>
+      <div className="relative h-20 w-full grid grid-cols-3 items-center px-2 md:px-6">
         {/* Mobile Navigation */}
+        <div className="col-start-1 flex md:hidden">
         <Sheet>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon" aria-label="Menu">
               <Menu className="h-6 w-6" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-72 pt-10 bg-gradient-to-br from-brand-bg via-white to-brand-teal/10">
+          <SheetContent side="top" className="w-full pt-10 bg-gradient-to-b from-brand-bg via-white to-brand-teal/30 bg-[length:100%_300%] transition-colors duration-700 ease-in-out shadow-none border-none rounded-none">
             <nav className="flex flex-col gap-2">
-              <div className="mb-4 px-4">
+              <div className="mb-10 px-4 ">
                 <Link href="/" className="flex items-center gap-2">
-                  <div className="relative h-8 w-8">
+                  {/* <div className="relative h-8 w-8">
                     <Image
                       src="/brand/icone.png"
                       alt="MyServ Icon"
                       fill
                       className="object-contain"
                     />
-                  </div>
-                  <div className="relative h-6 w-24">
+                  </div> */}
+                  <div className="absolute left-1/2 -translate-x-1/2 h-40 w-40">
                     <Image
                       src="/brand/logotipo.png"
                       alt="MyServ"
@@ -227,8 +188,49 @@ export function Header() {
             </nav>
           </SheetContent>
         </Sheet>
+        </div>
+        {/* Logo */}
+        <div className="mx-auto md:mx-0">
+          <Link href="/" className="flex items-center gap-2 group">
+            {/* <div className="relative h-10 w-10 drop-shadow-lg">
+              <Image
+                src="/brand/icone.png"
+                alt="MyServ Logo"
+                fill
+                sizes="(max-width: 768px) 32px, 40px"
+                className="object-contain scale-100 group-hover:scale-110 transition-transform duration-300"
+                priority
+              />
+            </div> */}
+            <div className="absolute left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 h-40 w-40">
+              <Image
+                src="/brand/logotipo.png"
+                alt="MyServ"
+                fill
+                sizes="(max-width: 768px) 100px, 128px"
+                className="object-contain opacity-90 group-hover:opacity-100 transition-opacity duration-300"
+                priority
+              />
+            </div>
+          </Link>
+        </div>
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center space-x-2">
+          <DesktopNavItem href="/" active={activeTab === '/'}>
+            Início
+          </DesktopNavItem>
+          <DesktopNavItem href="/servicos" active={activeTab.startsWith('/servicos')}>
+            Serviços
+          </DesktopNavItem>
+          <DesktopNavItem href="/como-funciona" active={activeTab === '/como-funciona'}>
+            Como Funciona
+          </DesktopNavItem>
+          <DesktopNavItem href="/seja-profissional" active={activeTab === '/seja-profissional'}>
+            Seja um Profissional
+          </DesktopNavItem>
+        </nav>
         {/* User Actions */}
-        <div className="flex items-center gap-2">
+        <div className="col-start-3 flex justify-end gap-2">
           {isLoading ? (
             <div className="h-8 w-24 bg-gray-200 animate-pulse rounded-md"></div>
           ) : isAuthenticated ? (

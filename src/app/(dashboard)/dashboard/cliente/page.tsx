@@ -185,7 +185,7 @@ function ClientDashboardContent() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between">
         <div>
@@ -206,7 +206,7 @@ function ClientDashboardContent() {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="border-b">
+      {/* <div className="border-b">
         <nav className="-mb-px flex space-x-8 overflow-x-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon
@@ -226,7 +226,30 @@ function ClientDashboardContent() {
             )
           })}
         </nav>
-      </div>
+      </div> */}
+      <div className="border-b">
+  <nav className="flex justify-around overflow-x-auto">
+    {tabs.map((tab) => {
+      const Icon = tab.icon
+      const isActive = activeTab === tab.id
+      return (
+        <button
+          key={tab.id}
+          onClick={() => setActiveTab(tab.id as any)}
+          className={`flex flex-col items-center justify-center px-3 py-3 text-sm font-semibold transition-colors border-b-4 ${
+            isActive
+              ? 'text-[#00a9d4] border-[#00a9d4]'
+              : 'text-gray-500 border-transparent hover:text-[#00a9d4]'
+          }`}
+        >
+          <Icon className="w-[18px] h-[18px] mb-1" />
+          {tab.label}
+        </button>
+      )
+    })}
+  </nav>
+</div>
+
 
       {/* Tab Content */}
       {activeTab === 'overview' && (

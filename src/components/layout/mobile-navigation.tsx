@@ -41,22 +41,22 @@ export function MobileNavigation() {
   const [lastScrollY, setLastScrollY] = useState(0)
   
   // Hide navigation on scroll down, show on scroll up
-  useEffect(() => {
-    const handleScroll = () => {
-      const currentScrollY = window.scrollY
+  // useEffect(() => {
+  //   const handleScroll = () => {
+  //     const currentScrollY = window.scrollY
       
-      if (currentScrollY > lastScrollY && currentScrollY > 100) {
-        setVisible(false)
-      } else {
-        setVisible(true)
-      }
+  //     if (currentScrollY > lastScrollY && currentScrollY > 100) {
+  //       setVisible(false)
+  //     } else {
+  //       setVisible(true)
+  //     }
       
-      setLastScrollY(currentScrollY)
-    }
+  //     setLastScrollY(currentScrollY)
+  //   }
     
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [lastScrollY])
+  //   window.addEventListener('scroll', handleScroll, { passive: true })
+  //   return () => window.removeEventListener('scroll', handleScroll)
+  // }, [lastScrollY])
 
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/auth')) {
     return null // Don't show mobile navigation on admin or auth pages
@@ -64,9 +64,10 @@ export function MobileNavigation() {
 
   return (
     <motion.nav 
-      className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-brand-bg via-white/90 to-brand-teal/10 border-t border-gray-200 shadow-2xl md:hidden z-40 backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl md:hidden z-40"
       initial={{ y: 0 }}
-      animate={{ y: visible ? 0 : 100 }}
+      // animate={{ y: visible ? 0 : 100 }}
+      animate={{ y: 0 }} // Always show for now, can be toggled later
       transition={{ duration: 0.3 }}
     >
       <div className="flex items-center justify-around h-16">

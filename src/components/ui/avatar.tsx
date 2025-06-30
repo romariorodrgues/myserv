@@ -36,14 +36,20 @@ const AvatarImage = React.forwardRef<
     ref={ref}
     className={cn("aspect-square h-full w-full relative", className)}
   >
-    <Image
-      src={src}
-      alt={alt}
-      width={width}
-      height={height}
-      className="object-cover rounded-full"
-      {...props}
-    />
+    {src ? (
+      <Image
+        src={src}
+        alt={alt}
+        width={width}
+        height={height}
+        className="object-cover rounded-full"
+        {...props}
+      />
+    ) : (
+      <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600">
+        ?
+      </div>
+    )}
   </div>
 ))
 AvatarImage.displayName = "AvatarImage"

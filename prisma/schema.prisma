@@ -76,11 +76,44 @@ model ClientProfile {
   userId    String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  preferences ClientPreferences?
+  privacy     ClientPrivacy?
+
 
   // Relations
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("client_profiles")
+}
+
+model ClientPreferences {
+  id                 String   @id @default(cuid())
+  clientProfileId    String  @unique
+  emailNotifications Boolean @default(false)
+  smsNotifications   Boolean @default(false)
+  whatsappNotifications Boolean @default(false)
+  marketingEmails    Boolean @default(false)
+  serviceReminders   Boolean @default(false)
+  reviewRequests     Boolean @default(false)
+
+  // Relations
+  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+
+  @@map("client_preferences")
+}
+
+model ClientPrivacy {
+  id                 String   @id @default(cuid())
+  clientProfileId    String  @unique
+  profileVisibility  String  @default("PUBLIC") // ou enum se preferir
+  showPhone          Boolean @default(false)
+  showEmail          Boolean @default(false)
+  showLocation       Boolean @default(false)
+
+  // Relations
+  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+
+  @@map("client_privacy")
 }
 
 // Address model

@@ -61,50 +61,47 @@ export default function PerfilPage() {
     <div className="min-h-screen bg-gradient-to-br from-brand-bg via-white to-brand-teal/5">
       <div className="container mx-auto px-4 py-8">
         {/* Profile Header */}
-        <Card className="mb-8">
-          <CardContent className="p-8">
-            <div className="flex items-center gap-6">
-              {/* Avatar */}
-              <div className="relative">
-                <Avatar className="w-24 h-24">
-                  <AvatarImage src={user.avatar || ''} alt={user.name} />
-                  <AvatarFallback className="text-2xl bg-brand-cyan/10 text-brand-navy">
-                    {user.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
-                <Button
-                  size="sm"
-                  className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full p-0"
-                >
-                  <Camera className="h-4 w-4" />
-                </Button>
-              </div>
+<Card className="mb-8">
+  <CardContent className="flex flex-col md:flex-row items-center md:items-start md:justify-between gap-6 px-6 py-8">
+    {/* Avatar */}
+    <div className="flex flex-col items-center gap-2 md:flex-row md:items-center md:gap-6">
+      <div className="relative">
+        <Avatar className="w-24 h-24">
+          <AvatarImage src={user.avatar || ''} alt={user.name} />
+          <AvatarFallback className="text-2xl bg-[#ecf4f6] text-[#00a9d4]">
+            {user.name.split(' ').map(n => n[0]).join('')}
+          </AvatarFallback>
+        </Avatar>
+        <Button
+          size="sm"
+          className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full p-0 border border-gray-300 bg-white shadow-sm"
+        >
+          <Camera className="w-4 h-4 text-brand-navy" />
+        </Button>
+      </div>
 
-              {/* User Info */}
-              <div className="flex-1">
-                <h1 className="text-2xl font-bold text-brand-navy mb-2">
-                  {user.name}
-                </h1>
-                <p className="text-gray-600 mb-3">{user.email}</p>
-                <div className="flex items-center gap-4">
-                  <Badge variant="secondary">
-                    Membro desde {user.memberSince}
-                  </Badge>
-                  <div className="flex items-center gap-1">
-                    <span className="text-sm text-gray-600">Avaliação:</span>
-                    <span className="font-semibold text-yellow-600">{user.rating}★</span>
-                  </div>
-                </div>
-              </div>
+      {/* User Info */}
+      <div className="text-center md:text-left">
+        <h1 className="text-xl font-bold text-brand-navy">{user.name}</h1>
+        <p className="text-sm text-gray-600">{user.email}</p>
+        <div className="flex items-center justify-center md:justify-start gap-3 mt-2 flex-wrap">
+          <span className="bg-[#ecf4f6] text-[#00a9d4] text-xs px-3 py-1 rounded-md font-medium">
+            Membro desde {user.memberSince}
+          </span>
+          <span className="text-sm font-medium text-yellow-600">{user.rating}★</span>
+        </div>
+      </div>
+    </div>
 
-              {/* Edit Button */}
-              <Button variant="outline">
+    {/* Edit Button */}
+    <div className="mt-4 md:mt-0 md:ml-auto">
+      <Button variant="outline">
                 <Edit className="h-4 w-4 mr-2" />
                 Editar Perfil
               </Button>
-            </div>
-          </CardContent>
-        </Card>
+    </div>
+  </CardContent>
+</Card>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
