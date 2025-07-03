@@ -7,5 +7,6 @@ export async function getMyProfile(): Promise<ClientProfileData> {
   })
   if (!res.ok) throw new Error('Erro ao buscar perfil')
   const data = await res.json()
+console.log('🔍 Dados recebidos do /me:', data)
   return data.user
 }

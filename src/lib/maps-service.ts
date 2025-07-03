@@ -89,7 +89,7 @@ export class GoogleMapsService {
                 street = component.long_name
               } else if (types.includes('street_number')) {
                 number = component.long_name
-              } else if (types.includes('sublocality') || types.includes('neighborhood')) {
+              } else if (types.includes('sublocality') || types.includes('district')) {
                 district = component.long_name
               } else if (types.includes('administrative_area_level_2')) {
                 city = component.long_name
@@ -159,7 +159,7 @@ export class GoogleMapsService {
                 street = component.long_name
               } else if (types.includes('street_number')) {
                 number = component.long_name
-              } else if (types.includes('sublocality') || types.includes('neighborhood')) {
+              } else if (types.includes('sublocality') || types.includes('district')) {
                 district = component.long_name
               } else if (types.includes('administrative_area_level_2')) {
                 city = component.long_name
