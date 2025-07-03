@@ -34,7 +34,7 @@ interface FavoriteProvider {
     location: {
       city: string
       state: string
-      neighborhood?: string
+      district?: string
     }
     services: Array<{
       id: string
@@ -96,7 +96,7 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
             location: {
               city: 'São Paulo',
               state: 'SP',
-              neighborhood: 'Vila Madalena'
+              district: 'Vila Madalena'
             },
             services: [
               { id: '1', name: 'Limpeza Residencial', category: 'Limpeza', basePrice: 120 },
@@ -128,7 +128,7 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
             location: {
               city: 'São Paulo',
               state: 'SP',
-              neighborhood: 'Moema'
+              district: 'Moema'
             },
             services: [
               { id: '3', name: 'Instalação de Ar Condicionado', category: 'Técnico', basePrice: 300 },
@@ -160,7 +160,7 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
             location: {
               city: 'São Paulo',
               state: 'SP',
-              neighborhood: 'Ipiranga'
+              district: 'Ipiranga'
             },
             services: [
               { id: '5', name: 'Instalação Elétrica', category: 'Elétrica', basePrice: 200 },
@@ -196,7 +196,7 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
           service.category.toLowerCase().includes(searchTerm.toLowerCase())
         ) ||
         favorite.serviceProvider.location.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        favorite.serviceProvider.location.neighborhood?.toLowerCase().includes(searchTerm.toLowerCase())
+        favorite.serviceProvider.location.district?.toLowerCase().includes(searchTerm.toLowerCase())
       )
     }
 
@@ -396,7 +396,7 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
                         
                         <div className="flex items-center space-x-1">
                           <MapPin className="w-4 h-4" />
-                          <span>{favorite.serviceProvider.location.neighborhood}, {favorite.serviceProvider.location.city}</span>
+                          <span>{favorite.serviceProvider.location.district}, {favorite.serviceProvider.location.city}</span>
                         </div>
                       </div>
                       

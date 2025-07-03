@@ -7,7 +7,7 @@
 
 import { getMyProfile } from '@/lib/api/get-my-profile'
 import { useState } from 'react'
-import { User, Phone, Mail, MapPin, Bell, Shield, CreditCard, Eye, EyeOff, Save } from 'lucide-react'
+import { User, MapPin, Bell, Shield, Eye, EyeOff, Save } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,19 +26,20 @@ interface ClientProfileData {
   name: string
   email: string
   phone?: string
-  document?: string
-  bio?: string
+  userType: string
+  description: string
+  cpfCnpj?: string // CPF ou CNPJ
   profileImage?: string | null
   address?: {
     street?: string
     number?: string
-    complement?: string
-    neighborhood?: string
     city?: string
     state?: string
     zipCode?: string
+    complement?: string
+    district?: string // ✅ confirmado no schema
   }
-  preferences: {
+  preferences?: {
     emailNotifications: boolean
     smsNotifications: boolean
     whatsappNotifications: boolean
@@ -54,41 +55,16 @@ interface ClientProfileData {
   }
 }
 
-interface ClientProfileSettingsProps {
-  clientId?: string
-}
-
-export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) {
+// No props expected for this component
+export function ClientProfileSettings() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'privacy' | 'security'>('profile')
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [profileData, setProfileData] = useState<ClientProfileData | null>({
-  id: '',
-  name: '',
-  email: '',
-  phone: '',
-  document: '',
-  bio: '',
-  profileImage: null,
-  address: {},
-  preferences: {
-    emailNotifications: false,
-    smsNotifications: false,
-    whatsappNotifications: false,
-    marketingEmails: false,
-    serviceReminders: false,
-    reviewRequests: false,
-  },
-  privacy: {
-    profileVisibility: 'PUBLIC',
-    showPhone: false,
-    showEmail: false,
-    showLocation: false,
-  },
-})
+  const [profileData, setProfileData] = useState<ClientProfileData | null>(null)
+
 
 
   // Mock data - replace with actual data fetching
@@ -104,7 +80,7 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
   //     street: 'Rua das Flores',
   //     number: '123',
   //     complement: 'Apto 45',
-  //     neighborhood: 'Vila Madalena',
+  //     district: 'Vila Madalena',
   //     city: 'São Paulo',
   //     state: 'SP',
   //     zipCode: '01234-567'
@@ -134,6 +110,7 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
   const handleSaveProfile = async () => {
     try {
       setSaving(true)
+      if (!profileData) throw new Error('Perfil não carregado')
       await updateMyProfile(profileData)
       // Mock API call - replace with actual implementation
       // await new Promise(resolve => setTimeout(resolve, 1000))
@@ -150,9 +127,10 @@ export function ClientProfileSettings({ clientId }: ClientProfileSettingsProps) 
   const handleSavePreferences = async () => {
     try {
       setSaving(true)
-      
+      if (!profileData) throw new Error('Perfil não carregado')
+       await updateMyProfile(profileData)
       // Mock API call
-      await new Promise(resolve => setTimeout(resolve, 800))
+      // await new Promise(resolve => setTimeout(resolve, 800))
       
       toast.success('Preferências atualizadas com sucesso!')
     } catch (error) {
@@ -213,23 +191,40 @@ useEffect(() => {
     try {
       setLoading(true)
       const data = await getMyProfile()
+
       setProfileData({
-        ...data,
-        preferences: data.preferences ?? {
-          emailNotifications: false,
-          smsNotifications: false,
-          whatsappNotifications: false,
-          marketingEmails: false,
-          serviceReminders: false,
-          reviewRequests: false
-        },
-        privacy: data.privacy ?? {
-          profileVisibility: 'PUBLIC',
-          showPhone: false,
-          showEmail: false,
-          showLocation: false
-        }
-      })
+  id: data.id,
+  name: data.name,
+  email: data.email,
+  phone: data.phone,
+  profileImage: data.profileImage ?? null,
+  userType: data.userType,
+  description: data.description ?? '', // Ensure description is set
+  cpfCnpj: data.cpfCnpj ?? '', // Optional, if available
+  address: {
+    street: data.address?.street ?? '',
+    number: data.address?.number ?? '',
+    district: data.address?.district ?? '',
+    city: data.address?.city ?? '',
+    state: data.address?.state ?? '',
+    zipCode: data.address?.zipCode ?? '',
+    complement: data.address?.complement ?? '',
+  },
+  preferences: {
+    emailNotifications: data.preferences?.emailNotifications ?? false,
+    smsNotifications: data?.preferences?.smsNotifications ?? false,
+    whatsappNotifications: data?.preferences?.whatsappNotifications ?? false,
+    marketingEmails: data?.preferences?.marketingEmails ?? false,
+    serviceReminders: data?.preferences?.serviceReminders ?? false,
+    reviewRequests: data?.preferences?.reviewRequests ?? false,
+  },
+  privacy: {
+    profileVisibility: data?.privacy?.profileVisibility ?? 'PUBLIC',
+    showPhone: data?.privacy?.showPhone ?? false,
+    showEmail: data?.privacy?.showEmail ?? false,
+    showLocation: data?.privacy?.showLocation ?? false,
+  },
+})
     } catch (error) {
       console.error('Erro ao carregar perfil:', error)
       toast.error('Erro ao carregar perfil')
@@ -240,6 +235,7 @@ useEffect(() => {
 
   fetchProfile()
 }, [])
+
 if (loading || !profileData) {
   return <div className="p-4">Carregando perfil...</div>
 }
@@ -350,19 +346,19 @@ if (loading || !profileData) {
                 <Label htmlFor="document">CPF</Label>
                 <Input
                   id="document"
-                  value={profileData?.document || ''}
-                  onChange={(e) => setProfileData(prev => prev ? { ...prev, document: e.target.value } : prev)}
+                  value={profileData?.cpfCnpj || ''}
+                  onChange={(e) => setProfileData(prev => prev ? { ...prev, cpfCnpj: e.target.value } : prev)}
                   placeholder="000.000.000-00"
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="bio">Sobre você</Label>
+              <Label htmlFor="description">Sobre você</Label>
               <Textarea
-                id="bio"
-                value={profileData?.bio || ''}
-                onChange={(e) => setProfileData(prev => prev ? { ...prev, bio: e.target.value } : prev)}
+                id="description"
+                value={profileData?.description || ''}
+                onChange={(e) => setProfileData(prev => prev ? { ...prev, description: e.target.value } : prev)}
                 placeholder="Conte um pouco sobre você..."
                 rows={3}
               />
@@ -430,13 +426,13 @@ if (loading || !profileData) {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="neighborhood">Bairro</Label>
+                  <Label htmlFor="district">Bairro</Label>
                   <Input
-                    id="neighborhood"
-                    value={profileData?.address?.neighborhood || ''}
+                    id="district"
+                    value={profileData?.address?.district || ''}
                     onChange={(e) => setProfileData(prev => prev ? ({
                       ...prev,
-                      address: { ...prev.address, neighborhood: e.target.value }
+                      address: { ...prev.address, district: e.target.value }
                     }) : prev)}
                     placeholder="Nome do bairro"
                   />
@@ -534,13 +530,21 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Receba atualizações importantes por e-mail</p>
                 </div>
                 <Switch
-                  checked={profileData?.preferences.emailNotifications}
+                  checked={profileData?.preferences?.emailNotifications}
                   onCheckedChange={(checked) =>
                     setProfileData(prev =>
                       prev
                         ? {
                             ...prev,
-                            preferences: { ...prev.preferences, emailNotifications: checked }
+                            preferences: {
+                              ...prev.preferences,
+                              emailNotifications: checked,
+                              smsNotifications: prev.preferences?.smsNotifications ?? false,
+                              whatsappNotifications: prev.preferences?.whatsappNotifications ?? false,
+                              marketingEmails: prev.preferences?.marketingEmails ?? false,
+                              serviceReminders: prev.preferences?.serviceReminders ?? false,
+                              reviewRequests: prev.preferences?.reviewRequests ?? false,
+                            }
                           }
                         : prev
                     )
@@ -554,13 +558,20 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Receba confirmações e lembretes por SMS</p>
                 </div>
                 <Switch
-                  checked={profileData?.preferences.smsNotifications}
+                  checked={profileData?.preferences?.smsNotifications}
                   onCheckedChange={(checked) =>
                     setProfileData(prev =>
                       prev
                         ? {
                             ...prev,
-                            preferences: { ...prev.preferences, smsNotifications: checked }
+                            preferences: {
+                              emailNotifications: prev.preferences?.emailNotifications ?? false,
+                              smsNotifications: checked,
+                              whatsappNotifications: prev.preferences?.whatsappNotifications ?? false,
+                              marketingEmails: prev.preferences?.marketingEmails ?? false,
+                              serviceReminders: prev.preferences?.serviceReminders ?? false,
+                              reviewRequests: prev.preferences?.reviewRequests ?? false,
+                            }
                           }
                         : prev
                     )
@@ -574,13 +585,20 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Receba mensagens via WhatsApp</p>
                 </div>
                 <Switch
-                  checked={profileData?.preferences.whatsappNotifications}
+                  checked={profileData?.preferences?.whatsappNotifications}
                   onCheckedChange={(checked) =>
                     setProfileData(prev =>
                       prev
                         ? {
                             ...prev,
-                            preferences: { ...prev.preferences, whatsappNotifications: checked }
+                            preferences: {
+                              emailNotifications: prev.preferences?.emailNotifications ?? false,
+                              smsNotifications: prev.preferences?.smsNotifications ?? false,
+                              whatsappNotifications: checked,
+                              marketingEmails: prev.preferences?.marketingEmails ?? false,
+                              serviceReminders: prev.preferences?.serviceReminders ?? false,
+                              reviewRequests: prev.preferences?.reviewRequests ?? false,
+                            }
                           }
                         : prev
                     )
@@ -596,13 +614,20 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Receba ofertas e novidades da plataforma</p>
                 </div>
                   <Switch
-                  checked={profileData?.preferences.marketingEmails}
+                  checked={profileData?.preferences?.marketingEmails}
                   onCheckedChange={(checked) =>
                     setProfileData(prev =>
                       prev
                         ? {
                             ...prev,
-                            preferences: { ...prev.preferences, marketingEmails: checked }
+                            preferences: {
+                              emailNotifications: prev.preferences?.emailNotifications ?? false,
+                              smsNotifications: prev.preferences?.smsNotifications ?? false,
+                              whatsappNotifications: prev.preferences?.whatsappNotifications ?? false,
+                              marketingEmails: checked,
+                              serviceReminders: prev.preferences?.serviceReminders ?? false,
+                              reviewRequests: prev.preferences?.reviewRequests ?? false,
+                            }
                           }
                         : prev
                     )
@@ -616,13 +641,20 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Receba lembretes sobre seus agendamentos</p>
                 </div>
                 <Switch
-                  checked={profileData?.preferences.serviceReminders}
+                  checked={profileData?.preferences?.serviceReminders}
                   onCheckedChange={(checked) =>
                     setProfileData(prev =>
                       prev
                         ? {
                             ...prev,
-                            preferences: { ...prev.preferences, serviceReminders: checked }
+                            preferences: {
+                              emailNotifications: prev.preferences?.emailNotifications ?? false,
+                              smsNotifications: prev.preferences?.smsNotifications ?? false,
+                              whatsappNotifications: prev.preferences?.whatsappNotifications ?? false,
+                              marketingEmails: prev.preferences?.marketingEmails ?? false,
+                              serviceReminders: checked,
+                              reviewRequests: prev.preferences?.reviewRequests ?? false,
+                            }
                           }
                         : prev
                     )
@@ -636,13 +668,20 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Receba pedidos para avaliar serviços</p>
                 </div>
                 <Switch
-                  checked={profileData?.preferences.reviewRequests || false}
+                  checked={profileData?.preferences?.reviewRequests || false}
                   onCheckedChange={(checked) =>
                     setProfileData(prev =>
                       prev
                         ? {
                             ...prev,
-                            preferences: { ...prev.preferences, reviewRequests: checked }
+                            preferences: {
+                              emailNotifications: prev.preferences?.emailNotifications ?? false,
+                              smsNotifications: prev.preferences?.smsNotifications ?? false,
+                              whatsappNotifications: prev.preferences?.whatsappNotifications ?? false,
+                              marketingEmails: prev.preferences?.marketingEmails ?? false,
+                              serviceReminders: prev.preferences?.serviceReminders ?? false,
+                              reviewRequests: checked,
+                            }
                           }
                         : prev
                     )
@@ -684,7 +723,13 @@ if (loading || !profileData) {
                         prev
                           ? {
                               ...prev,
-                              privacy: { ...prev.privacy, profileVisibility: 'PUBLIC' }
+                              privacy: {
+                                ...prev.privacy,
+                                profileVisibility: 'PUBLIC',
+                                showPhone: prev.privacy?.showPhone ?? false,
+                                showEmail: prev.privacy?.showEmail ?? false,
+                                showLocation: prev.privacy?.showLocation ?? false,
+                              }
                             }
                           : prev
                       )}
@@ -701,7 +746,13 @@ if (loading || !profileData) {
                         prev
                           ? {
                               ...prev,
-                              privacy: { ...prev.privacy, profileVisibility: 'PRIVATE' }
+                              privacy: {
+                                ...prev.privacy,
+                                profileVisibility: 'PRIVATE',
+                                showPhone: prev.privacy?.showPhone ?? false,
+                                showEmail: prev.privacy?.showEmail ?? false,
+                                showLocation: prev.privacy?.showLocation ?? false,
+                              }
                             }
                           : prev
                       )}
@@ -720,12 +771,18 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Permita que profissionais vejam seu telefone</p>
                 </div>
                 <Switch
-                  checked={profileData?.privacy.showPhone}
+                  checked={profileData?.privacy?.showPhone}
                   onCheckedChange={(checked) => setProfileData(prev =>
                     prev
                       ? {
                           ...prev,
-                          privacy: { ...prev.privacy, showPhone: checked }
+                          privacy: {
+                            ...prev.privacy,
+                            showPhone: checked,
+                            profileVisibility: prev.privacy?.profileVisibility ?? 'PUBLIC',
+                            showEmail: prev.privacy?.showEmail ?? false,
+                            showLocation: prev.privacy?.showLocation ?? false,
+                          }
                         }
                       : prev
                   )}
@@ -737,13 +794,19 @@ if (loading || !profileData) {
                   <Label>Mostrar E-mail</Label>
                   <p className="text-sm text-gray-500">Permita que profissionais vejam seu e-mail</p>
                 </div>
-                <Switch
-                  checked={profileData?.privacy.showEmail}
+                  <Switch
+                  checked={profileData?.privacy?.showEmail}
                   onCheckedChange={(checked) => setProfileData(prev =>
                     prev
                       ? {
                           ...prev,
-                          privacy: { ...prev.privacy, showEmail: checked }
+                          privacy: {
+                            ...prev.privacy,
+                            showEmail: checked,
+                            profileVisibility: prev.privacy?.profileVisibility ?? 'PUBLIC',
+                            showPhone: prev.privacy?.showPhone ?? false,
+                            showLocation: prev.privacy?.showLocation ?? false,
+                          }
                         }
                       : prev
                   )}
@@ -756,12 +819,18 @@ if (loading || !profileData) {
                   <p className="text-sm text-gray-500">Permita que profissionais vejam sua localização</p>
                 </div>
                 <Switch
-                  checked={profileData?.privacy.showLocation}
+                  checked={profileData?.privacy?.showLocation}
                   onCheckedChange={(checked) => setProfileData(prev =>
                     prev
                       ? {
                           ...prev,
-                          privacy: { ...prev.privacy, showLocation: checked }
+                          privacy: {
+                            ...prev.privacy,
+                            showLocation: checked,
+                            profileVisibility: prev.privacy?.profileVisibility ?? 'PUBLIC',
+                            showPhone: prev.privacy?.showPhone ?? false,
+                            showEmail: prev.privacy?.showEmail ?? false,
+                          }
                         }
                       : prev
                   )}

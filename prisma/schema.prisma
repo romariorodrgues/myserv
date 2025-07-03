@@ -126,6 +126,7 @@ model Address {
   street    String
   number    String
   zipCode   String
+  complement String?
   latitude  Float?
   longitude Float?
   createdAt DateTime @default(now())

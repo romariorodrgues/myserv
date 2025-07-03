@@ -32,7 +32,7 @@ export type ServiceProviderInfo = {
 export type ServiceLocation = {
   city: string
   state: string
-  neighborhood?: string
+  district?: string
 }
 
 export type ServiceCardProps = {
@@ -160,7 +160,7 @@ export function ServiceCardHorizontal({
               <div className="flex items-center text-sm text-gray-600">
                 <MapPin className="w-4 h-4 mr-1 text-gray-500" />
                 <span>
-                  {location.neighborhood ? `${location.neighborhood}, ` : ''}
+                  {location.district ? `${location.district}, ` : ''}
                   {location.city}/{location.state}
                 </span>
                 {distance && (

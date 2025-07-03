@@ -33,7 +33,7 @@ const servicesMock = [
     location: {
       city: 'São Paulo',
       state: 'SP',
-      neighborhood: 'Vila Mariana'
+      district: 'Vila Mariana'
     },
     distance: 3.2,
     available: true,
@@ -59,7 +59,7 @@ const servicesMock = [
     location: {
       city: 'São Paulo',
       state: 'SP',
-      neighborhood: 'Pinheiros'
+      district: 'Pinheiros'
     },
     distance: 5.8,
     available: true,
@@ -85,7 +85,7 @@ const servicesMock = [
     location: {
       city: 'São Paulo',
       state: 'SP',
-      neighborhood: 'Moema'
+      district: 'Moema'
     },
     distance: 1.7,
     available: false,
@@ -111,7 +111,7 @@ const servicesMock = [
     location: {
       city: 'São Paulo',
       state: 'SP',
-      neighborhood: 'Santana'
+      district: 'Santana'
     },
     distance: 8.5,
     available: true,

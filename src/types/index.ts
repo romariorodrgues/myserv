@@ -26,22 +26,41 @@ export interface User {
 }
 
 // src/types/client.ts
-export type ClientProfileData = {
+export interface ClientProfileData {
   id: string
   name: string
   email: string
-  profileImage: string | null
-  phone: string
+  phone?: string
+  cpfCnpj: string
+  description?: string
   userType: string
-  address: {
-    street: string
-    number: string
-    city: string
-    state: string
-    zipCode: string
-    district: string
+  profileImage?: string | null
+  address?: {
+    street?: string
+    number?: string
+    city?: string
+    state?: string
+    zipCode?: string
+    complement?: string
+    district?: string // ✅ confirmado no schema
+  }
+  preferences?: {
+    emailNotifications: boolean
+    smsNotifications: boolean
+    whatsappNotifications: boolean
+    marketingEmails: boolean
+    serviceReminders: boolean
+    reviewRequests: boolean
+  }
+  privacy?: {
+    profileVisibility: 'PUBLIC' | 'PRIVATE'
+    showPhone: boolean
+    showEmail: boolean
+    showLocation: boolean
   }
 }
+
+
 
 export interface ClientProfile {
   id: string
