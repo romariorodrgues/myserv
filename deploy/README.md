@@ -4,33 +4,50 @@
 
 ## 🚀 Deploy Automático (Recomendado)
 
-### Método 1: Deploy Local
+### ⚠️ **Importante**: Se você receber erro 404 ao baixar os scripts, aguarde alguns minutos para o GitHub processar o commit ou use o método alternativo.
+
+### Método 1: Deploy Local (Recomendado)
 ```bash
 # 1. Clonar repositório
 git clone https://github.com/romariorodrgues/myserv.git
 cd myserv/deploy
 
 # 2. Executar deploy automático
+chmod +x deploy-to-ec2.sh
 ./deploy-to-ec2.sh sua-chave.pem IP-DA-EC2
 
 # 3. Acessar aplicação
 # http://IP-DA-EC2
 ```
 
-### Método 2: Instalação Direta na EC2
+### Método 2: Download Direto dos Scripts
 ```bash
 # 1. Conectar na EC2
 ssh -i sua-chave.pem ec2-user@seu-ip-publico
 
-# 2. Download e execução
-curl -O https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup.sh
-chmod +x ec2-setup.sh
-./ec2-setup.sh
+# 2. Baixar scripts (aguarde se receber 404)
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup.sh
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/optimize-t2micro.sh
 
-# 3. Otimizar para t2.micro
-curl -O https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/optimize-t2micro.sh
-chmod +x optimize-t2micro.sh
+# 3. Executar instalação
+chmod +x ec2-setup.sh optimize-t2micro.sh
+./ec2-setup.sh
 ./optimize-t2micro.sh
+```
+
+### Método 3: Instalação Manual (Se scripts não funcionarem)
+```bash
+# 1. Conectar na EC2
+ssh -i sua-chave.pem ec2-user@seu-ip-publico
+
+# 2. Clonar repositório na EC2
+git clone https://github.com/romariorodrgues/myserv.git
+cd myserv
+
+# 3. Executar scripts locais
+chmod +x deploy/ec2-setup.sh deploy/optimize-t2micro.sh
+./deploy/ec2-setup.sh
+./deploy/optimize-t2micro.sh
 ```
 
 ### Resultado Final
