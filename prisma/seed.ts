@@ -48,7 +48,7 @@ async function main() {
   })
 
   // Create client profile
-  await prisma.clientProfile.upsert({
+  const clientProfile = await prisma.clientProfile.upsert({
     where: { userId: client.id },
     update: {},
     create: {
@@ -63,7 +63,10 @@ await prisma.clientPreferences.upsert({
     clientProfileId: clientProfile.id,
     emailNotifications: true,
     smsNotifications: false,
-    pushNotifications: true,
+    whatsappNotifications: true,
+    marketingEmails: false,
+    serviceReminders: true,
+    reviewRequests: true,
   },
 })
 
