@@ -2,6 +2,36 @@
 
 > **O que fazer após instalar o MyServ na EC2**
 
+## ⚠️ Solução para Conflitos de Curl
+
+Se você encontrou erro como:
+```
+Error: problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.x86_64
+package curl-minimal conflicts with curl
+```
+
+**🔧 Solução Rápida:**
+```bash
+# Baixar e executar script de correção
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-curl-conflicts.sh
+chmod +x fix-curl-conflicts.sh
+./fix-curl-conflicts.sh
+```
+
+**Ou manualmente:**
+```bash
+# Remover curl-minimal
+sudo yum remove -y curl-minimal
+
+# Instalar curl resolvendo conflitos  
+sudo yum install -y curl --allowerasing
+
+# Continuar instalação
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup.sh
+chmod +x ec2-setup.sh
+./ec2-setup.sh
+```
+
 ## 🚀 Primeiros Passos (Obrigatório)
 
 ### 1. Verificar Instalação

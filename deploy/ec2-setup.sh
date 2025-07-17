@@ -43,9 +43,20 @@ fi
 log "Atualizando sistema..."
 sudo yum update -y
 
-# 2. Instalar dependências essenciais
-log "Instalando dependências essenciais..."
-sudo yum install -y git curl wget htop
+# 2. Resolver conflitos de curl e instalar dependências
+log "Resolvendo conflitos do curl..."
+# Primeiro, tentar resolver conflitos do curl
+sudo yum remove -y curl-minimal || true
+sudo yum install -y git wget htop
+
+# Instalar curl sem conflitos
+log "Instalando curl..."
+sudo yum install -y curl --allowerasing || {
+    warn "Falha na instalação padrão do curl, tentando com --skip-broken..."
+    sudo yum install -y curl --skip-broken || {
+        warn "Instalação do curl falhou, mas continuando (wget está disponível)..."
+    }
+}
 
 # 3. Instalar Node.js 18+ (via NodeSource)
 log "Instalando Node.js 18..."

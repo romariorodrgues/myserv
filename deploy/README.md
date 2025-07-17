@@ -4,9 +4,21 @@
 
 ## 🚀 Deploy Automático (Recomendado)
 
-### ⚠️ **Importante**: Se você receber erro 404 ao baixar os scripts, aguarde alguns minutos para o GitHub processar o commit ou use o método alternativo.
+### ⚠️ **Problemas Comuns e Soluções**
 
-### Método 1: Deploy Local (Recomendado)
+**1. Erro de conflito do curl:**
+```bash
+# Se receber erro: "curl-minimal conflicts with curl"
+# Use a instalação simplificada:
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-simple.sh
+chmod +x ec2-setup-simple.sh
+./ec2-setup-simple.sh
+```
+
+**2. Erro 404 nos scripts:**
+Aguarde alguns minutos para o GitHub processar o commit ou use o método de clonagem local.
+
+### Método 1: Deploy Local (Mais Confiável)
 ```bash
 # 1. Clonar repositório
 git clone https://github.com/romariorodrgues/myserv.git
@@ -20,7 +32,18 @@ chmod +x deploy-to-ec2.sh
 # http://IP-DA-EC2
 ```
 
-### Método 2: Download Direto dos Scripts
+### Método 2: Instalação Simplificada (Para problemas de curl)
+```bash
+# 1. Conectar na EC2
+ssh -i sua-chave.pem ec2-user@seu-ip-publico
+
+# 2. Usar script sem conflitos
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-simple.sh
+chmod +x ec2-setup-simple.sh
+./ec2-setup-simple.sh
+```
+
+### Método 3: Download Direto dos Scripts
 ```bash
 # 1. Conectar na EC2
 ssh -i sua-chave.pem ec2-user@seu-ip-publico
@@ -35,7 +58,7 @@ chmod +x ec2-setup.sh optimize-t2micro.sh
 ./optimize-t2micro.sh
 ```
 
-### Método 3: Instalação Manual (Se scripts não funcionarem)
+### Método 4: Instalação Manual (Se scripts não funcionarem)
 ```bash
 # 1. Conectar na EC2
 ssh -i sua-chave.pem ec2-user@seu-ip-publico
