@@ -2,46 +2,49 @@
 
 > **O que fazer após instalar o MyServ na EC2**
 
-## ⚠️ Soluções para Conflitos de Instalação
+## ⚠️ Soluções para Problemas de Instalação
 
 ### 🔧 Conflito de Curl
-Se você encontrou erro como:
 ```
-Error: problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.x86_64
-package curl-minimal conflicts with curl
+Error: problem with installed package curl-minimal conflicts with curl
 ```
 
 ### 🔧 Conflito de Node.js  
-Se você encontrou erro como:
 ```
 file /usr/lib/node_modules/npm/bin/npm conflicts with file from package nodejs20-npm
 ```
 
-### 🚀 SOLUÇÃO RECOMENDADA (Funciona para TODOS os conflitos)
+### � Problema de systemd
+```
+System has not been booted with systemd as init system (PID 1). Can't operate.
+Failed to connect to bus: Host is down
+```
 
-Use nossa instalação ultra simplificada que evita todos os conflitos:
+### 🚀 SOLUÇÃO UNIVERSAL (Detecta e resolve TODOS os problemas)
 
+```bash
+# Diagnóstico automático e solução
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/diagnose-systemd.sh
+chmod +x diagnose-systemd.sh
+./diagnose-systemd.sh
+```
+
+### 🛠️ Soluções Específicas
+
+**Para problemas de systemd:**
+```bash
+# Instalação sem systemd
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-no-systemd.sh
+chmod +x ec2-setup-no-systemd.sh
+./ec2-setup-no-systemd.sh
+```
+
+**Para conflitos gerais (systemd OK):**
 ```bash
 # Instalação que funciona com o que já está no sistema
 wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh
 chmod +x ec2-setup-ultra-simple.sh
 ./ec2-setup-ultra-simple.sh
-```
-
-### 🛠️ Soluções Específicas
-
-**Para conflitos do curl:**
-```bash
-wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-curl-conflicts.sh
-chmod +x fix-curl-conflicts.sh
-./fix-curl-conflicts.sh
-```
-
-**Para conflitos do Node.js:**
-```bash
-wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-nodejs-conflicts.sh
-chmod +x fix-nodejs-conflicts.sh
-./fix-nodejs-conflicts.sh
 ```
 
 ## 🚀 Primeiros Passos (Obrigatório)

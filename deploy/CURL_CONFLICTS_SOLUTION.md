@@ -1,4 +1,4 @@
-# 🔧 Guia de Soluções para Conflitos de Instalação
+# 🔧 Guia de Soluções para Problemas de Instalação
 
 ## ❌ Problemas Identificados
 
@@ -13,26 +13,41 @@ package curl-minimal conflicts with curl
 file /usr/lib/node_modules/npm/bin/npm from install of nodejs-2:18.20.8-1nodesource.x86_64 conflicts with file from package nodejs20-npm-1:10.8.2-1.20.18.3.1.amzn2023.0.1.x86_64
 ```
 
+### 3. Problema do systemd
+```
+System has not been booted with systemd as init system (PID 1). Can't operate.
+Failed to connect to bus: Host is down
+```
+
 ## ✅ Soluções Disponíveis
 
-### 🚀 Solução RECOMENDADA: Instalação Ultra Simplificada
+### 🚀 Solução UNIVERSAL: Diagnóstico Automático
 
-Para evitar TODOS os conflitos, use nossa versão que trabalha com o que já está no sistema:
+Detecta e resolve TODOS os problemas automaticamente:
 
+```bash
+# Diagnóstico e solução automática
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/diagnose-systemd.sh
+chmod +x diagnose-systemd.sh
+./diagnose-systemd.sh
+```
+
+### 🛠️ Soluções Específicas
+
+#### Para Problemas de systemd:
+```bash
+# Instalação sem dependência de systemd
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-no-systemd.sh
+chmod +x ec2-setup-no-systemd.sh
+./ec2-setup-no-systemd.sh
+```
+
+#### Para Todos os Conflitos (systemd funcionando):
 ```bash
 # Usar Node.js existente e evitar conflitos
 wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh
 chmod +x ec2-setup-ultra-simple.sh
 ./ec2-setup-ultra-simple.sh
-```
-
-### 🛠️ Solução Para Conflitos do Node.js
-
-```bash
-# Corrigir conflitos automaticamente
-wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-nodejs-conflicts.sh
-chmod +x fix-nodejs-conflicts.sh
-./fix-nodejs-conflicts.sh
 ```
 
 ### ⚡ Solução Para Conflitos do Curl
