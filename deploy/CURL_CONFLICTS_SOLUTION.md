@@ -1,4 +1,4 @@
-# 🔧 Guia de Soluções para Problemas de Instalação
+# 🔧 Guia Completo de Problemas de Instalação
 
 ## ❌ Problemas Identificados
 
@@ -17,6 +17,38 @@ file /usr/lib/node_modules/npm/bin/npm from install of nodejs-2:18.20.8-1nodesou
 ```
 System has not been booted with systemd as init system (PID 1). Can't operate.
 Failed to connect to bus: Host is down
+```
+
+### 4. Problema de Diretório
+```
+bash: line 134: cd: /home/ec2-user: No such file or directory
+```
+
+## ✅ Solução UNIVERSAL (Resolve TUDO)
+
+### 🚀 Instalação Universal - Detecta e Resolve Automaticamente
+
+```bash
+# Detecta usuário, sistema e resolve todos os problemas
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-universal.sh
+chmod +x ec2-setup-universal.sh
+./ec2-setup-universal.sh
+```
+
+**O que detecta automaticamente:**
+- ✅ Usuário atual e diretório home
+- ✅ Sistema operacional e gerenciador de pacotes  
+- ✅ Sistema de init (systemd, upstart, sysv)
+- ✅ Node.js existente vs instalação necessária
+- ✅ Problemas de permissão e diretórios
+
+### 🔍 Diagnóstico Completo (Se quiser entender o problema primeiro)
+
+```bash
+# Diagnóstico detalhado e solução automática
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/diagnose-systemd.sh
+chmod +x diagnose-systemd.sh
+./diagnose-systemd.sh
 ```
 
 ## ✅ Soluções Disponíveis

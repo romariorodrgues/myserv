@@ -21,6 +21,20 @@ info() { echo -e "${BLUE}[DEBUG]${NC} $1"; }
 
 log "Verificando sistema de init..."
 
+# 0. Verificar usuário e diretório
+info "Verificando ambiente do usuário:"
+CURRENT_USER=$(whoami)
+CURRENT_HOME=$(eval echo ~$CURRENT_USER)
+echo "• Usuário atual: $CURRENT_USER"
+echo "• Diretório home: $CURRENT_HOME"
+
+if [ -d "$CURRENT_HOME" ] && [ -w "$CURRENT_HOME" ]; then
+    echo "✅ Diretório home acessível"
+else
+    warn "❌ Problema com diretório home: $CURRENT_HOME"
+    echo "   • Não existe ou sem permissão de escrita"
+fi
+
 # 1. Verificar PID 1
 info "PID 1 atual:"
 ps -p 1 -o comm= 2>/dev/null || echo "Não foi possível verificar PID 1"
@@ -80,13 +94,18 @@ echo ""
 echo "🔧 RECOMENDAÇÕES:"
 echo "=================="
 
-if [ "$SYSTEMD_WORKING" = true ]; then
-    log "systemd está funcionando! Pode usar instalação normal:"
-    echo "   wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh"
-    echo "   chmod +x ec2-setup-ultra-simple.sh"
-    echo "   ./ec2-setup-ultra-simple.sh"
+if [ "$SYSTEMD_WORKING" = true ] && [ -d "$CURRENT_HOME" ] && [ -w "$CURRENT_HOME" ]; then
+    log "Sistema OK! Use instalação universal (detecta automaticamente):"
+    echo "   wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-universal.sh"
+    echo "   chmod +x ec2-setup-universal.sh"
+    echo "   ./ec2-setup-universal.sh"
+elif [ "$SYSTEMD_WORKING" = true ]; then
+    log "systemd OK, mas problemas de diretório. Use instalação universal:"
+    echo "   wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-universal.sh"
+    echo "   chmod +x ec2-setup-universal.sh"
+    echo "   ./ec2-setup-universal.sh"
 else
-    warn "systemd não está funcionando. Use instalação alternativa:"
+    warn "Problemas com systemd. Use instalação sem systemd:"
     echo "   wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-no-systemd.sh"
     echo "   chmod +x ec2-setup-no-systemd.sh"
     echo "   ./ec2-setup-no-systemd.sh"
@@ -112,9 +131,12 @@ echo "===================================="
 read -p "Deseja executar a instalação apropriada agora? (s/n): " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Ss]$ ]]; then
-    if [ "$SYSTEMD_WORKING" = true ]; then
-        log "Executando instalação com systemd..."
-        wget -qO- https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh | bash
+    if [ "$SYSTEMD_WORKING" = true ] && [ -d "$CURRENT_HOME" ] && [ -w "$CURRENT_HOME" ]; then
+        log "Executando instalação universal..."
+        wget -qO- https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-universal.sh | bash
+    elif [ "$SYSTEMD_WORKING" = true ]; then
+        log "Executando instalação universal (com correção de diretório)..."
+        wget -qO- https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-universal.sh | bash
     else
         log "Executando instalação sem systemd..."
         wget -qO- https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-no-systemd.sh | bash
