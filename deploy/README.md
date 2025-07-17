@@ -196,6 +196,208 @@ pm2 restart myserv
 
 ---
 
+## ✅ Pós-Instalação - O que fazer após o deploy
+
+### 1️⃣ **Verificar se tudo está funcionando**
+
+```bash
+# Conectar na EC2
+ssh -i sua-chave.pem ec2-user@seu-ip-publico
+
+# Verificar status dos serviços
+pm2 status
+sudo systemctl status nginx
+
+# Verificar logs
+pm2 logs myserv --lines 20
+sudo tail -f /var/log/nginx/access.log
+
+# Testar aplicação
+curl -I http://localhost:3000
+```
+
+### 2️⃣ **Acessar a aplicação**
+
+```
+🌐 URL: http://SEU-IP-PUBLICO
+```
+
+**Primeiro acesso:**
+1. Abra o navegador e acesse a URL
+2. Teste o login com usuários de exemplo
+3. Navegue pelas funcionalidades
+
+### 3️⃣ **Configurar APIs Externas (Importante)**
+
+#### Google Maps API
+```bash
+# Editar arquivo de ambiente
+sudo nano /var/www/myserv/.env
+
+# Substituir:
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY="sua-chave-real-do-google-maps"
+
+# Reiniciar aplicação
+pm2 restart myserv
+```
+
+#### MercadoPago (Pagamentos)
+```bash
+# Configurar MercadoPago
+MERCADOPAGO_ACCESS_TOKEN="seu-token-real"
+NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY="sua-chave-publica-real"
+
+# Reiniciar aplicação
+pm2 restart myserv
+```
+
+#### WhatsApp/ChatPro (Notificações)
+```bash
+# Configurar WhatsApp
+CHATPRO_API_KEY="sua-chave-chatpro"
+CHATPRO_INSTANCE_ID="seu-instance-id"
+
+# Reiniciar aplicação
+pm2 restart myserv
+```
+
+### 4️⃣ **Configurar Domínio (Opcional)**
+
+#### Com domínio próprio:
+```bash
+# 1. Apontar domínio para IP da EC2 (DNS A record)
+# 2. Configurar Nginx
+sudo nano /etc/nginx/conf.d/myserv.conf
+
+# Alterar linha:
+server_name seu-dominio.com www.seu-dominio.com;
+
+# 3. Reiniciar Nginx
+sudo systemctl restart nginx
+
+# 4. Configurar SSL
+sudo certbot --nginx -d seu-dominio.com -d www.seu-dominio.com
+```
+
+### 5️⃣ **Configurar Administração**
+
+#### Criar usuário administrador real:
+```bash
+# Conectar na aplicação via navegador
+# Fazer login como admin@myserv.com / admin123
+# Ir para /admin/usuarios
+# Criar seu usuário administrador real
+# Desativar usuários de teste
+```
+
+### 6️⃣ **Configurar Monitoramento**
+
+```bash
+# Verificar scripts de monitoramento
+ls -la /home/ec2-user/
+
+# Executar manualmente para testar
+/home/ec2-user/check-resources.sh
+/home/ec2-user/backup-myserv.sh
+
+# Verificar cron jobs
+crontab -l
+
+# Ver logs de monitoramento
+tail -f /home/ec2-user/resource-monitor.log
+```
+
+### 7️⃣ **Segurança e Backup**
+
+#### Configurar backup para S3 (Opcional):
+```bash
+# Instalar AWS CLI
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+
+# Configurar AWS CLI
+aws configure
+
+# Modificar script de backup para enviar para S3
+nano /home/ec2-user/backup-myserv.sh
+```
+
+#### Configurar alertas por email:
+```bash
+# Instalar mailutils
+sudo yum install -y mailx
+
+# Configurar SMTP no sistema
+# Modificar scripts de alerta para enviar email
+```
+
+### 8️⃣ **Personalizar a Aplicação**
+
+#### Alterar informações da empresa:
+```bash
+# Editar arquivos de configuração
+sudo nano /var/www/myserv/src/app/layout.tsx
+sudo nano /var/www/myserv/public/brand/
+
+# Após alterações, rebuild
+cd /var/www/myserv
+npm run build
+pm2 restart myserv
+```
+
+### 9️⃣ **Otimizações de Performance**
+
+#### Para tráfego alto:
+```bash
+# Aumentar workers do Nginx
+sudo nano /etc/nginx/nginx.conf
+
+# Configurar cache
+# Configurar compressão
+# Otimizar banco de dados
+```
+
+### 🔟 **Escalar para Produção**
+
+#### Quando crescer:
+1. **Upgrade da instância** (t2.small → t2.medium)
+2. **Migrar para RDS** (PostgreSQL)
+3. **Configurar Load Balancer**
+4. **Adicionar CloudFront CDN**
+5. **Implementar CI/CD**
+
+---
+
+## 📱 Checklist Pós-Deploy
+
+- [ ] ✅ Aplicação carregando no navegador
+- [ ] ✅ Login funcionando com usuários teste
+- [ ] ✅ PM2 e Nginx rodando
+- [ ] ⚠️ Google Maps configurado
+- [ ] ⚠️ Pagamentos configurados
+- [ ] ⚠️ WhatsApp configurado
+- [ ] ⚠️ SSL configurado (se domínio)
+- [ ] ⚠️ Backup testado
+- [ ] ⚠️ Monitoramento ativo
+- [ ] ⚠️ Usuário admin real criado
+
+---
+
+## 🆘 Suporte e Problemas
+
+### Problemas comuns:
+1. **App não carrega** → `pm2 logs myserv`
+2. **502 Error** → `sudo systemctl restart nginx`
+3. **Pouca memória** → `/home/ec2-user/cleanup-logs.sh`
+4. **SSL não funciona** → Verificar domínio DNS
+
+### Contato:
+- **Email:** romariorodrigues.dev@gmail.com
+- **GitHub:** https://github.com/romariorodrgues/myserv
+
+---
+
 ## 💡 Dicas Importantes
 
 - ✅ **Backup automático** configurado
