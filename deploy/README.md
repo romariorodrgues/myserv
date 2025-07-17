@@ -1,8 +1,26 @@
-# ☁️ MyServ - Deploy Rápido para EC2 t2.micro
+# ☁️ MyServ - Deploy Rápido para Servidores
 
-> **Instalação completa do MyServ em instância AWS EC2 t2.micro com Amazon Linux**
+> **Instalação completa do MyServ em diferentes tipos de servidor**
 
-## 🚀 Deploy Automático (Recomendado)
+## 🐧 Ubuntu Server (Recomendado)
+
+### Deploy Express Ubuntu 20.04/22.04
+```bash
+# Conectar no servidor
+ssh usuario@seu-servidor-ubuntu
+
+# Instalação automática otimizada
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ubuntu-server-setup.sh
+chmod +x ubuntu-server-setup.sh
+./ubuntu-server-setup.sh
+```
+
+**📖 Documentação Completa:** [UBUNTU_SERVER_DEPLOY_GUIDE.md](UBUNTU_SERVER_DEPLOY_GUIDE.md)
+**⚡ Guia Rápido:** [UBUNTU_QUICK_DEPLOY.md](UBUNTU_QUICK_DEPLOY.md)
+
+## ☁️ AWS EC2 Amazon Linux
+
+### Deploy para EC2 t2.micro
 
 ### ⚠️ **Problemas Comuns e Soluções**
 
@@ -17,6 +35,14 @@ chmod +x ec2-setup-simple.sh
 
 **2. Erro 404 nos scripts:**
 Aguarde alguns minutos para o GitHub processar o commit ou use o método de clonagem local.
+
+**3. Problemas diversos (systemd, diretórios, etc.):**
+```bash
+# Instalação universal que resolve tudo
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-universal.sh
+chmod +x ec2-setup-universal.sh
+./ec2-setup-universal.sh
+```
 
 ### Método 1: Deploy Local (Mais Confiável)
 ```bash
