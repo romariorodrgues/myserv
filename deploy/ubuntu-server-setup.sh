@@ -164,9 +164,13 @@ cd myserv
 
 # 9. Instalar dependências do projeto
 log "Instalando dependências do projeto..."
-npm install --production
+npm install
 
-# 10. Configurar banco de dados
+# 10. Fazer build de produção
+log "Fazendo build de produção..."
+npm run build
+
+# 11. Configurar banco de dados
 log "Configurando banco de dados..."
 npx prisma generate
 npx prisma db push

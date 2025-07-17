@@ -22,6 +22,17 @@ chmod +x ubuntu-server-setup.sh
 🌐 http://SEU-IP-UBUNTU
 ```
 
+**⚠️ IMPORTANTE:**
+- **NÃO** precisa de porta (`:80` ou `:3000`)
+- Use apenas o IP do servidor
+- Exemplos: `http://192.168.1.100` ou `http://54.123.45.67`
+
+**🔍 Descobrir seu IP:**
+```bash
+# No servidor Ubuntu, execute:
+curl http://checkip.amazonaws.com
+```
+
 ## 📋 O que é Instalado Automaticamente
 
 - ✅ **Node.js 18+** (via NodeSource)
@@ -141,8 +152,36 @@ sudo lsof -i :3000
 # Reinstalar dependências
 cd ~/myserv
 rm -rf node_modules
-npm install --production
+npm install
+npm run build
 pm2 restart myserv
+```
+
+### Erro: "Could not find a production build"
+```bash
+# Se aparecer erro de build em loop no PM2
+pm2 stop myserv
+cd ~/myserv
+npm run build
+pm2 start npm --name 'myserv' -- start
+pm2 logs myserv --lines 5
+```
+
+### Não consegue acessar via navegador
+```bash
+# 1. Verificar se responde localmente
+curl -I http://localhost
+# Deve retornar: HTTP/1.1 200 OK
+
+# 2. Descobrir IP correto
+curl http://checkip.amazonaws.com
+
+# 3. Verificar firewall
+sudo ufw status
+# Deve mostrar: 80 ALLOW Anywhere
+
+# 4. Verificar se Nginx está rodando
+sudo systemctl status nginx
 ```
 
 ### Nginx retorna 502
@@ -251,6 +290,7 @@ echo "Porta 3000: $(sudo lsof -i :3000 | wc -l) conexões"
 
 Após a instalação você terá:
 - ✅ MyServ rodando em produção
+- ✅ Acesso via **http://SEU-IP** (porta 80, sem precisar especificar)
 - ✅ HTTPS opcional com Let's Encrypt
 - ✅ Monitoramento automático a cada 5 minutos
 - ✅ Backup semanal automático
@@ -259,6 +299,8 @@ Após a instalação você terá:
 - ✅ Logs organizados
 
 **🌐 Acesse: `http://seu-servidor-ubuntu` e comece a usar!**
+
+**💡 Dica:** O Nginx faz proxy da porta 80 para a porta 3000 automaticamente, por isso você não precisa especificar porta alguma!
 
 ---
 *Deploy para Ubuntu Server - Romário Rodrigues*

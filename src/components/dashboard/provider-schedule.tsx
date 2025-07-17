@@ -15,7 +15,6 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { toast } from 'sonner'
-import { toast } from 'sonner'
 
 interface TimeSlot {
   id: string
