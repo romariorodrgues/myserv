@@ -2,34 +2,46 @@
 
 > **O que fazer após instalar o MyServ na EC2**
 
-## ⚠️ Solução para Conflitos de Curl
+## ⚠️ Soluções para Conflitos de Instalação
 
+### 🔧 Conflito de Curl
 Se você encontrou erro como:
 ```
 Error: problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.x86_64
 package curl-minimal conflicts with curl
 ```
 
-**🔧 Solução Rápida:**
+### 🔧 Conflito de Node.js  
+Se você encontrou erro como:
+```
+file /usr/lib/node_modules/npm/bin/npm conflicts with file from package nodejs20-npm
+```
+
+### 🚀 SOLUÇÃO RECOMENDADA (Funciona para TODOS os conflitos)
+
+Use nossa instalação ultra simplificada que evita todos os conflitos:
+
 ```bash
-# Baixar e executar script de correção
+# Instalação que funciona com o que já está no sistema
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh
+chmod +x ec2-setup-ultra-simple.sh
+./ec2-setup-ultra-simple.sh
+```
+
+### 🛠️ Soluções Específicas
+
+**Para conflitos do curl:**
+```bash
 wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-curl-conflicts.sh
 chmod +x fix-curl-conflicts.sh
 ./fix-curl-conflicts.sh
 ```
 
-**Ou manualmente:**
+**Para conflitos do Node.js:**
 ```bash
-# Remover curl-minimal
-sudo yum remove -y curl-minimal
-
-# Instalar curl resolvendo conflitos  
-sudo yum install -y curl --allowerasing
-
-# Continuar instalação
-wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup.sh
-chmod +x ec2-setup.sh
-./ec2-setup.sh
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-nodejs-conflicts.sh
+chmod +x fix-nodejs-conflicts.sh
+./fix-nodejs-conflicts.sh
 ```
 
 ## 🚀 Primeiros Passos (Obrigatório)

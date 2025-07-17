@@ -1,71 +1,78 @@
-# 🔧 Guia de Soluções para Conflitos de Curl
+# 🔧 Guia de Soluções para Conflitos de Instalação
 
-## ❌ Problema Identificado
+## ❌ Problemas Identificados
 
-Erro durante instalação:
+### 1. Conflito do Curl
 ```
 Error: problem with installed package curl-minimal-8.11.1-4.amzn2023.0.1.x86_64
 package curl-minimal conflicts with curl
 ```
 
+### 2. Conflito do Node.js
+```
+file /usr/lib/node_modules/npm/bin/npm from install of nodejs-2:18.20.8-1nodesource.x86_64 conflicts with file from package nodejs20-npm-1:10.8.2-1.20.18.3.1.amzn2023.0.1.x86_64
+```
+
 ## ✅ Soluções Disponíveis
 
-### 🚀 Solução 1: Script de Correção Automática
+### 🚀 Solução RECOMENDADA: Instalação Ultra Simplificada
+
+Para evitar TODOS os conflitos, use nossa versão que trabalha com o que já está no sistema:
 
 ```bash
-# Baixar e executar correção
+# Usar Node.js existente e evitar conflitos
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh
+chmod +x ec2-setup-ultra-simple.sh
+./ec2-setup-ultra-simple.sh
+```
+
+### 🛠️ Solução Para Conflitos do Node.js
+
+```bash
+# Corrigir conflitos automaticamente
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-nodejs-conflicts.sh
+chmod +x fix-nodejs-conflicts.sh
+./fix-nodejs-conflicts.sh
+```
+
+### ⚡ Solução Para Conflitos do Curl
+
+```bash
+# Correção específica para curl
 wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/fix-curl-conflicts.sh
 chmod +x fix-curl-conflicts.sh
 ./fix-curl-conflicts.sh
 ```
 
-### 🛠️ Solução 2: Instalação Simplificada (Recomendada)
+### 🔄 Solução Manual (Últimos Recursos)
 
-Use o script sem dependências de curl:
-
+#### Para Conflitos de Curl:
 ```bash
-# Baixar script simplificado
-wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-simple.sh
-chmod +x ec2-setup-simple.sh
-./ec2-setup-simple.sh
-```
-
-### ⚡ Solução 3: Correção Manual
-
-```bash
-# 1. Remover curl-minimal
+# Remover curl-minimal
 sudo yum remove -y curl-minimal
 
-# 2. Limpar cache
-sudo yum clean all
-
-# 3. Instalar curl resolvendo conflitos
+# Instalar curl resolvendo conflitos
 sudo yum install -y curl --allowerasing
 
-# 4. Se falhar, usar --skip-broken
-sudo yum install -y curl --skip-broken
-
-# 5. Continuar com instalação normal
+# Continuar instalação
 wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup.sh
 chmod +x ec2-setup.sh
 ./ec2-setup.sh
 ```
 
-### 🔄 Solução 4: Reinstalação Completa
-
-Se tudo falhar, remover e reinstalar:
-
+#### Para Conflitos de Node.js:
 ```bash
-# Remover pacotes conflitantes
-sudo yum remove -y curl curl-minimal
+# Remover todas as versões
+sudo yum remove -y nodejs* npm*
+sudo yum autoremove -y
 
-# Reinstalar apenas o necessário
-sudo yum install -y wget git
+# Instalar versão do Amazon Linux
+sudo yum install -y nodejs npm
 
-# Usar instalação simplificada
-wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-simple.sh
-chmod +x ec2-setup-simple.sh
-./ec2-setup-simple.sh
+# Usar instalação ultra simplificada
+wget https://raw.githubusercontent.com/romariorodrgues/myserv/main/deploy/ec2-setup-ultra-simple.sh
+chmod +x ec2-setup-ultra-simple.sh
+./ec2-setup-ultra-simple.sh
 ```
 
 ## 📋 Verificação Pós-Correção
@@ -74,18 +81,24 @@ Após executar qualquer solução:
 
 ```bash
 # Verificar ferramentas disponíveis
-which wget  # Deve retornar: /usr/bin/wget
-which curl  # Opcional, pode falhar
-which git   # Deve retornar: /usr/bin/git
+which node   # Deve retornar: /usr/bin/node
+which npm    # Deve retornar: /usr/bin/npm
+which wget   # Deve retornar: /usr/bin/wget
+
+# Verificar versões
+node --version
+npm --version
 
 # Verificar instalação do MyServ
 pm2 status
 sudo systemctl status nginx
 ```
 
-## 💡 Por que esse erro acontece?
+## 💡 Por que esses erros acontecem?
 
-O Amazon Linux 2023 vem com `curl-minimal` pré-instalado, que conflita com o pacote `curl` completo. Isso é normal e nossa solução resolve automaticamente.
+1. **Curl**: Amazon Linux 2023 vem com `curl-minimal` que conflita com `curl` completo
+2. **Node.js**: Múltiplas fontes de instalação (Amazon repos vs NodeSource) geram conflitos
+3. **npm**: Diferentes versões do npm podem conflitar entre si
 
 ## 🎯 Resultado Final
 
@@ -98,7 +111,7 @@ Após qualquer solução, você deve ter:
 ## 📞 Suporte
 
 Se nenhuma solução funcionar:
-1. Verifique se está usando Amazon Linux 2023
-2. Confirme que tem permissões sudo
-3. Tente reiniciar a instância EC2
-4. Use a instalação manual do guia `MANUAL_INSTALL.md`
+1. Reinicie a instância EC2
+2. Use: `ec2-setup-ultra-simple.sh` (mais compatível)
+3. Verifique Security Groups (porta 80 aberta)
+4. Consulte `POST_INSTALL_GUIDE.md` para configuração manual
