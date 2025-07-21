@@ -170,18 +170,28 @@ npm install
 log "Fazendo build de produção..."
 npm run build
 
-# 11. Configurar banco de dados
+# 11. Configurar variáveis de ambiente
+log "Configurando variáveis de ambiente..."
+cat > .env << 'EOF'
+# Database
+DATABASE_URL="file:./dev.db"
+
+# Next.js
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=myserv-secret-key-2025
+
+# APIs (configurar conforme necessário)
+GOOGLE_MAPS_API_KEY=your-google-maps-key
+MERCADOPAGO_ACCESS_TOKEN=your-mercadopago-token
+CHATPRO_API_KEY=your-chatpro-key
+EOF
+
+# 12. Configurar banco de dados
 log "Configurando banco de dados..."
 npx prisma generate
 npx prisma db push
 
-# Criar dados de teste
-log "Criando dados de teste..."
-npx prisma db seed || {
-    warn "Falha no seed, mas continuando..."
-}
-
-# 11. Configurar PM2
+# 13. Configurar PM2
 log "Configurando PM2..."
 pm2 delete myserv 2>/dev/null || true
 

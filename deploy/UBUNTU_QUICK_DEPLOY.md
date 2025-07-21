@@ -157,6 +157,23 @@ npm run build
 pm2 restart myserv
 ```
 
+### Erro: "Environment variable not found: DATABASE_URL"
+```bash
+# Criar arquivo .env com configurações básicas
+cd ~/myserv
+cat > .env << 'EOF'
+DATABASE_URL="file:./dev.db"
+NEXTAUTH_URL=http://localhost:3000
+NEXTAUTH_SECRET=myserv-secret-key-2025
+EOF
+
+# Depois executar Prisma
+npx prisma generate
+npx prisma db push
+npm run build
+pm2 restart myserv
+```
+
 ### Erro: "Could not find a production build"
 ```bash
 # Se aparecer erro de build em loop no PM2
