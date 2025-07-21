@@ -1,6 +1,4 @@
-# MyServ - Copilot Instructions
-
-<!-- Use this file to provide workspace-specific custom instructions to Copilot. For more details, visit https://code.visualstudio.com/docs/copilot/copilot-customization#_use-a-githubcopilotinstructionsmd-file -->
+# MyServ - Instructions
 
 ## Project Overview
 MyServ is a service marketplace platform that connects service providers with clients through location-based search and appointment scheduling. The system is inspired by GetNinjas and includes modern UI/UX patterns.
@@ -30,7 +28,6 @@ MyServ is a service marketplace platform that connects service providers with cl
 - Use clean architecture with separation of concerns
 - Include proper error handling and validation
 - Add comprehensive comments and documentation
-- Follow the author signature: "Romário Rodrigues" <romariorodrigues.dev@gmail.com>
 
 ## API Integration Guidelines
 - Implement proper error handling for all external APIs
