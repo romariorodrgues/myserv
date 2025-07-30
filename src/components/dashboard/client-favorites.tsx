@@ -70,119 +70,136 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
     filterAndSortFavorites()
   }, [favorites, searchTerm, categoryFilter, locationFilter, sortBy])
 
-  const fetchFavorites = async () => {
-    try {
-      setLoading(true)
-      
-      // Mock data for development - replace with actual API call
-      const mockData: FavoriteProvider[] = [
-        {
-          id: '1',
-          addedAt: '2025-06-10T15:30:00Z',
-          serviceProvider: {
-            id: 'provider-1',
-            description: 'Especialista em limpeza residencial e comercial com 10 anos de experiência. Atendimento de qualidade garantido.',
-            priceRange: 'R$ 80 - R$ 200',
-            isVerified: true,
-            isHighlighted: true,
-            availableScheduling: true,
-            user: {
-              name: 'Maria Silva',
-              profileImage: null,
-              phone: '(11) 99999-1234'
-            },
-            rating: 4.9,
-            reviewCount: 127,
-            location: {
-              city: 'São Paulo',
-              state: 'SP',
-              district: 'Vila Madalena'
-            },
-            services: [
-              { id: '1', name: 'Limpeza Residencial', category: 'Limpeza', basePrice: 120 },
-              { id: '2', name: 'Limpeza Pós-Obra', category: 'Limpeza', basePrice: 180 }
-            ],
-            availability: {
-              nextAvailable: '2025-06-15T09:00:00Z',
-              responseTime: '2 horas'
-            }
-          }
-        },
-        {
-          id: '2',
-          addedAt: '2025-06-08T10:15:00Z',
-          serviceProvider: {
-            id: 'provider-2',
-            description: 'Técnico especializado em instalação e manutenção de ar condicionado. Certificado pelos principais fabricantes.',
-            priceRange: 'R$ 150 - R$ 500',
-            isVerified: true,
-            isHighlighted: false,
-            availableScheduling: true,
-            user: {
-              name: 'João Santos',
-              profileImage: null,
-              phone: '(11) 98888-5678'
-            },
-            rating: 4.8,
-            reviewCount: 89,
-            location: {
-              city: 'São Paulo',
-              state: 'SP',
-              district: 'Moema'
-            },
-            services: [
-              { id: '3', name: 'Instalação de Ar Condicionado', category: 'Técnico', basePrice: 300 },
-              { id: '4', name: 'Manutenção de Ar Condicionado', category: 'Técnico', basePrice: 150 }
-            ],
-            availability: {
-              nextAvailable: '2025-06-14T14:00:00Z',
-              responseTime: '1 hora'
-            }
-          }
-        },
-        {
-          id: '3',
-          addedAt: '2025-06-05T16:45:00Z',
-          serviceProvider: {
-            id: 'provider-3',
-            description: 'Eletricista residencial e predial com mais de 15 anos de experiência. Trabalhos garantidos.',
-            priceRange: 'R$ 100 - R$ 400',
-            isVerified: false,
-            isHighlighted: false,
-            availableScheduling: false,
-            user: {
-              name: 'Carlos Pereira',
-              profileImage: null,
-              phone: '(11) 97777-9012'
-            },
-            rating: 4.5,
-            reviewCount: 234,
-            location: {
-              city: 'São Paulo',
-              state: 'SP',
-              district: 'Ipiranga'
-            },
-            services: [
-              { id: '5', name: 'Instalação Elétrica', category: 'Elétrica', basePrice: 200 },
-              { id: '6', name: 'Reparo Elétrico', category: 'Elétrica', basePrice: 120 }
-            ],
-            availability: {
-              responseTime: '4 horas'
-            }
-          }
-        }
-      ]
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 800))
-      setFavorites(mockData)
-      
-    } catch (error) {
-      console.error('Error fetching favorites:', error)
-    } finally {
-      setLoading(false)
-    }
+  const fetchFavorites = async () => {
+  try {
+    setLoading(true)
+
+    const res = await fetch('/api/favorites')
+    if (!res.ok) throw new Error('Erro ao buscar favoritos')
+
+    const data = await res.json()
+    setFavorites(data)
+    
+  } catch (error) {
+    console.error('Error fetching favorites:', error)
+  } finally {
+    setLoading(false)
   }
+}
+  // const fetchFavorites = async () => {
+  //   try {
+  //     setLoading(true)
+      
+  //     // Mock data for development - replace with actual API call
+  //     const mockData: FavoriteProvider[] = [
+  //       {
+  //         id: '1',
+  //         addedAt: '2025-06-10T15:30:00Z',
+  //         serviceProvider: {
+  //           id: 'provider-1',
+  //           description: 'Especialista em limpeza residencial e comercial com 10 anos de experiência. Atendimento de qualidade garantido.',
+  //           priceRange: 'R$ 80 - R$ 200',
+  //           isVerified: true,
+  //           isHighlighted: true,
+  //           availableScheduling: true,
+  //           user: {
+  //             name: 'Maria Silva',
+  //             profileImage: null,
+  //             phone: '(11) 99999-1234'
+  //           },
+  //           rating: 4.9,
+  //           reviewCount: 127,
+  //           location: {
+  //             city: 'São Paulo',
+  //             state: 'SP',
+  //             district: 'Vila Madalena'
+  //           },
+  //           services: [
+  //             { id: '1', name: 'Limpeza Residencial', category: 'Limpeza', basePrice: 120 },
+  //             { id: '2', name: 'Limpeza Pós-Obra', category: 'Limpeza', basePrice: 180 }
+  //           ],
+  //           availability: {
+  //             nextAvailable: '2025-06-15T09:00:00Z',
+  //             responseTime: '2 horas'
+  //           }
+  //         }
+  //       },
+  //       {
+  //         id: '2',
+  //         addedAt: '2025-06-08T10:15:00Z',
+  //         serviceProvider: {
+  //           id: 'provider-2',
+  //           description: 'Técnico especializado em instalação e manutenção de ar condicionado. Certificado pelos principais fabricantes.',
+  //           priceRange: 'R$ 150 - R$ 500',
+  //           isVerified: true,
+  //           isHighlighted: false,
+  //           availableScheduling: true,
+  //           user: {
+  //             name: 'João Santos',
+  //             profileImage: null,
+  //             phone: '(11) 98888-5678'
+  //           },
+  //           rating: 4.8,
+  //           reviewCount: 89,
+  //           location: {
+  //             city: 'São Paulo',
+  //             state: 'SP',
+  //             district: 'Moema'
+  //           },
+  //           services: [
+  //             { id: '3', name: 'Instalação de Ar Condicionado', category: 'Técnico', basePrice: 300 },
+  //             { id: '4', name: 'Manutenção de Ar Condicionado', category: 'Técnico', basePrice: 150 }
+  //           ],
+  //           availability: {
+  //             nextAvailable: '2025-06-14T14:00:00Z',
+  //             responseTime: '1 hora'
+  //           }
+  //         }
+  //       },
+  //       {
+  //         id: '3',
+  //         addedAt: '2025-06-05T16:45:00Z',
+  //         serviceProvider: {
+  //           id: 'provider-3',
+  //           description: 'Eletricista residencial e predial com mais de 15 anos de experiência. Trabalhos garantidos.',
+  //           priceRange: 'R$ 100 - R$ 400',
+  //           isVerified: false,
+  //           isHighlighted: false,
+  //           availableScheduling: false,
+  //           user: {
+  //             name: 'Carlos Pereira',
+  //             profileImage: null,
+  //             phone: '(11) 97777-9012'
+  //           },
+  //           rating: 4.5,
+  //           reviewCount: 234,
+  //           location: {
+  //             city: 'São Paulo',
+  //             state: 'SP',
+  //             district: 'Ipiranga'
+  //           },
+  //           services: [
+  //             { id: '5', name: 'Instalação Elétrica', category: 'Elétrica', basePrice: 200 },
+  //             { id: '6', name: 'Reparo Elétrico', category: 'Elétrica', basePrice: 120 }
+  //           ],
+  //           availability: {
+  //             responseTime: '4 horas'
+  //           }
+  //         }
+  //       }
+  //     ]
+
+  //     // Simulate API delay
+  //     await new Promise(resolve => setTimeout(resolve, 800))
+  //     setFavorites(mockData)
+      
+  //   } catch (error) {
+  //     console.error('Error fetching favorites:', error)
+  //   } finally {
+  //     setLoading(false)
+  //   }
+  // }
 
   const filterAndSortFavorites = () => {
     let filtered = [...favorites]
@@ -232,13 +249,27 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
   }
 
   const removeFavorite = async (favoriteId: string) => {
-    try {
-      // Mock implementation - replace with actual API call
-      setFavorites(prev => prev.filter(fav => fav.id !== favoriteId))
-    } catch (error) {
-      console.error('Error removing favorite:', error)
-    }
+  try {
+    const res = await fetch(`/api/favorites?providerId=${favoriteId}`, {
+      method: 'DELETE'
+    })
+
+    if (!res.ok) throw new Error('Erro ao remover favorito')
+    
+    setFavorites(prev => prev.filter(fav => fav.serviceProvider.id !== favoriteId))
+  } catch (error) {
+    console.error('Error removing favorite:', error)
   }
+}
+
+  // const removeFavorite = async (favoriteId: string) => {
+  //   try {
+  //     // Mock implementation - replace with actual API call
+  //     setFavorites(prev => prev.filter(fav => fav.id !== favoriteId))
+  //   } catch (error) {
+  //     console.error('Error removing favorite:', error)
+  //   }
+  // }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {
