@@ -1,56 +1,61 @@
-/**
- * User registration API endpoint
- * Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
- * 
- * Handles user registration for both clients and service providers
- */
-
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { z } from 'zod'
-import { UserType } from '@/types'
+import { UserTypeValues, type UserType } from '@/types'
 import { isValidCPF, isValidCNPJ } from '@/utils'
 
-// Validation schema for registration
-const registerSchema = z.object({
-  name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
-  email: z.string().email('Email inválido'),
-  phone: z.string().min(10, 'Telefone inválido'),
-  cpfCnpj: z.string().min(11, 'CPF/CNPJ inválido'),
-  userType: z.enum([UserType.CLIENT, UserType.SERVICE_PROVIDER]),
-  password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
-  acceptTerms: z.boolean().refine(val => val === true, 'Deve aceitar os termos')
-})
+const UserTypeArray = Object.values(UserTypeValues) as [UserType, ...UserType[]]
+
+const registerSchema = z
+  .object({
+    name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+    email: z.string().email('Email inválido'),
+    phone: z.string().min(10, 'Telefone inválido'),
+    cpfCnpj: z.string().min(11, 'CPF/CNPJ inválido'),
+    userType: z.enum(UserTypeArray),
+    password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+    confirmPassword: z.string().min(8, 'Confirmação inválida'),
+    acceptTerms: z.literal(true, {
+      errorMap: () => ({ message: 'Deve aceitar os termos' }),
+    }),
+  })
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    
-    // Validate input data
-    const validatedData = registerSchema.parse(body)
-    
-    // Validate CPF/CNPJ
-    const cleanDocument = validatedData.cpfCnpj.replace(/\D/g, '')
-    const isValidDocument = cleanDocument.length === 11 
-      ? isValidCPF(cleanDocument) 
-      : isValidCNPJ(cleanDocument)
-    
+
+    // Parse + limpeza de dados
+    const fullData = registerSchema.parse({
+      ...body,
+      email: body.email.trim().toLowerCase(),
+      cpfCnpj: body.cpfCnpj.replace(/\D/g, ''),
+    })
+
+    // Extração sem confirmPassword
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+const { confirmPassword: _, acceptTerms: __, ...validatedData } = fullData
+
+
+
+    // Validação de CPF/CNPJ
+    const isValidDocument =
+      validatedData.cpfCnpj.length === 11
+        ? isValidCPF(validatedData.cpfCnpj)
+        : isValidCNPJ(validatedData.cpfCnpj)
+
     if (!isValidDocument) {
-      return NextResponse.json(
-        { error: 'CPF/CNPJ inválido' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'CPF/CNPJ inválido' }, { status: 400 })
     }
 
-    // Check if user already exists
+    // Verifica duplicidade
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
           { email: validatedData.email },
-          { cpfCnpj: cleanDocument }
-        ]
-      }
+          { cpfCnpj: validatedData.cpfCnpj },
+        ],
+      },
     })
 
     if (existingUser) {
@@ -60,50 +65,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Hash password
+    // Hash da senha
     const hashedPassword = await bcrypt.hash(validatedData.password, 12)
 
-    // Create user in database
-    const user = await prisma.user.create({
-      data: {
-        name: validatedData.name,
-        email: validatedData.email,
-        phone: validatedData.phone,
-        cpfCnpj: cleanDocument,
-        password: hashedPassword,
-        userType: validatedData.userType,
-        isApproved: validatedData.userType === UserType.CLIENT, // Auto-approve clients
-      }
-    })
+    // Criação do usuário
+    let user
 
-    // Create specific profile based on user type
-    if (validatedData.userType === UserType.CLIENT) {
-      await prisma.clientProfile.create({
-        data: {
-          userId: user.id
-        }
-      })
+try {
+  user = await prisma.user.create({
+    data: {
+      ...validatedData,
+      password: hashedPassword,
+      isApproved: validatedData.userType === UserTypeValues.CLIENT,
+    },
+  })
+} catch (err) {
+  console.error('Erro ao criar usuário no banco:', err)
+  throw err // ou NextResponse.json({ error: 'Erro ao salvar usuário' }, { status: 500 })
+}
+
+
+    // Criação de perfil
+    if (validatedData.userType === UserTypeValues.CLIENT) {
+      await prisma.clientProfile.create({ data: { userId: user.id } })
     } else {
       await prisma.serviceProvider.create({
         data: {
           userId: user.id,
           hasScheduling: false,
-          hasQuoting: true
-        }
+          hasQuoting: true,
+          chargesTravel: false,
+        },
       })
     }
 
-    // Return success response (exclude sensitive data)
-    const { ...userWithoutSensitiveData } = user
-    
-    return NextResponse.json({
-      success: true,
-      message: validatedData.userType === UserType.CLIENT 
-        ? 'Conta criada com sucesso! Você já pode fazer login.'
-        : 'Cadastro realizado! Sua conta será analisada e aprovada em até 24 horas.',
-      user: userWithoutSensitiveData
-    }, { status: 201 })
+    // Remover a senha da resposta
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { password: _password, ...userWithoutSensitiveData } = user
 
+    return NextResponse.json(
+      {
+        success: true,
+        message:
+          validatedData.userType === UserTypeValues.CLIENT
+            ? 'Conta criada com sucesso! Você já pode fazer login.'
+            : 'Cadastro realizado! Sua conta será analisada e aprovada em até 24 horas.',
+        user: userWithoutSensitiveData,
+      },
+      { status: 201 }
+    )
   } catch (error) {
     console.error('Registration error:', error)
 
@@ -121,10 +131,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-// Handle unsupported methods
 export async function GET() {
-  return NextResponse.json(
-    { error: 'Método não permitido' },
-    { status: 405 }
-  )
+  return NextResponse.json({ error: 'Método não permitido' }, { status: 405 })
 }
