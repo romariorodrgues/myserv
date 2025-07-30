@@ -5,6 +5,7 @@
 
 'use client'
 
+import { ProfileVisibility } from '@/types/index'
 import { getMyProfile } from '@/lib/api/get-my-profile'
 import { useState } from 'react'
 import { User, MapPin, Bell, Shield, Eye, EyeOff, Save } from 'lucide-react'
@@ -20,40 +21,8 @@ import { toast } from 'sonner'
 import Image from 'next/image'
 import { useEffect } from 'react'
 import { updateMyProfile } from '@/lib/api/update-my-profile'
+import type { ClientProfileData } from '@/types'
 
-interface ClientProfileData {
-  id: string
-  name: string
-  email: string
-  phone?: string
-  userType: string
-  description: string
-  cpfCnpj?: string // CPF ou CNPJ
-  profileImage?: string | null
-  address?: {
-    street?: string
-    number?: string
-    city?: string
-    state?: string
-    zipCode?: string
-    complement?: string
-    district?: string // ✅ confirmado no schema
-  }
-  preferences?: {
-    emailNotifications: boolean
-    smsNotifications: boolean
-    whatsappNotifications: boolean
-    marketingEmails: boolean
-    serviceReminders: boolean
-    reviewRequests: boolean
-  }
-  privacy?: {
-    profileVisibility: 'PUBLIC' | 'PRIVATE'
-    showPhone: boolean
-    showEmail: boolean
-    showLocation: boolean
-  }
-}
 
 // No props expected for this component
 export function ClientProfileSettings() {
@@ -94,7 +63,7 @@ export function ClientProfileSettings() {
   //     reviewRequests: true
   //   },
   //   privacy: {
-  //     profileVisibility: 'PUBLIC',
+  //     profileVisibility: ProfileVisibility.PUBLIC,
   //     showPhone: true,
   //     showEmail: false,
   //     showLocation: true
@@ -219,7 +188,7 @@ useEffect(() => {
     reviewRequests: data?.preferences?.reviewRequests ?? false,
   },
   privacy: {
-    profileVisibility: data?.privacy?.profileVisibility ?? 'PUBLIC',
+    profileVisibility: data?.privacy?.profileVisibility ?? ProfileVisibility.PUBLIC,
     showPhone: data?.privacy?.showPhone ?? false,
     showEmail: data?.privacy?.showEmail ?? false,
     showLocation: data?.privacy?.showLocation ?? false,
@@ -716,23 +685,25 @@ if (loading || !profileData) {
                 <div className="space-y-2">
                   <label className="flex items-center space-x-2">
                     <input
-                      type="radio"
-                      value="PUBLIC"
-                      checked={profileData?.privacy?.profileVisibility === 'PUBLIC' || false}
-                      onChange={() => setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              privacy: {
-                                ...prev.privacy,
-                                profileVisibility: 'PUBLIC',
-                                showPhone: prev.privacy?.showPhone ?? false,
-                                showEmail: prev.privacy?.showEmail ?? false,
-                                showLocation: prev.privacy?.showLocation ?? false,
-                              }
-                            }
-                          : prev
-                      )}
+                        type="radio"
+                        value={ProfileVisibility.PUBLIC}
+                        checked={profileData?.privacy?.profileVisibility === ProfileVisibility.PUBLIC}
+                        onChange={() =>
+                          setProfileData(prev =>
+                            prev
+                              ? {
+                                  ...prev,
+                                  privacy: {
+                                    ...prev.privacy,
+                                    profileVisibility: ProfileVisibility.PUBLIC,
+                                    showPhone: prev.privacy?.showPhone ?? false,
+                                    showEmail: prev.privacy?.showEmail ?? false,
+                                    showLocation: prev.privacy?.showLocation ?? false,
+                                  }
+                                }
+                              : prev
+                          )
+                        }
                       className="text-blue-600"
                     />
                     <span>Público - Qualquer pessoa pode ver seu perfil</span>
@@ -740,15 +711,15 @@ if (loading || !profileData) {
                   <label className="flex items-center space-x-2">
                     <input
                       type="radio"
-                      value="PRIVATE"
-                      checked={profileData?.privacy?.profileVisibility === 'PRIVATE'}
+                      value={ProfileVisibility.PRIVATE}
+                      checked={profileData?.privacy?.profileVisibility === ProfileVisibility.PRIVATE}
                       onChange={() => setProfileData(prev =>
                         prev
                           ? {
                               ...prev,
                               privacy: {
                                 ...prev.privacy,
-                                profileVisibility: 'PRIVATE',
+                                profileVisibility: ProfileVisibility.PRIVATE,
                                 showPhone: prev.privacy?.showPhone ?? false,
                                 showEmail: prev.privacy?.showEmail ?? false,
                                 showLocation: prev.privacy?.showLocation ?? false,
@@ -779,7 +750,7 @@ if (loading || !profileData) {
                           privacy: {
                             ...prev.privacy,
                             showPhone: checked,
-                            profileVisibility: prev.privacy?.profileVisibility ?? 'PUBLIC',
+                            profileVisibility: prev.privacy?.profileVisibility ?? ProfileVisibility.PUBLIC,
                             showEmail: prev.privacy?.showEmail ?? false,
                             showLocation: prev.privacy?.showLocation ?? false,
                           }
@@ -803,7 +774,7 @@ if (loading || !profileData) {
                           privacy: {
                             ...prev.privacy,
                             showEmail: checked,
-                            profileVisibility: prev.privacy?.profileVisibility ?? 'PUBLIC',
+                            profileVisibility: prev.privacy?.profileVisibility ?? ProfileVisibility.PUBLIC,
                             showPhone: prev.privacy?.showPhone ?? false,
                             showLocation: prev.privacy?.showLocation ?? false,
                           }
@@ -827,7 +798,7 @@ if (loading || !profileData) {
                           privacy: {
                             ...prev.privacy,
                             showLocation: checked,
-                            profileVisibility: prev.privacy?.profileVisibility ?? 'PUBLIC',
+                            profileVisibility: prev.privacy?.profileVisibility ?? ProfileVisibility.PUBLIC,
                             showPhone: prev.privacy?.showPhone ?? false,
                             showEmail: prev.privacy?.showEmail ?? false,
                           }
