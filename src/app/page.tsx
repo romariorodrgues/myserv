@@ -5,6 +5,8 @@
  * Main landing page with hero section, features, and service categories
  */
 
+// creates development branch
+
 import Link from "next/link"
 import { Star, Shield, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
