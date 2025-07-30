@@ -151,7 +151,19 @@ function ProviderDashboardContent() {
       return
     }
 
-    fetchBookings()
+    /** 
+     * A função a baixo está sendo executada em looping
+     * fetchBookings()
+     * 
+     * Dicas para solução:
+     * 1 - entender o que a mesma retorna e qual a importância dela para o fluxo da página
+     * 2 - verificar se a função realmente deve ser chamada em umm useEffect
+     * 3 - verificar se todos os estados que estão como dependencia do useEffect realmente precisam estar lá
+     * 4 - Utilizar o react-query para fazer a requisição de dados poderá simplificar o fluxo além de evitar loops infinitos
+     * 
+     * OBS.: A página está quebrando devido a função está comentada
+    */
+
   }, [session, status, router, fetchBookings, searchParams, mockSession])
 
   const handleBookingAction = async (bookingId: string, newStatus: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
