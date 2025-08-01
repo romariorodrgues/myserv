@@ -14,6 +14,7 @@ import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "sonner";
 import { ClientLayoutWrapper } from "@/components/layout/client-layout-wrapper";
+import ReactQueryProvider from "@/lib/react-query";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -82,6 +83,8 @@ export default function RootLayout({
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       </head>
       <body>
+        <ReactQueryProvider>
+
          <ClientLayoutWrapper>
         <div className="relative min-h-screen flex flex-col">
           {/* Efeito visual de background animado */}
@@ -111,6 +114,7 @@ export default function RootLayout({
           </AuthProvider>
         </div>
          </ClientLayoutWrapper>
+        </ReactQueryProvider>
       </body>
     </html>
   )
