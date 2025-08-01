@@ -5,7 +5,8 @@
 
 'use client'
 
-// import { useSession } from 'next-auth/react'
+import { LucideIcon } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import Link from 'next/link'
@@ -17,6 +18,8 @@ import { ClientHistory } from '@/components/dashboard/client-history'
 import { ClientFavorites } from '@/components/dashboard/client-favorites'
 import { ClientProfileSettings } from '@/components/dashboard/client-profile-settings'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
+import { redirect } from 'next/navigation'
+
 
 interface Booking {
   id: string
@@ -43,18 +46,31 @@ interface Booking {
 }
 
 function ClientDashboardContent() {
-  // const { data: session, status } = useSession()
+  const { data: session } = useSession()
   const searchParams = useSearchParams()
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
-  const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'favorites' | 'settings'>('overview')
-  
-  // Temporary mock data for development
-  const session = { user: { name: 'João Cliente', userType: 'CLIENT', id: 'client-1' } }
+  const [activeTab, setActiveTab] = useState<TabOption>('overview')
 
+    type TabOption = 'overview' | 'history' | 'favorites' | 'settings'
+
+  const tabs: { id: TabOption; label: string; icon: LucideIcon }[] = [
+  { id: 'overview', label: 'Visão Geral', icon: User },
+  { id: 'history', label: 'Histórico', icon: History },
+  { id: 'favorites', label: 'Favoritos', icon: Heart },
+  { id: 'settings', label: 'Configurações', icon: Settings }
+]
+if (!session) {
+    redirect('/login') // já redireciona no servidor, sem flash de tela
+  }
   const fetchBookings = useCallback(async () => {
     try {
       // Fetch bookings with payment information for WhatsApp communication
+      if (!session?.user?.id) {
+        setBookings([])
+        setLoading(false)
+        return
+      }
       const response = await fetch(`/api/bookings/with-payments?clientId=${session.user.id}`)
       if (response.ok) {
         const data = await response.json()
@@ -110,13 +126,13 @@ function ClientDashboardContent() {
     } finally {
       setLoading(false)
     }
-  }, [session.user.id])
+  }, [session?.user?.id])
 
   useEffect(() => {
     // Check URL params for active tab
     const tab = searchParams.get('tab')
     if (tab && ['overview', 'history', 'favorites', 'settings'].includes(tab)) {
-      setActiveTab(tab as any)
+      setActiveTab(tab as TabOption)
     }
     
     fetchBookings()
@@ -177,12 +193,6 @@ function ClientDashboardContent() {
     )
   }
 
-  const tabs = [
-    { id: 'overview', label: 'Visão Geral', icon: User },
-    { id: 'history', label: 'Histórico', icon: History },
-    { id: 'favorites', label: 'Favoritos', icon: Heart },
-    { id: 'settings', label: 'Configurações', icon: Settings }
-  ]
 
   return (
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
@@ -191,7 +201,7 @@ function ClientDashboardContent() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Dashboard do Cliente</h1>
           <p className="text-muted-foreground">
-            Bem-vindo de volta, {session.user.name}!
+            Bem-vindo de volta, {session?.user?.name ?? 'usuário'}!
           </p>
         </div>
         
@@ -235,7 +245,7 @@ function ClientDashboardContent() {
       return (
         <button
           key={tab.id}
-          onClick={() => setActiveTab(tab.id as any)}
+          onClick={() => setActiveTab(tab.id as TabOption)}
           className={`flex flex-col items-center justify-center px-3 py-3 text-sm font-semibold transition-colors border-b-4 ${
             isActive
               ? 'text-[#00a9d4] border-[#00a9d4]'
@@ -412,16 +422,17 @@ function ClientDashboardContent() {
         </div>
       )}
 
-      {activeTab === 'history' && (
+      {activeTab === 'history' && session?.user?.id && (
         <ClientHistory clientId={session.user.id} />
       )}
 
-      {activeTab === 'favorites' && (
-        <ClientFavorites clientId={session.user.id} />
-      )}
+      {activeTab === 'favorites' && session?.user?.id && (
+  <ClientFavorites clientId={session?.user?.id} />
+)}
+
 
       {activeTab === 'settings' && (
-        <ClientProfileSettings clientId={session.user.id} />
+        <ClientProfileSettings />
       )}
     </div>
   )

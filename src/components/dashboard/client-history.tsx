@@ -6,12 +6,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Clock, MapPin, Star, Filter, Search, ChevronDown, Calendar, User } from 'lucide-react'
+import { Clock, MapPin, Star, Filter, Search, ChevronDown, Calendar, User, Check } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
+
 
 interface ServiceRequest {
   id: string
@@ -56,16 +57,20 @@ const statusConfig = {
 
 export function ClientHistory({ clientId }: ClientHistoryProps) {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
-  const [filteredRequests, setFilteredRequests] = useState<ServiceRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
+  const [filteredRequests, setFilteredRequests] = useState<ServiceRequest[]>([])
   const [statusFilter, setStatusFilter] = useState<string>('ALL')
   const [sortBy, setSortBy] = useState<'date' | 'status' | 'rating'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [filterMenuOpen, setFilterMenuOpen] = useState(false)
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false)
 
   useEffect(() => {
+  if (clientId) {
     fetchServiceHistory()
-  }, [clientId])
+  }
+}, [clientId])
 
   useEffect(() => {
     filterAndSortRequests()
@@ -73,73 +78,79 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
 
   const fetchServiceHistory = async () => {
     try {
+      if (!clientId) return
       setLoading(true)
       
-      // Mock data for development - replace with actual API call
-      const mockData: ServiceRequest[] = [
-        {
-          id: '1',
-          status: 'COMPLETED',
-          description: 'Necessito de limpeza residencial completa para apartamento de 3 quartos',
-          preferredDate: '2025-06-10T10:00:00Z',
-          createdAt: '2025-06-08T09:00:00Z',
-          updatedAt: '2025-06-10T16:00:00Z',
-          address: 'Rua das Flores, 123',
-          city: 'São Paulo',
-          state: 'SP',
-          rating: 5,
-          review: 'Excelente trabalho! Muito satisfeito com o resultado.',
-          price: 150,
-          service: { id: '1', name: 'Limpeza Residencial', category: 'Limpeza' },
-          serviceProvider: {
-            id: '1',
-            user: { name: 'Maria Silva', profileImage: null },
-            rating: 4.8,
-            reviewCount: 127
-          }
-        },
-        {
-          id: '2',
-          status: 'PENDING',
-          description: 'Instalação de ar condicionado split 12000 BTUs',
-          preferredDate: '2025-06-15T14:00:00Z',
-          createdAt: '2025-06-12T10:30:00Z',
-          updatedAt: '2025-06-12T10:30:00Z',
-          address: 'Av. Paulista, 1000',
-          city: 'São Paulo',
-          state: 'SP',
-          price: 300,
-          service: { id: '2', name: 'Instalação de Ar Condicionado', category: 'Técnico' },
-          serviceProvider: {
-            id: '2',
-            user: { name: 'João Santos', profileImage: null },
-            rating: 4.9,
-            reviewCount: 89
-          }
-        },
-        {
-          id: '3',
-          status: 'REJECTED',
-          description: 'Reforma de banheiro - troca de azulejos e louças',
-          preferredDate: '2025-06-20T08:00:00Z',
-          createdAt: '2025-06-11T15:45:00Z',
-          updatedAt: '2025-06-12T09:15:00Z',
-          address: 'Rua dos Jardins, 456',
-          city: 'São Paulo',
-          state: 'SP',
-          service: { id: '3', name: 'Reforma de Banheiro', category: 'Reforma' },
-          serviceProvider: {
-            id: '3',
-            user: { name: 'Carlos Pereira', profileImage: null },
-            rating: 4.5,
-            reviewCount: 234
-          }
-        }
-      ]
+       const response = await fetch(`/api/requests/history?clientId=${clientId}`)
+        const data = await response.json()
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setRequests(mockData)
+        setRequests(data)
+
+      // Mock data for development - replace with actual API call
+      // const mockData: ServiceRequest[] = [
+      //   {
+      //     id: '1',
+      //     status: 'COMPLETED',
+      //     description: 'Necessito de limpeza residencial completa para apartamento de 3 quartos',
+      //     preferredDate: '2025-06-10T10:00:00Z',
+      //     createdAt: '2025-06-08T09:00:00Z',
+      //     updatedAt: '2025-06-10T16:00:00Z',
+      //     address: 'Rua das Flores, 123',
+      //     city: 'São Paulo',
+      //     state: 'SP',
+      //     rating: 5,
+      //     review: 'Excelente trabalho! Muito satisfeito com o resultado.',
+      //     price: 150,
+      //     service: { id: '1', name: 'Limpeza Residencial', category: 'Limpeza' },
+      //     serviceProvider: {
+      //       id: '1',
+      //       user: { name: 'Maria Silva', profileImage: null },
+      //       rating: 4.8,
+      //       reviewCount: 127
+      //     }
+      //   },
+      //   {
+      //     id: '2',
+      //     status: 'PENDING',
+      //     description: 'Instalação de ar condicionado split 12000 BTUs',
+      //     preferredDate: '2025-06-15T14:00:00Z',
+      //     createdAt: '2025-06-12T10:30:00Z',
+      //     updatedAt: '2025-06-12T10:30:00Z',
+      //     address: 'Av. Paulista, 1000',
+      //     city: 'São Paulo',
+      //     state: 'SP',
+      //     price: 300,
+      //     service: { id: '2', name: 'Instalação de Ar Condicionado', category: 'Técnico' },
+      //     serviceProvider: {
+      //       id: '2',
+      //       user: { name: 'João Santos', profileImage: null },
+      //       rating: 4.9,
+      //       reviewCount: 89
+      //     }
+      //   },
+      //   {
+      //     id: '3',
+      //     status: 'REJECTED',
+      //     description: 'Reforma de banheiro - troca de azulejos e louças',
+      //     preferredDate: '2025-06-20T08:00:00Z',
+      //     createdAt: '2025-06-11T15:45:00Z',
+      //     updatedAt: '2025-06-12T09:15:00Z',
+      //     address: 'Rua dos Jardins, 456',
+      //     city: 'São Paulo',
+      //     state: 'SP',
+      //     service: { id: '3', name: 'Reforma de Banheiro', category: 'Reforma' },
+      //     serviceProvider: {
+      //       id: '3',
+      //       user: { name: 'Carlos Pereira', profileImage: null },
+      //       rating: 4.5,
+      //       reviewCount: 234
+      //     }
+      //   }
+      // ]
+
+      // // Simulate API delay
+      // await new Promise(resolve => setTimeout(resolve, 1000))
+      // setRequests(mockData)
       
     } catch (error) {
       console.error('Error fetching service history:', error)
@@ -250,24 +261,112 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
               />
             </div>
             
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-            >
-              <option value="ALL">Todos os status</option>
-              <option value="PENDING">Pendente</option>
-              <option value="ACCEPTED">Aceito</option>
-              <option value="COMPLETED">Concluído</option>
-              <option value="REJECTED">Rejeitado</option>
-              <option value="CANCELLED">Cancelado</option>
-            </select>
             
-            <Button variant="outline" size="sm">
+<div className="relative w-full sm:w-auto">
+  <button
+    onClick={() => setStatusMenuOpen(!statusMenuOpen)}
+    className="w-full sm:w-auto px-3 py-2 border border-gray-300 bg-white rounded-md text-sm flex justify-between items-center"
+  >
+    <span>
+      {{
+        ALL: 'Todos os status',
+        PENDING: 'Pendente',
+        ACCEPTED: 'Aceito',
+        COMPLETED: 'Concluído',
+        REJECTED: 'Rejeitado',
+        CANCELLED: 'Cancelado'
+      }[statusFilter as keyof typeof statusConfig] ?? 'Todos os status'}
+    </span>
+    <ChevronDown className="w-4 h-4 ml-2 text-gray-500" />
+  </button>
+
+  {statusMenuOpen && (
+    <div className="absolute z-10 mt-2 w-full sm:w-[220px] bg-white border border-gray-200 rounded-md shadow-lg p-2 space-y-1">
+      {[
+        { value: 'ALL', label: 'Todos os status' },
+        { value: 'PENDING', label: 'Pendente' },
+        { value: 'ACCEPTED', label: 'Aceito' },
+        { value: 'COMPLETED', label: 'Concluído' },
+        { value: 'REJECTED', label: 'Rejeitado' },
+        { value: 'CANCELLED', label: 'Cancelado' }
+      ].map((option) => (
+        <button
+          key={option.value}
+          onClick={() => {
+            setStatusFilter(option.value)
+            setStatusMenuOpen(false)
+          }}
+          className={`flex items-center justify-between w-full px-3 py-1 text-sm rounded hover:bg-gray-100 ${
+            statusFilter === option.value ? 'font-semibold text-blue-600' : 'text-gray-700'
+          }`}
+        >
+          {option.label}
+          {statusFilter === option.value && <Check className="w-4 h-4" />}
+        </button>
+      ))}
+    </div>
+  )}
+</div>
+            
+            {/* <Button variant="outline" size="sm">
               <Filter className="w-4 h-4 mr-1" />
               Filtros
               <ChevronDown className="w-3 h-3 ml-1" />
-            </Button>
+            </Button> */}
+            <div className="relative w-full sm:w-auto">
+  <Button
+    variant="outline"
+    size="sm"
+    onClick={() => setFilterMenuOpen(!filterMenuOpen)}
+    className="w-full sm:w-auto"
+  >
+    <Filter className="w-4 h-4 mr-1" />
+    Filtros
+    <ChevronDown className="w-3 h-3 ml-1" />
+  </Button>
+
+  {filterMenuOpen && (
+    <div className="absolute z-10 mt-2 w-full sm:w-[220px] bg-white border border-gray-200 rounded-md shadow-lg p-2 space-y-2">
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Ordenar por</p>
+        {['date', 'status', 'rating'].map((option) => (
+          <button
+            key={option}
+            onClick={() => {
+              setSortBy(option as typeof sortBy)
+              setFilterMenuOpen(false)
+            }}
+            className={`flex items-center justify-between w-full px-3 py-1 text-sm rounded hover:bg-gray-100 ${
+              sortBy === option ? 'font-semibold text-blue-600' : 'text-gray-700'
+            }`}
+          >
+            {option === 'date' ? 'Data' : option === 'status' ? 'Status' : 'Avaliação'}
+            {sortBy === option && <Check className="w-4 h-4" />}
+          </button>
+        ))}
+      </div>
+
+      <div>
+        <p className="text-sm font-medium text-gray-700 mb-1">Ordem</p>
+        {['asc', 'desc'].map((order) => (
+          <button
+            key={order}
+            onClick={() => {
+              setSortOrder(order as typeof sortOrder)
+              setFilterMenuOpen(false)
+            }}
+            className={`flex items-center justify-between w-full px-3 py-1 text-sm rounded hover:bg-gray-100 ${
+              sortOrder === order ? 'font-semibold text-blue-600' : 'text-gray-700'
+            }`}
+          >
+            {order === 'asc' ? 'Crescente' : 'Decrescente'}
+            {sortOrder === order && <Check className="w-4 h-4" />}
+          </button>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
           </div>
         </div>
       </CardHeader>
