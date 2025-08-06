@@ -12,34 +12,82 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Eye, EyeOff, Mail, Lock, User, Phone, FileText } from 'lucide-react'
-import { UserType } from '@/types'
+import { UserTypeValues } from '@/types'
+import { useRouter } from 'next/navigation'
+
+type RegisterFormData = {
+  name: string
+  email: string
+  phone: string
+  cpfCnpj: string
+  userType: keyof typeof UserTypeValues
+  password: string
+  confirmPassword: string
+  acceptTerms: boolean
+}
 
 export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<RegisterFormData>({
     name: '',
     email: '',
     phone: '',
     cpfCnpj: '',
-    userType: UserType.CLIENT,
+    userType: 'CLIENT',
     password: '',
     confirmPassword: '',
     acceptTerms: false
   })
 
+  const router = useRouter()
+
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsLoading(true)
-    
-    // TODO: Implement registration logic
-    console.log('Registration attempt:', formData)
-    
-    setTimeout(() => {
-      setIsLoading(false)
-    }, 1000)
+  e.preventDefault()
+  setIsLoading(true)
+
+  const passwordInput = document.getElementById('password') as HTMLInputElement
+const confirmInput = document.getElementById('confirmPassword') as HTMLInputElement
+
+if (passwordInput.value !== confirmInput.value) {
+  confirmInput.setCustomValidity('As senhas não coincidem')
+  confirmInput.reportValidity()
+  setIsLoading(false)
+  return
+} else {
+  confirmInput.setCustomValidity('') // limpa o erro se estiver tudo certo
+}
+
+
+  try {
+    const response = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(formData),
+    })
+
+    const data = await response.json()
+
+    if (!response.ok) {
+      console.error('Erro ao registrar:', data)
+      alert(data.error || 'Erro ao registrar')
+    } else {
+      console.log('Registro concluído:', data)
+      alert(data.message)
+      // Redirecionar ou limpar formulário
+       router.push('/entrar')
+    }
+  } catch (err) {
+    console.error('Erro de rede:', err)
+    alert('Erro de rede ao registrar')
+  } finally {
+    setIsLoading(false)
   }
+}
+
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
@@ -79,15 +127,15 @@ export default function RegisterPage() {
               </label>
               <div className="grid grid-cols-2 gap-4">
                 <label className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                  formData.userType === UserType.CLIENT 
+                  formData.userType === UserTypeValues.CLIENT 
                     ? 'border-blue-500 bg-blue-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}>
                   <input
                     type="radio"
                     name="userType"
-                    value={UserType.CLIENT}
-                    checked={formData.userType === UserType.CLIENT}
+                    value={UserTypeValues.CLIENT}
+                    checked={formData.userType === UserTypeValues.CLIENT}
                     onChange={handleInputChange}
                     className="sr-only"
                   />
@@ -99,15 +147,15 @@ export default function RegisterPage() {
                 </label>
                 
                 <label className={`border-2 rounded-lg p-4 cursor-pointer transition-colors ${
-                  formData.userType === UserType.SERVICE_PROVIDER 
+                  formData.userType === UserTypeValues.SERVICE_PROVIDER 
                     ? 'border-blue-500 bg-blue-50' 
                     : 'border-gray-200 hover:border-gray-300'
                 }`}>
                   <input
                     type="radio"
                     name="userType"
-                    value={UserType.SERVICE_PROVIDER}
-                    checked={formData.userType === UserType.SERVICE_PROVIDER}
+                    value={UserTypeValues.SERVICE_PROVIDER}
+                    checked={formData.userType === UserTypeValues.SERVICE_PROVIDER}
                     onChange={handleInputChange}
                     className="sr-only"
                   />
@@ -233,7 +281,7 @@ export default function RegisterPage() {
                 </label>
                 <div className="mt-1 relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <Input
+                    <Input
                     id="confirmPassword"
                     name="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -242,7 +290,16 @@ export default function RegisterPage() {
                     placeholder="Confirme sua senha"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
+                    onInvalid={(e) =>
+                      e.currentTarget.setCustomValidity(
+                        formData.confirmPassword !== formData.password
+                          ? 'As senhas não coincidem'
+                          : ''
+                      )
+                    }
+                    onInput={(e) => e.currentTarget.setCustomValidity('')}
                   />
+
                   <button
                     type="button"
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"

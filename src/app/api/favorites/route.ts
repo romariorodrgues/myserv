@@ -68,27 +68,44 @@ export async function GET(request: NextRequest) {
     })
 
     // Format response
-    const formattedFavorites = favorites.map(favorite => ({
-      id: favorite.id,
-      providerId: favorite.serviceProviderId,
-      name: favorite.serviceProvider.user.name,
-      image: favorite.serviceProvider.user.profileImage,
-      services: favorite.serviceProvider.services.map(ps => ps.service.name),
-      category: favorite.serviceProvider.services[0]?.service.category.name || 'Diversos',
-      location: favorite.serviceProvider.user.address 
-        ? `${favorite.serviceProvider.user.address.city}, ${favorite.serviceProvider.user.address.state}`
-        : 'Localização não informada',
-      rating: 4.8, // TODO: Calculate from reviews
-      reviewCount: 125, // TODO: Calculate from reviews
-      basePrice: favorite.serviceProvider.services[0]?.basePrice || 0,
-      available: true, // TODO: Check availability
-      createdAt: favorite.createdAt
-    }))
+    const formattedFavorites = favorites.map(fav => ({
+  id: fav.id,
+  addedAt: fav.createdAt,
+  serviceProvider: {
+    id: fav.serviceProviderId,
+    user: {
+      name: fav.serviceProvider.user.name,
+      profileImage: fav.serviceProvider.user.profileImage,
+      phone: undefined, // ou preencha se quiser retornar o telefone
+    },
+    location: {
+      city: fav.serviceProvider.user.address?.city || '',
+      state: fav.serviceProvider.user.address?.state || '',
+      district: '', // ou preencha se tiver esse campo
+    },
+    services: fav.serviceProvider.services.map(ps => ({
+      id: ps.serviceId,
+      name: ps.service.name,
+      category: ps.service.category.name,
+      basePrice: ps.basePrice ?? undefined
+    })),
+    description: '', // Preencha se quiser
+    priceRange: '', // Preencha se quiser
+    isVerified: false, // ou ajuste se tiver lógica
+    isHighlighted: false, // ou ajuste se tiver lógica
+    availableScheduling: false, // ou ajuste se tiver lógica
+    rating: 4.8,
+    reviewCount: 125,
+    availability: {
+      nextAvailable: undefined,
+      responseTime: undefined
+    }
+  }
+}))
 
-    return NextResponse.json({
-      favorites: formattedFavorites,
-      total: formattedFavorites.length
-    })
+
+    return NextResponse.json(formattedFavorites)
+
 
   } catch (error) {
     console.error('Error fetching favorites:', error)

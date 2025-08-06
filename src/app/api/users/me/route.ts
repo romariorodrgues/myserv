@@ -55,57 +55,48 @@ export async function GET() {
 
 export async function PUT(req: Request) {
   const session = await getServerSession(authOptions)
-
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const body: ClientProfileData = await req.json()
-  const hasCompleteAddress =
-  body.address &&
-  body.address.state &&
-  body.address.city &&
-  body.address.district &&
-  body.address.street &&
-  body.address.number &&
-  body.address.zipCode;
+  const body: Partial<ClientProfileData> = await req.json()
 
   try {
     await prisma.$transaction(async (tx) => {
-      // Atualiza User e Address
+      // Atualiza dados básicos do usuário
       await tx.user.update({
         where: { id: session.user.id },
         data: {
           name: body.name,
           phone: body.phone,
           email: body.email,
-          profileImage: body.profileImage,
-          description: body.description,
+          profileImage: body.profileImage ?? undefined,
+          description: body.description ?? undefined,
           cpfCnpj: body.cpfCnpj,
-          address: hasCompleteAddress
-  ? {
-      upsert: {
-        create: {
-          state: body.address!.state!,
-          city: body.address!.city!,
-          district: body.address!.district!,
-          street: body.address!.street!,
-          number: body.address!.number!,
-          zipCode: body.address!.zipCode!,
-          complement: body.address!.complement ?? '',
-        },
-        update: {
-          state: body.address!.state!,
-          city: body.address!.city!,
-          district: body.address!.district!,
-          street: body.address!.street!,
-          number: body.address!.number!,
-          zipCode: body.address!.zipCode!,
-          complement: body.address!.complement ?? '',
-        },
-      },
-    }
-  : undefined,
+          address: body.address
+            ? {
+                upsert: {
+                  create: {
+                    state: body.address.state!,
+                    city: body.address.city!,
+                    district: body.address.district!,
+                    street: body.address.street!,
+                    number: body.address.number!,
+                    zipCode: body.address.zipCode!,
+                    complement: body.address.complement ?? '',
+                  },
+                  update: {
+                    state: body.address.state!,
+                    city: body.address.city!,
+                    district: body.address.district!,
+                    street: body.address.street!,
+                    number: body.address.number!,
+                    zipCode: body.address.zipCode!,
+                    complement: body.address.complement ?? '',
+                  },
+                },
+              }
+            : undefined,
           clientProfile: {
             upsert: {
               create: {},
@@ -121,7 +112,7 @@ export async function PUT(req: Request) {
         create: { userId: session.user.id },
       })
 
-      // Atualiza Preferences
+      // Preferences
       if (body.preferences) {
         await tx.clientPreferences.upsert({
           where: { clientProfileId: profile.id },
@@ -130,7 +121,7 @@ export async function PUT(req: Request) {
         })
       }
 
-      // Atualiza Privacy
+      // Privacy
       if (body.privacy) {
         await tx.clientPrivacy.upsert({
           where: { clientProfileId: profile.id },
@@ -140,7 +131,6 @@ export async function PUT(req: Request) {
       }
     })
 
-    // Retorna usuário atualizado completo
     const updatedUser = await prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
@@ -162,22 +152,23 @@ export async function PUT(req: Request) {
       cpfCnpj: updatedUser!.cpfCnpj,
       description: updatedUser!.description ?? '',
       userType: updatedUser!.userType,
-      profileImage: updatedUser!.profileImage,
-      address: updatedUser!.address ? {
-        street: updatedUser!.address.street,
-        number: updatedUser!.address.number,
-        district: updatedUser!.address.district,
-        city: updatedUser!.address.city,
-        state: updatedUser!.address.state,
-        zipCode: updatedUser!.address.zipCode,
-        complement: updatedUser!.address.complement ?? '',
-      } : undefined,
+      profileImage: updatedUser!.profileImage ?? '',
+      address: updatedUser!.address
+        ? {
+            street: updatedUser!.address.street,
+            number: updatedUser!.address.number,
+            district: updatedUser!.address.district,
+            city: updatedUser!.address.city,
+            state: updatedUser!.address.state,
+            zipCode: updatedUser!.address.zipCode,
+            complement: updatedUser!.address.complement ?? '',
+          }
+        : undefined,
       preferences: updatedUser!.clientProfile?.preferences as ClientProfileData['preferences'],
       privacy: updatedUser!.clientProfile?.privacy as ClientProfileData['privacy'],
     }
 
     return NextResponse.json({ user: responseData })
-
   } catch (error) {
     console.error('[PUT /me]', error)
     return NextResponse.json({ error: 'Erro ao atualizar perfil' }, { status: 500 })

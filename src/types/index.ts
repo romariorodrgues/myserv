@@ -1,9 +1,138 @@
-/**
- * TypeScript type definitions for MyServ platform
- * Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
- * 
- * Centralized type definitions for better type safety and code organization
- */
+// Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
+// Centralized type definitions for MyServ platform
+
+import { $Enums } from '@prisma/client'
+
+export type PrismaUserType = $Enums.UserType
+
+export const UserTypeValues = {
+  CLIENT: 'CLIENT',
+  SERVICE_PROVIDER: 'SERVICE_PROVIDER',
+  ADMIN: 'ADMIN',
+} as const
+
+export type UserType = typeof UserTypeValues[keyof typeof UserTypeValues]
+
+// ─── LEGACY ENUMS (DEPRECATED) ─────────────────────────────────────────
+// Note: these enums were replaced by the corresponding $Enums from Prisma
+
+// export enum UserType {
+//   CLIENT = 'CLIENT',
+//   SERVICE_PROVIDER = 'SERVICE_PROVIDER',
+//   ADMIN = 'ADMIN',
+// }
+
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE',
+  OTHER = 'OTHER',
+  PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY',
+}
+
+export enum MaritalStatus {
+  SINGLE = 'SINGLE',
+  MARRIED = 'MARRIED',
+  DIVORCED = 'DIVORCED',
+  WIDOWED = 'WIDOWED',
+  OTHER = 'OTHER',
+}
+
+export enum RequestType {
+  SCHEDULING = 'SCHEDULING',
+  QUOTE = 'QUOTE',
+}
+
+export enum RequestStatus {
+  PENDING = 'PENDING',
+  ACCEPTED = 'ACCEPTED',
+  REJECTED = 'REJECTED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED',
+}
+
+export enum PaymentMethod {
+  CREDIT_CARD = 'CREDIT_CARD',
+  DEBIT_CARD = 'DEBIT_CARD',
+  PIX = 'PIX',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  BOLETO = 'BOLETO',
+}
+
+export enum PaymentGateway {
+  MERCADO_PAGO = 'MERCADO_PAGO',
+  PAGAR_ME = 'PAGAR_ME',
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING',
+  PROCESSING = 'PROCESSING',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+}
+
+export enum BillingCycle {
+  MONTHLY = 'MONTHLY',
+  QUARTERLY = 'QUARTERLY',
+  ANNUALLY = 'ANNUALLY',
+}
+
+export enum SubscriptionStatus {
+  ACTIVE = 'ACTIVE',
+  CANCELLED = 'CANCELLED',
+  EXPIRED = 'EXPIRED',
+  SUSPENDED = 'SUSPENDED',
+}
+
+export enum NotificationType {
+  SERVICE_REQUEST = 'SERVICE_REQUEST',
+  PAYMENT = 'PAYMENT',
+  SYSTEM = 'SYSTEM',
+  PROMOTIONAL = 'PROMOTIONAL',
+}
+
+export enum ProfileVisibility {
+  PUBLIC = 'PUBLIC',
+  PRIVATE = 'PRIVATE',
+}
+
+// ─── INTERFACES ──────────────────────────────────────────────────────────
+
+export interface ClientProfileData {
+  id: string
+  name: string
+  email: string
+  phone?: string
+  cpfCnpj: string
+  description?: string
+  userType: UserType
+  profileImage?: string | null
+  address?: {
+    street?: string
+    number?: string
+    city?: string
+    state?: string
+    zipCode?: string
+    complement?: string
+    district?: string
+  }
+  preferences?: {
+    emailNotifications?: boolean
+    smsNotifications?: boolean
+    whatsappNotifications?: boolean
+    marketingEmails?: boolean
+    serviceReminders?: boolean
+    reviewRequests?: boolean
+  }
+  privacy?: {
+    profileVisibility?: ProfileVisibility
+    showPhone?: boolean
+    showEmail?: boolean
+    showLocation?: boolean
+  }
+}
 
 export interface User {
   id: string
@@ -24,43 +153,6 @@ export interface User {
   serviceProvider?: ServiceProvider
   clientProfile?: ClientProfile
 }
-
-// src/types/client.ts
-export interface ClientProfileData {
-  id: string
-  name: string
-  email: string
-  phone?: string
-  cpfCnpj: string
-  description?: string
-  userType: string
-  profileImage?: string | null
-  address?: {
-    street?: string
-    number?: string
-    city?: string
-    state?: string
-    zipCode?: string
-    complement?: string
-    district?: string // ✅ confirmado no schema
-  }
-  preferences?: {
-    emailNotifications: boolean
-    smsNotifications: boolean
-    whatsappNotifications: boolean
-    marketingEmails: boolean
-    serviceReminders: boolean
-    reviewRequests: boolean
-  }
-  privacy?: {
-    profileVisibility: 'PUBLIC' | 'PRIVATE'
-    showPhone: boolean
-    showEmail: boolean
-    showLocation: boolean
-  }
-}
-
-
 
 export interface ClientProfile {
   id: string
@@ -210,7 +302,8 @@ export interface SupportedRegion {
   isActive: boolean
 }
 
-// Form interfaces
+// ─── FORMS ───────────────────────────────────────────────────────────────
+
 export interface RegisterFormData {
   name: string
   email: string
@@ -244,6 +337,8 @@ export interface ServiceProviderFormData {
   services: string[]
 }
 
+// ─── UTILS / API ─────────────────────────────────────────────────────────
+
 export interface SearchFilters {
   query?: string
   serviceId?: string
@@ -257,7 +352,6 @@ export interface SearchFilters {
   hasQuoting?: boolean
 }
 
-// API Response types
 export interface ApiResponse<T = unknown> {
   success: boolean
   data?: T
@@ -282,75 +376,4 @@ export interface PaginatedResponse<T> {
     hasNext: boolean
     hasPrev: boolean
   }
-}
-
-// Enums
-export enum UserType {
-  CLIENT = 'CLIENT',
-  SERVICE_PROVIDER = 'SERVICE_PROVIDER',
-  ADMIN = 'ADMIN'
-}
-
-export enum Gender {
-  MALE = 'MALE',
-  FEMALE = 'FEMALE',
-  OTHER = 'OTHER',
-  PREFER_NOT_TO_SAY = 'PREFER_NOT_TO_SAY'
-}
-
-export enum MaritalStatus {
-  SINGLE = 'SINGLE',
-  MARRIED = 'MARRIED',
-  DIVORCED = 'DIVORCED',
-  WIDOWED = 'WIDOWED',
-  OTHER = 'OTHER'
-}
-
-export enum RequestType {
-  SCHEDULING = 'SCHEDULING',
-  QUOTE = 'QUOTE'
-}
-
-export enum RequestStatus {
-  PENDING = 'PENDING',
-  ACCEPTED = 'ACCEPTED',
-  REJECTED = 'REJECTED',
-  COMPLETED = 'COMPLETED',
-  CANCELLED = 'CANCELLED',
-  EXPIRED = 'EXPIRED'
-}
-
-export enum PaymentMethod {
-  CREDIT_CARD = 'CREDIT_CARD',
-  DEBIT_CARD = 'DEBIT_CARD',
-  PIX = 'PIX',
-  BANK_TRANSFER = 'BANK_TRANSFER',
-  BOLETO = 'BOLETO'
-}
-
-export enum PaymentGateway {
-  MERCADO_PAGO = 'MERCADO_PAGO',
-  PAGAR_ME = 'PAGAR_ME'
-}
-
-export enum PaymentStatus {
-  PENDING = 'PENDING',
-  PROCESSING = 'PROCESSING',
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  CANCELLED = 'CANCELLED',
-  REFUNDED = 'REFUNDED'
-}
-
-export enum BillingCycle {
-  MONTHLY = 'MONTHLY',
-  QUARTERLY = 'QUARTERLY',
-  ANNUALLY = 'ANNUALLY'
-}
-
-export enum NotificationType {
-  SERVICE_REQUEST = 'SERVICE_REQUEST',
-  PAYMENT = 'PAYMENT',
-  SYSTEM = 'SYSTEM',
-  PROMOTIONAL = 'PROMOTIONAL'
 }
