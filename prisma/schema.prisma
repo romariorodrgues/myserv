@@ -40,6 +40,11 @@ model User {
   payments        Payment[]
   notifications   Notification[]
   favorites       Favorite[]
+  
+  // Support Chat Relations
+  supportChats     SupportChat[]
+  sentMessages     SupportMessage[]
+  adminAssignments SupportAssignment[]
 
   @@map("users")
 }
@@ -455,4 +460,71 @@ enum NotificationType {
   PAYMENT
   SYSTEM
   PROMOTIONAL
+}
+
+enum ChatStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+// Support Chat System Models
+model SupportChat {
+  id          String     @id @default(cuid())
+  userId      String     // Cliente ou Prestador
+  status      ChatStatus @default(OPEN) // OPEN, IN_PROGRESS, CLOSED
+  priority    Priority   @default(MEDIUM) // LOW, MEDIUM, HIGH, URGENT
+  subject     String?    // Assunto do suporte
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  closedAt    DateTime?
+  closedBy    String?    // Admin que fechou
+  
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    SupportMessage[]
+  assignments SupportAssignment[]
+  
+  @@map("support_chats")
+}
+
+model SupportMessage {
+  id          String      @id @default(cuid())
+  chatId      String
+  senderId    String      // Quem enviou (user ou admin)
+  content     String
+  type        MessageType @default(TEXT) // TEXT, IMAGE, FILE
+  isFromAdmin Boolean     @default(false)
+  readAt      DateTime?
+  createdAt   DateTime    @default(now())
+  
+  chat        SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  sender      User        @relation(fields: [senderId], references: [id])
+  
+  @@map("support_messages")
+}
+
+model SupportAssignment {
+  id         String      @id @default(cuid())
+  chatId     String
+  adminId    String
+  assignedAt DateTime    @default(now())
+  isActive   Boolean     @default(true)
+  
+  chat       SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  admin      User        @relation(fields: [adminId], references: [id])
+  
+  @@map("support_assignments")
 }

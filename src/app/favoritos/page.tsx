@@ -127,7 +127,7 @@ export default function FavoritosPage() {
                 Entre na sua conta para acessar seus profissionais favoritos
               </p>
               <Button asChild>
-                <a href="/auth/signin">Fazer Login</a>
+                <a href="/entrar">Fazer Login</a>
               </Button>
             </CardContent>
           </Card>
