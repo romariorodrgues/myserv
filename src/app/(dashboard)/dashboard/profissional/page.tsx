@@ -32,6 +32,7 @@ import { ProviderMetrics } from '@/components/dashboard/provider-metrics'
 import { ProviderPriceManagement } from '@/components/dashboard/provider-price-management'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
 import { useQuery } from '@tanstack/react-query'
+import PlansSettings from '@/components/dashboard/plans-settings'
 
 interface Booking {
   id: string
@@ -62,16 +63,10 @@ function ProviderDashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
-  
-  // Temporary mock data for development
-  const mockSession = useMemo(
-    () => ({ user: { name: 'João Prestador', userType: 'SERVICE_PROVIDER', id: 'provider-1' } }),
-    []
-  )
 
 
   const fetchBookings = async (): Promise<Booking[]> => {
-    const currentSession = session || mockSession
+    const currentSession = session;
     if (!currentSession?.user?.id) {
       return []
     }
@@ -98,8 +93,8 @@ function ProviderDashboardContent() {
             city: 'São Paulo',
             state: 'SP',
             service: { name: 'Instalação de Ar Condicionado' },
-            client: { 
-              name: 'Maria Silva', 
+            client: {
+              name: 'Maria Silva',
               profileImage: null,
               phone: '(11) 99999-1111'
             },
@@ -115,8 +110,8 @@ function ProviderDashboardContent() {
             city: 'São Paulo',
             state: 'SP',
             service: { name: 'Reparo Elétrico' },
-            client: { 
-              name: 'Carlos Santos', 
+            client: {
+              name: 'Carlos Santos',
               profileImage: null,
               phone: '(11) 98888-2222'
             },
@@ -137,28 +132,6 @@ function ProviderDashboardContent() {
     queryFn: fetchBookings,
   })
 
-  useEffect(() => {
-    if (status === 'loading') return // Still loading
-    
-    // Check URL params for active tab
-    const tab = searchParams.get('tab')
-    if (tab && ['overview', 'schedule', 'history', 'metrics', 'pricing', 'settings'].includes(tab)) {
-      setActiveTab(tab as TDashboardTab)
-    }
-    
-    const currentSession = session || mockSession
-    if (!currentSession) {
-      router.push('/entrar')
-      return
-    }
-
-    if (currentSession.user.userType !== 'SERVICE_PROVIDER') {
-      router.push('/dashboard/cliente')
-      return
-    }
-
-  }, [session, status, router, searchParams, mockSession])
-
   const handleBookingAction = async (bookingId: string, newStatus: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
     try {
       const response = await fetch(`/api/bookings/${bookingId}`, {
@@ -172,7 +145,7 @@ function ProviderDashboardContent() {
       if (response.ok) {
         // Refresh bookings list
         await refetchBookings()
-        
+
         const statusText = newStatus === 'ACCEPTED' ? 'aceita' : newStatus === 'REJECTED' ? 'rejeitada' : 'marcada como concluída'
         alert(`Solicitação ${statusText} com sucesso!`)
       } else {
@@ -185,7 +158,28 @@ function ProviderDashboardContent() {
     }
   }
 
-  if (isLoading || isFetching) {
+  useEffect(() => {
+    if (status === 'loading') return // Still loading
+
+    // Check URL params for active tab
+    const tab = searchParams.get('tab')
+    if (tab && ['overview', 'schedule', 'history', 'metrics', 'pricing', 'settings'].includes(tab)) {
+      setActiveTab(tab as TDashboardTab)
+    }
+
+  }, [searchParams])
+
+  if (!session && status === 'unauthenticated') {
+    router.push('/entrar')
+    return
+  }
+
+  if (session && session.user.userType !== 'SERVICE_PROVIDER') {
+    router.push('/dashboard/cliente')
+    return
+  }
+
+  if (isLoading || isFetching || !session) {
     return (
       <div className="space-y-6 p-4">
         <div className="animate-pulse">
@@ -205,7 +199,7 @@ function ProviderDashboardContent() {
     )
   }
 
-  const currentSession = session || mockSession
+  const currentSession = session
   const pendingBookings = bookings.filter(b => b.status === 'PENDING').length
   const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length
   const completedBookings = bookings.filter(b => b.status === 'COMPLETED').length
@@ -240,11 +234,10 @@ function ProviderDashboardContent() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TDashboardTab)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-primary text-primary'
-                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                }`}
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
+                  ? 'border-primary text-primary'
+                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                  }`}
               >
                 <Icon className="h-4 w-4" />
                 <span className="whitespace-nowrap">{tab.label}</span>
@@ -327,17 +320,17 @@ function ProviderDashboardContent() {
                   <Calendar className="h-6 w-6 mb-2" />
                   Gerenciar Agenda
                 </Button>
-                
+
                 <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('pricing')}>
                   <DollarSign className="h-6 w-6 mb-2" />
                   Configurar Preços
                 </Button>
-                
+
                 <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('history')}>
                   <History className="h-6 w-6 mb-2" />
                   Ver Histórico
                 </Button>
-                
+
                 <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('metrics')}>
                   <BarChart3 className="h-6 w-6 mb-2" />
                   Ver Métricas
@@ -373,7 +366,7 @@ function ProviderDashboardContent() {
                             <p className="text-sm text-muted-foreground">
                               {booking.preferredDate ? new Date(booking.preferredDate).toLocaleDateString('pt-BR') : 'Data a definir'}
                             </p>
-                            
+
                             {/* WhatsApp Communication Section */}
                             <div className="mt-2">
                               <BookingWhatsAppContact
@@ -423,24 +416,24 @@ function ProviderDashboardContent() {
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">{booking.client.name}</p>
                           <p className="text-sm text-muted-foreground mb-3">{booking.description}</p>
-                          
+
                           {/* Action buttons for pending bookings */}
                           <div className="flex space-x-2 mb-3">
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => handleBookingAction(booking.id, 'ACCEPTED')}
                             >
                               Aceitar
                             </Button>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               variant="outline"
                               onClick={() => handleBookingAction(booking.id, 'REJECTED')}
                             >
                               Rejeitar
                             </Button>
                           </div>
-                          
+
                           {/* WhatsApp Communication for accepted bookings with completed payment */}
                           {booking.status !== 'PENDING' && (
                             <BookingWhatsAppContact
@@ -494,7 +487,7 @@ function ProviderDashboardContent() {
                             </p>
                           </div>
                         </div>
-                        
+
                         <BookingWhatsAppContact
                           booking={booking}
                           userType="SERVICE_PROVIDER"
@@ -553,48 +546,52 @@ function ProviderDashboardContent() {
       )}
 
       {activeTab === 'schedule' && (
-        <ProviderSchedule providerId={currentSession.user.id} />
+        <ProviderSchedule providerId={session.user.id} />
       )}
 
       {activeTab === 'history' && (
-        <ProviderServiceHistory providerId={currentSession.user.id} />
+        <ProviderServiceHistory providerId={session.user.id} />
       )}
 
       {activeTab === 'metrics' && (
-        <ProviderMetrics providerId={currentSession.user.id} />
+        <ProviderMetrics providerId={session.user.id} />
       )}
 
       {activeTab === 'pricing' && (
-        <ProviderPriceManagement providerId={currentSession.user.id} />
+        <ProviderPriceManagement providerId={session.user.id} />
       )}
 
       {activeTab === 'settings' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Configurações do Prestador</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <p className="text-muted-foreground">
-                Configurações avançadas do prestador em desenvolvimento...
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Button variant="outline" asChild>
-                  <Link href="/prestador/perfil">
-                    <User className="h-4 w-4 mr-2" />
-                    Editar Perfil
-                  </Link>
-                </Button>
-                <Button variant="outline" asChild>
-                  <Link href="/prestador/servicos">
-                    <Settings className="h-4 w-4 mr-2" />
-                    Gerenciar Serviços
-                  </Link>
-                </Button>
+        <div className='flex gap-4 flex-col'>
+          <Card>
+            <CardHeader>
+              <CardTitle>Configurações do Prestador</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <p className="text-muted-foreground">
+                  Configurações avançadas do prestador em desenvolvimento...
+                </p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Button variant="outline" asChild>
+                    <Link href="/prestador/perfil">
+                      <User className="h-4 w-4 mr-2" />
+                      Editar Perfil
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild>
+                    <Link href="/prestador/servicos">
+                      <Settings className="h-4 w-4 mr-2" />
+                      Gerenciar Serviços
+                    </Link>
+                  </Button>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <PlansSettings userId={session.user.id} />
+        </div>
       )}
     </div>
   )
