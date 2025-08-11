@@ -240,6 +240,55 @@ await prisma.clientPrivacy.upsert({
     },
   })
 
+  // creates plans
+
+  const startPlan = await prisma.plan.upsert({
+    where: { name: 'Start' },
+    update: {},
+    create: {
+      name: 'Start',
+      description: 'Plano inicial com recursos básicos para freelancers e pequenas empresas.',
+      price: 0,
+      features: JSON.stringify(['Propostas ilimitadas', 'Relatórios completos', 'Agenda personalizada', 'Controle de precificação de serviço']),
+      isActive: true,
+      billingCycle: 'MONTHLY',
+    },
+  })
+
+  await prisma.plan.upsert({
+    where: { name: 'Enterprise' },
+    update: {},
+    create: {
+      name: 'Enterprise',
+      description: 'Plano avançado com recursos completos para empresas de médio e grande porte.',
+      price: 59.90,
+      features: JSON.stringify(['Propostas ilimitadas', 'Relatórios completos', 'Agenda personalizada', 'Controle de precificação de serviço']),
+      isActive: true,
+      billingCycle: 'MONTHLY',
+    },
+  })
+
+//   console.log(JSON.stringify({
+//       serviceProviderId: provider.id,
+//       planId: startPlan.id,
+//       startDate: new Date(),
+//       status: 'ACTIVE',
+//       isAutoRenew: false,
+// }))
+
+  await prisma.subscription.create({
+    data: {
+      serviceProviderId: serviceProvider.id,
+      planId: startPlan.id,
+      startDate: new Date(),
+      status: 'ACTIVE',
+      isAutoRenew: false,
+    },
+  })
+
+
+
+
   console.log('✅ Database seeding completed!')
   console.log('\n📧 Test users created:')
   console.log('Admin: admin@myserv.com / admin123')
