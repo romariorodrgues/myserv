@@ -132,6 +132,7 @@ export interface ClientProfileData {
     showEmail?: boolean
     showLocation?: boolean
   }
+  plan: string,
 }
 
 export interface User {
