@@ -7,7 +7,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense, useMemo } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -590,7 +590,7 @@ function ProviderDashboardContent() {
             </CardContent>
           </Card>
 
-          <PlansSettings userId={session.user.id} />
+          <PlansSettings />
         </div>
       )}
     </div>
