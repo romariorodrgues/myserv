@@ -4,22 +4,16 @@ import { Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import axios from "axios";
 import { TSubscribeResponde } from "@/app/api/payments/subscribe/route";
-import { useQuery } from "@tanstack/react-query";
-import { ClientProfileData } from "@/types";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { StringDecoder } from "string_decoder";
 
-type TPlansSettingsProps = {
-  userId: string,
-}
-
-export default function PlansSettings({ userId }: TPlansSettingsProps) {
+export default function PlansSettings() {
   const [plan, setPlan] = useState<'Start' | 'Enterprise'>('Start')
-  const router = useRouter()
 
-  const { data: user } = useQuery<ClientProfileData>({
+  const { data } = useQuery({
     queryKey: ['user'],
     queryFn: async () => {
       const { data } = await axios.get('/api/users/me');
@@ -29,20 +23,26 @@ export default function PlansSettings({ userId }: TPlansSettingsProps) {
     staleTime: 1000 * 60 * 2, // 2 minutes
   })
 
-  const createPreference = useCallback(async () => {
-    const { data, status } = await axios.post<TSubscribeResponde>('/api/payments/subscribe', {
-      payer: {
-        name: user?.name, userEmail: user?.email
-      },
-    });
+  const createPreferenceMutation = useMutation({
+    mutationFn: async (userId: StringDecoder) => {
+      console.log(userId)
+      const { data, status } = await axios.post<TSubscribeResponde>('/api/payments/subscribe', {
+        payerId: userId,
+      });
 
-    if (status !== 200) {
-      throw new Error('Erro ao criar preferência de pagamento');
+      if (status !== 200) {
+        throw new Error('Erro ao criar preferência de pagamento');
+      }
+
+      return data
+    },
+    onSuccess: (data: TSubscribeResponde) => {
+      window.open(data.initialPoint);
+    },
+    onError: (e) => {
+      window.alert(e.message);
     }
-
-    router.push(data.initialPoint);
-  }, [])
-
+  })
 
   return (
     <Card className="">
@@ -102,8 +102,8 @@ export default function PlansSettings({ userId }: TPlansSettingsProps) {
                 <span className='font-semibold text-brand-bg text-base'>Aumento do score</span>
               </li>
             </ul>
-            <Button disabled={plan === 'Enterprise'} variant='outline' className='w-full mt-4 rounded-sm' onClick={createPreference}>
-              Assinar
+            <Button disabled={plan === 'Enterprise' || createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutateAsync(data.user.id)}>
+              {createPreferenceMutation.isPending ? 'Carregando...' : 'Assinar'}
             </Button>
           </div>
         </div>
