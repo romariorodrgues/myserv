@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         });
 
         if (!enterprisePlan) {
-          return NextResponse.json({ message: "Plan Not Found" }, { status: 404 });
+          return NextResponse.json({ message: "Plan not found or is not active" }, { status: 404 });
         }
 
         const serviceProviderId = paymentData.metadata.payer.provider_id as string;
@@ -153,7 +153,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { message: "Unhandled notification type:" + type },
+      { message: "Unhandled notification type: " + type },
       { status: 200 }
     );
   } catch (e) {
