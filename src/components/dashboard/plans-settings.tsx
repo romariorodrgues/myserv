@@ -4,31 +4,23 @@ import { Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { useState } from "react";
-import axios from "axios";
-import { TSubscribeResponde } from "@/app/api/payments/subscribe/route";
+import axios, { AxiosResponse } from "axios";
+import { SubscriptionResponse, CreatePreferenceResponse } from "@/app/api/payments/subscribe/route";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import { StringDecoder } from "string_decoder";
 
 export default function PlansSettings() {
-  const [plan, setPlan] = useState<'Start' | 'Enterprise'>('Start')
-
-  const { data } = useQuery({
-    queryKey: ['user'],
+  const { data: [subscription] } = useQuery<SubscriptionResponse[]>({
+    queryKey: ['subscription'],
+    initialData: [],
     queryFn: async () => {
-      const { data } = await axios.get('/api/users/me');
-      setPlan(data.user.plan);
+      const { data } = await axios.get<any, AxiosResponse<SubscriptionResponse[]>, any>('/api/payments/subscribe');
       return data;
     },
-    staleTime: 1000 * 60 * 2, // 2 minutes
   })
 
   const createPreferenceMutation = useMutation({
-    mutationFn: async (userId: StringDecoder) => {
-      console.log(userId)
-      const { data, status } = await axios.post<TSubscribeResponde>('/api/payments/subscribe', {
-        payerId: userId,
-      });
+    mutationFn: async () => {
+      const { data, status } = await axios.post<CreatePreferenceResponse>('/api/payments/subscribe');
 
       if (status !== 200) {
         throw new Error('Erro ao criar preferência de pagamento');
@@ -36,7 +28,7 @@ export default function PlansSettings() {
 
       return data
     },
-    onSuccess: (data: TSubscribeResponde) => {
+    onSuccess: (data: CreatePreferenceResponse) => {
       window.open(data.initialPoint);
     },
     onError: (e) => {
@@ -54,7 +46,7 @@ export default function PlansSettings() {
 
           {/* Card de plano start */}
           <div className='p-4 border-border rounded-sm bg-gradient-to-br from-brand-bg to-brand-teal relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
-            {plan === 'Start' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
+            {subscription?.plan.name === 'Start' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
             <h2 className='text-2xl font-bold mb-4 text-brand-navy'>Start</h2>
             <ul>
               <li className='flex items-center gap-2'>
@@ -81,7 +73,7 @@ export default function PlansSettings() {
 
           {/* Card de plano enterprise */}
           <div className='p-4 border-border rounded-sm bg-gradient-to-br from-brand-cyan to-brand-navy relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
-            {plan === 'Enterprise' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
+            {subscription?.plan.name === 'Enterprise' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
 
             <h2 className='text-2xl font-bold mb-4 text-brand-bg'>Enterprise</h2>
             <ul>
@@ -102,7 +94,7 @@ export default function PlansSettings() {
                 <span className='font-semibold text-brand-bg text-base'>Aumento do score</span>
               </li>
             </ul>
-            <Button disabled={plan === 'Enterprise' || createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutateAsync(data.user.id)}>
+            <Button disabled={subscription?.plan.name === 'Enterprise' || createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutate()}>
               {createPreferenceMutation.isPending ? 'Carregando...' : 'Assinar'}
             </Button>
           </div>
