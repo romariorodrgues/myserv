@@ -4,19 +4,13 @@ import { Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import axios, { AxiosResponse } from "axios";
-import { SubscriptionResponse, CreatePreferenceResponse } from "@/app/api/payments/subscribe/route";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import axios from "axios";
+import { CreatePreferenceResponse } from "@/app/api/payments/subscribe/route";
+import { useMutation } from "@tanstack/react-query";
+import useVerifyPlan from "@/hooks/use-verify-plan";
 
 export default function PlansSettings() {
-  const { data: [subscription] } = useQuery<SubscriptionResponse[]>({
-    queryKey: ['subscription'],
-    initialData: [],
-    queryFn: async () => {
-      const { data } = await axios.get<any, AxiosResponse<SubscriptionResponse[]>, any>('/api/payments/subscribe');
-      return data;
-    },
-  })
+  const { plan, subscriptions } = useVerifyPlan();
 
   const createPreferenceMutation = useMutation({
     mutationFn: async () => {
@@ -46,7 +40,7 @@ export default function PlansSettings() {
 
           {/* Card de plano start */}
           <div className='p-4 border-border rounded-sm bg-gradient-to-br from-brand-bg to-brand-teal relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
-            {subscription?.plan.name === 'Start' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
+            {plan === 'Start' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
             <h2 className='text-2xl font-bold mb-4 text-brand-navy'>Start</h2>
             <ul>
               <li className='flex items-center gap-2'>
@@ -73,7 +67,7 @@ export default function PlansSettings() {
 
           {/* Card de plano enterprise */}
           <div className='p-4 border-border rounded-sm bg-gradient-to-br from-brand-cyan to-brand-navy relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
-            {subscription?.plan.name === 'Enterprise' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
+            {plan === 'Enterprise' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
 
             <h2 className='text-2xl font-bold mb-4 text-brand-bg'>Enterprise</h2>
             <ul>
@@ -94,11 +88,22 @@ export default function PlansSettings() {
                 <span className='font-semibold text-brand-bg text-base'>Aumento do score</span>
               </li>
             </ul>
-            <Button disabled={subscription?.plan.name === 'Enterprise' || createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutate()}>
+            <Button disabled={plan === 'Enterprise' || createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutate()}>
               {createPreferenceMutation.isPending ? 'Carregando...' : 'Assinar'}
             </Button>
           </div>
         </div>
+        {
+          subscriptions[0] && (
+            <div className="w-full p-4 mt-8 bg-blue-100 rounded-md">
+              <p className="font-medium">O seu plano está em vigência até: {new Date(subscriptions[0].endDate || '').toLocaleString('pt-br', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+              })}</p>
+            </div>
+          )
+        }
       </CardContent>
     </Card>
   )
