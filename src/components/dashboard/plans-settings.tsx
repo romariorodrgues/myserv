@@ -74,7 +74,7 @@ export default function PlansSettings() {
                 <span className='font-semibold text-brand-navy text-base'>Controle de precificação de serviço</span>
               </li>
             </ul>
-            <Button disabled={plan === 'Start'} variant='outline' className='w-full mt-4 rounded-sm'>
+            <Button disabled={true} variant='outline' className='w-full mt-4 rounded-sm'>
               Assinar
             </Button>
           </div>
