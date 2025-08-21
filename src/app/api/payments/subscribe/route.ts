@@ -4,25 +4,80 @@ import { prisma } from "@/lib/prisma";
 import mercadoPagoConfig from "@/lib/mercadopago";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { SubscriptionStatus } from "@prisma/client";
+import { Plan } from "@/types";
 
-export type TSubscribeResponde = {
+export interface CreatePreferenceResponse {
   preferenceId: string;
   initialPoint: string;
 };
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json();
+export interface SubscriptionResponse {
+  id: string;
+  planId: string;
+  serviceProviderId: string;
+  status: SubscriptionStatus;
+  startDate: string;
+  endDate: string | null;
+  createdAt: string;
+  updatedAt: string;
+  plan: Plan;
+}
 
-    const payer = await prisma.user.findFirst({
-      where: { id: body.payerId, isActive: true },
+export async function GET() {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const serviceProvider = await prisma.serviceProvider.findFirst({
+      where: { userId: session.user.id },
       include: {
-        serviceProvider: true,
+        subscriptions: {
+          where: { status: "ACTIVE" },
+          include: { plan: true },
+        },
       },
     });
 
-    if (!payer)
-      return NextResponse.json({ message: "Payer Not Found" }, { status: 404 });
+    if (!serviceProvider)
+      return NextResponse.json(
+        { message: "You are not a provider" },
+        { status: 401 }
+      );
+
+    return NextResponse.json(serviceProvider.subscriptions, { status: 200 });
+  } catch (error: any) {
+    console.error(error);
+    return NextResponse.json(
+      { message: "Internal Server Error" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function POST() {
+  try {
+    const session = await getServerSession(authOptions);
+
+    if (!session?.user?.id || !session.user.name || !session.user.email) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const serviceProvider = await prisma.serviceProvider.findFirst({
+      where: { userId: session.user.id },
+      include: {
+        subscriptions: true,
+      },
+    });
+
+    if (!serviceProvider)
+      return NextResponse.json(
+        { message: "You are not a provider" },
+        { status: 401 }
+      );
 
     const enterprisePlan = await prisma.plan.findFirst({
       where: { name: "Enterprise", isActive: true },
@@ -45,22 +100,22 @@ export async function POST(req: Request) {
           },
         ],
         payer: {
-          name: payer.name,
-          email: payer.email,
+          name: session.user.name,
+          email: session.user.email,
         },
         back_urls: {
           success: `${process.env.BASE_URL}/success`,
           failure: `${process.env.BASE_URL}/error`,
           pending: `${process.env.BASE_URL}/pending`,
         },
-        notification_url: `${process.env.BASE_URL}/api/payments/webhook`,
+        notification_url: `${process.env.BASE_URL}/api/payments/webhook/subscribe`,
         auto_return: "approved",
         metadata: {
           payer: {
-            name: payer.name,
-            email: payer.email,
-            providerId: payer.serviceProvider?.id,
-            userId: payer.id,
+            name: session.user.name,
+            email: session.user.email,
+            providerId: serviceProvider.id,
+            userId: session.user.id,
           },
         },
         external_reference: enterprisePlan.id,
@@ -72,7 +127,7 @@ export async function POST(req: Request) {
         message:
           "A sua inscrição para o plano Enterprise está pendente. Faça o pagamento para aproveitar todos os benefícios.",
         title: "Pagamento Pendente",
-        userId: payer.id,
+        userId: session.user.id,
         type: "PAYMENT",
       },
     });
@@ -130,15 +185,18 @@ export async function PATCH() {
             update: {
               where: { id: startPlan?.id },
               data: {
-                status: 'ACTIVE',
-              }
+                status: "ACTIVE",
+              },
             },
           },
         },
       });
     }
 
-    return NextResponse.json({ message: 'Reset Subscriptions' }, { status: 200 });
+    return NextResponse.json(
+      { message: "Reset Subscriptions" },
+      { status: 200 }
+    );
   } catch (error: any) {
     return NextResponse.json(
       { error: "Internal Server Error", details: error.message },
