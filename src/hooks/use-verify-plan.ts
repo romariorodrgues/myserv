@@ -34,7 +34,7 @@ function useVerifyPlan(): useVerifyPlanResponse {
   );
 
   const isExpired = useMemo(
-    () => new Date(subscriptions[0]?.endDate || "") >= new Date(),
+    () => new Date(subscriptions[0]?.endDate || "") <= new Date(),
     [subscriptions]
   );
 
