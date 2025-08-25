@@ -10,7 +10,7 @@ import { useMutation } from "@tanstack/react-query";
 import useVerifyPlan from "@/hooks/use-verify-plan";
 
 export default function PlansSettings() {
-  const { plan, subscriptions } = useVerifyPlan();
+  const { plan, subscription } = useVerifyPlan();
 
   const createPreferenceMutation = useMutation({
     mutationFn: async () => {
@@ -94,13 +94,13 @@ export default function PlansSettings() {
           </div>
         </div>
         {
-          subscriptions[0] && (
+          subscription && (
             <div className="w-full p-4 mt-8 bg-blue-100 rounded-md">
-              <p className="font-medium">O seu plano está em vigência até: {new Date(subscriptions[0].endDate || '').toLocaleString('pt-br', {
+              <p className="font-medium">O seu plano está em vigência até: { subscription.endDate ?  new Date(subscription.endDate || '').toLocaleString('pt-br', {
                 day: '2-digit',
                 month: '2-digit',
                 year: '2-digit',
-              })}</p>
+              }): 'Data invalida'}</p>
             </div>
           )
         }
