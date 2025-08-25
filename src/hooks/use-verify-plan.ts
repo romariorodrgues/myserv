@@ -1,5 +1,4 @@
 import { SubscriptionResponse } from "@/app/api/payments/subscribe/route";
-import { Plan } from "@/types";
 import { useQuery } from "@tanstack/react-query";
 import axios, { AxiosResponse } from "axios";
 import { useMemo } from "react";
@@ -7,41 +6,29 @@ import { useMemo } from "react";
 type useVerifyPlanResponse = {
   plan: string;
   isExpired: boolean;
-  subscriptions: SubscriptionResponse[]
+  subscription?: SubscriptionResponse | null;
 };
 
 function useVerifyPlan(): useVerifyPlanResponse {
-  const { data: subscriptions } = useQuery<SubscriptionResponse[]>({
-    queryKey: ["subscriptions"],
-    initialData: [],
+  const { data: subscription } = useQuery<SubscriptionResponse | null>({
+    queryKey: ["subscription"],
     queryFn: async () => {
       const { data } = await axios.get<
         any,
-        AxiosResponse<SubscriptionResponse[]>,
+        AxiosResponse<SubscriptionResponse>,
         any
       >("/api/payments/subscribe");
+
       return data;
     },
   });
 
-  const currPlan = useMemo(
-    () =>
-      subscriptions.reduce<Plan>((prev, curr) => {
-        if (curr.status === "ACTIVE") return curr.plan;
-        return prev;
-      }, {} as Plan),
-    [subscriptions]
-  );
-
-  const isExpired = useMemo(
-    () => new Date(subscriptions[0]?.endDate || "") <= new Date(),
-    [subscriptions]
-  );
+  const isExpired = useMemo(() => !subscription, [subscription]);
 
   return {
-    plan: currPlan.name || "Start",
+    plan: subscription?.plan?.name || "Start",
     isExpired,
-    subscriptions,
+    subscription,
   };
 }
 
