@@ -10,7 +10,7 @@ import { Plan } from "@/types";
 export interface CreatePreferenceResponse {
   preferenceId: string;
   initialPoint: string;
-};
+}
 
 export interface SubscriptionResponse {
   id: string;
@@ -36,7 +36,7 @@ export async function GET() {
       where: { userId: session.user.id },
       include: {
         subscriptions: {
-          where: { status: "ACTIVE" },
+          where: { status: "ACTIVE", endDate: { gte: new Date() } },
           include: { plan: true },
         },
       },
@@ -48,7 +48,9 @@ export async function GET() {
         { status: 401 }
       );
 
-    return NextResponse.json(serviceProvider.subscriptions, { status: 200 });
+    return NextResponse.json(serviceProvider.subscriptions[0] || null, {
+      status: 200,
+    });
   } catch (error: any) {
     console.error(error);
     return NextResponse.json(
