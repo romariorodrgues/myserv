@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       payerPhone: booking.client.phone,
       payerDocument: booking.client.cpfCnpj,
       externalReference: bookingId,
-      notificationUrl: `${process.env.BASE_URL}/api/payments/webhook/`,
+      notificationUrl: `${process.env.BASE_URL}/api/payments/webhook/booking`,
       successUrl: `${process.env.BASE_URL}/pagamento/sucesso?booking=${bookingId}`,
       failureUrl: `${process.env.BASE_URL}/pagamento/erro?booking=${bookingId}`,
       pendingUrl: `${process.env.BASE_URL}/pagamento/pendente?booking=${bookingId}`,
@@ -239,7 +239,7 @@ export async function GET(request: NextRequest) {
           id: payment.serviceRequest.id,
           service: payment.serviceRequest.service.name,
           client: payment.serviceRequest.client.name,
-          provider: payment.serviceRequest.provider.user.name
+          provider: payment.serviceRequest.provider.name
         } : null
       }
     })
