@@ -34,6 +34,7 @@ import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-c
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
 import axios from 'axios'
+import PaymentHistory from '@/components/dashboard/payments-history'
 
 interface Booking {
   id: string
@@ -531,8 +532,8 @@ function ProviderDashboardContent() {
               </div>
             </CardContent>
           </Card>
-
           <PlansSettings />
+          <PaymentHistory />
         </div>
       )}
     </div>
