@@ -110,7 +110,7 @@ export async function POST() {
           failure: `${process.env.BASE_URL}/error`,
           pending: `${process.env.BASE_URL}/pending`,
         },
-        notification_url: `${process.env.BASE_URL}/api/payments/webhook/subscribe`,
+        notification_url: `${process.env.BASE_URL}/api/payments/webhook/subscription`,
         auto_return: "approved",
         metadata: {
           payer: {
