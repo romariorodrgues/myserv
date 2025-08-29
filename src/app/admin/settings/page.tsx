@@ -79,6 +79,12 @@ export default function AdminSettingsPage() {
                 >
                   🛠️ Serviços
                 </Link>
+                <Link 
+                  href="/admin/categories"
+                  className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100"
+                >
+                  🧭 Categorias
+                </Link>
                 <div className="border-t pt-2 mt-4">
                   <span className="block px-3 py-2 text-sm font-medium bg-blue-50 text-blue-700 rounded-md">
                     ⚙️ Configurações

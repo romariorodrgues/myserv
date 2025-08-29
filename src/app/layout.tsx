@@ -85,8 +85,11 @@ export default function RootLayout({
       </head>
       <body>
         <ReactQueryProvider>
-
          <ClientLayoutWrapper>
+         <div
+            suppressHydrationWarning
+            className="font-sans antialiased bg-gradient-to-br from-brand-bg via-white to-brand-teal/10 min-h-screen text-primary transition-colors duration-300"
+         >
         <div className="relative min-h-screen flex flex-col">
           {/* Efeito visual de background animado */}
           <div className="pointer-events-none fixed inset-0 z-0 opacity-60 blur-2xl select-none" aria-hidden="true">

@@ -34,7 +34,7 @@ interface Appointment {
   date: string
   startTime: string
   endTime: string
-  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLETED'
+  status: 'ACCEPTED' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | 'REJECTED'
   client: {
     name: string
     phone?: string
@@ -66,11 +66,11 @@ const DEFAULT_TIME_SLOTS = [
   { startTime: '17:00', endTime: '18:00' }
 ]
 
-export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
+export function ProviderSchedule({ providerId, initialTab, initialDate }: ProviderScheduleProps & { initialTab?: 'schedule'|'appointments'|'settings'; initialDate?: string }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments' | 'settings'>('schedule')
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments' | 'settings'>(initialTab || 'schedule')
+  const [selectedDate, setSelectedDate] = useState(initialDate || new Date().toISOString().split('T')[0])
   const [showTimeSlotForm, setShowTimeSlotForm] = useState<number | null>(null)
   
   // Schedule data
@@ -85,6 +85,11 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
     initializeSchedule()
     fetchAppointments()
   }, [providerId])
+
+  // Recarrega agendamentos ao trocar a data
+  useEffect(() => {
+    if (activeTab === 'appointments') fetchAppointments()
+  }, [selectedDate, activeTab])
 
   const initializeSchedule = () => {
     // Initialize with default working days (Monday to Friday)
@@ -105,7 +110,8 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
 
   const fetchAppointments = async () => {
     try {
-      const response = await fetch(`/api/schedule?providerId=${providerId}&type=appointments`)
+      const qs = new URLSearchParams({ providerId: providerId || '', type: 'appointments', date: selectedDate })
+      const response = await fetch(`/api/schedule?${qs.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setAppointments(data.appointments || [])
@@ -258,16 +264,29 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
     }
   }
 
-  const getAppointmentsForDate = (date: string) => {
-    return appointments.filter(apt => apt.date === date)
+  const getAppointmentsForDate = (date: string) => appointments.filter(apt => apt.date === date)
+
+  // Ações: aceitar/recusar/concluir
+  const updateAppointmentStatus = async (id: string, status: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
+    try {
+      const res = await fetch(`/api/bookings/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao atualizar')
+      toast.success(status === 'ACCEPTED' ? 'Agendamento aceito' : status === 'REJECTED' ? 'Agendamento recusado' : 'Serviço marcado como concluído')
+      await fetchAppointments()
+    } catch (e) {
+      console.error(e)
+      toast.error('Erro ao atualizar agendamento')
+    }
   }
 
   const getStatusBadge = (status: Appointment['status']) => {
     const config = {
-      CONFIRMED: { label: 'Confirmado', className: 'bg-green-100 text-green-800' },
+      ACCEPTED: { label: 'Aceito', className: 'bg-green-100 text-green-800' },
       PENDING: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
       CANCELLED: { label: 'Cancelado', className: 'bg-red-100 text-red-800' },
-      COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' }
+      COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' },
+      REJECTED: { label: 'Recusado', className: 'bg-gray-100 text-gray-800' }
     }
     
     return (
@@ -522,19 +541,19 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                       <div className="flex space-x-2">
                         {appointment.status === 'PENDING' && (
                           <>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'ACCEPTED')}>
                               <CheckCircle className="w-4 h-4 mr-1" />
                               Aceitar
                             </Button>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'REJECTED')}>
                               <X className="w-4 h-4 mr-1" />
                               Recusar
                             </Button>
                           </>
                         )}
                         
-                        {appointment.status === 'CONFIRMED' && (
-                          <Button size="sm" variant="outline">
+                        {appointment.status === 'ACCEPTED' && (
+                          <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'COMPLETED')}>
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Marcar como Concluído
                           </Button>

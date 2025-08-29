@@ -8,7 +8,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
@@ -59,11 +59,24 @@ interface BookingData {
 export default function ServiceRequestPage() {
   const params = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session, status } = useSession()
   const serviceId = params.serviceId as string
 
   const [service, setService] = useState<Service | null>(null)
-  const [selectedProvider, setSelectedProvider] = useState<string>('')
+  const [selectedProvider, setSelectedProvider] = useState<string>('') // ServiceProviderService.id
+  const [selectedProviderProfileId, setSelectedProviderProfileId] = useState<string>('') // ServiceProvider.id
+  const [selectedProviderLocked, setSelectedProviderLocked] = useState(false)
+  const [providerProfile, setProviderProfile] = useState<null | {
+    id: string
+    name: string
+    profileImage: string | null
+    city?: string
+    state?: string
+    stats?: { averageRating: number; totalReviews: number }
+    basePrice?: number
+    description?: string
+  }>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [bookingData, setBookingData] = useState<BookingData>({
@@ -113,13 +126,94 @@ export default function ServiceRequestPage() {
       if (response.ok) {
         const data = await response.json()
         setService(data.service)
+
+        // Seleção inicial do prestador
+        const providerIdFromQuery = searchParams.get('providerId') || '' // ServiceProvider.id opcional
+        const providers: any[] = data.service?.providers || []
+        let chosen = providers[0]
+        if (providerIdFromQuery) {
+          const match = providers.find(p => p.serviceProvider.id === providerIdFromQuery)
+          if (match) chosen = match
+        }
+        if (chosen) {
+          setSelectedProvider(chosen.id) // SPS id
+          setSelectedProviderProfileId(chosen.serviceProvider.id)
+          setSelectedProviderLocked(!!providerIdFromQuery)
+
+          // fallback imediato com dados do provider
+          setProviderProfile({
+            id: chosen.serviceProvider.id,
+            name: chosen.serviceProvider.user.name,
+            profileImage: chosen.serviceProvider.user.profileImage,
+            city: chosen.serviceProvider.user.address?.city,
+            state: chosen.serviceProvider.user.address?.state,
+            stats: { averageRating: 0, totalReviews: 0 },
+            basePrice: chosen.basePrice,
+            description: chosen.description,
+          })
+        }
       }
     } catch (error) {
       console.error('Error fetching service:', error)
     } finally {
       setLoading(false)
     }
-  }, [serviceId])
+  }, [serviceId, searchParams])
+
+  // Carrega perfil detalhado do prestador selecionado (para a coluna lateral)
+  useEffect(() => {
+    const loadProviderProfile = async () => {
+      const chosen = service?.providers?.find((p: any) => p.id === selectedProvider)
+      // fallback imediato com dados mínimos do serviço
+      if (chosen && !providerProfile) {
+        setProviderProfile({
+          id: chosen.serviceProvider.id,
+          name: chosen.serviceProvider.user.name,
+          profileImage: chosen.serviceProvider.user.profileImage,
+          basePrice: chosen.basePrice,
+          description: chosen.description,
+          city: undefined,
+          state: undefined,
+          stats: { averageRating: 0, totalReviews: 0 },
+        })
+      }
+
+      try {
+        const profileId = selectedProviderProfileId || chosen?.serviceProvider.id
+        if (!profileId) return
+        const res = await fetch(`/api/service-providers/${profileId}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (!data.success) return
+        const sp = data.data
+        setProviderProfile((prev) => ({
+          id: sp.id,
+          name: sp.user.name,
+          profileImage: sp.user.profileImage,
+          city: sp.user.address?.city,
+          state: sp.user.address?.state,
+          stats: {
+            averageRating: Number(sp.statistics?.averageRating || 0),
+            totalReviews: Number(sp.statistics?.totalReviews || 0),
+          },
+          basePrice: chosen?.basePrice ?? prev?.basePrice,
+          description: chosen?.description ?? prev?.description,
+        }))
+      } catch (e) {
+        // ignora; fallback já cobre
+      }
+    }
+    loadProviderProfile()
+  }, [selectedProvider, selectedProviderProfileId, service])
+
+  // Sempre que o provider selecionado mudar, sincroniza no bookingData.providerId
+  useEffect(() => {
+    if (!service || !selectedProvider) return
+    const selected = service.providers.find((p) => p.id === selectedProvider)
+    if (selected) {
+      setBookingData((prev) => ({ ...prev, providerId: selected.serviceProvider.id }))
+    }
+  }, [selectedProvider, service])
 
   useEffect(() => {
     fetchService()
@@ -140,6 +234,7 @@ export default function ServiceRequestPage() {
     const selectedProviderData = service?.providers.find(p => p.id === providerServiceId)
     if (selectedProviderData) {
       setSelectedProvider(providerServiceId)
+      setSelectedProviderProfileId(selectedProviderData.serviceProvider.id)
       setBookingData(prev => ({
         ...prev,
         providerId: selectedProviderData.serviceProvider.id
@@ -188,22 +283,17 @@ export default function ServiceRequestPage() {
     setSubmitting(true)
 
     try {
-      const response = await fetch('/api/bookings', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bookingData)
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        alert('Solicitação enviada com sucesso!')
-        router.push(`/dashboard/cliente?booking=${data.booking.id}`)
-      } else {
-        const error = await response.json()
-        alert(error.error || 'Erro ao enviar solicitação')
+      // SEMPRE abre a agenda para o cliente escolher dia/horário.
+      const providerProfileId = selectedProviderProfileId || service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.id
+      if (!providerProfileId) {
+        alert('Não foi possível identificar o prestador. Tente novamente.')
+        return
       }
+
+      const payload = { ...bookingData, serviceId, providerId: providerProfileId }
+      try { sessionStorage.setItem('pendingBooking', JSON.stringify(payload)) } catch {}
+      router.push(`/servico/${serviceId}/agendar?providerId=${providerProfileId}`)
+      return
     } catch (error) {
       console.error('Error submitting booking:', error)
       alert('Erro ao enviar solicitação')
@@ -507,18 +597,23 @@ export default function ServiceRequestPage() {
                     </div>
                   )}
                   
-                  <div className="flex justify-end">
+                  <div className="flex justify-end gap-2">
+                    {selectedProvider && service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling ? (
+                      <Button
+                        type="button"
+                        onClick={() => router.push(`/servico/${serviceId}/agendar?providerId=${selectedProviderProfileId}`)}
+                        className="px-8 py-2"
+                      >
+                        Escolher Data na Agenda
+                      </Button>
+                    ) : null}
+
                     <Button
                       type="submit"
                       disabled={submitting || !isFormValid()}
                       className="px-8 py-2"
                     >
-                      {submitting 
-                        ? 'Enviando...' 
-                        : selectedProvider && service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling
-                          ? 'Agendar Serviço'
-                          : 'Solicitar Orçamento'
-                      }
+                      {submitting ? 'Enviando…' : 'Solicitar Orçamento'}
                     </Button>
                   </div>
                 </div>
@@ -526,78 +621,81 @@ export default function ServiceRequestPage() {
             </Card>
           </div>
 
-          {/* Providers List */}
+          {/* Provider Profile (fixo quando vier providerId na URL; fallback para o primeiro da lista) */}
           <div>
             <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Escolha um Profissional</h2>
-              
-              {service.providers.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">
-                  Nenhum profissional disponível para este serviço
-                </p>
+              <h2 className="text-xl font-semibold mb-4">Profissional</h2>
+              {service?.providers?.length === 0 ? (
+                <p className="text-gray-500">Nenhum profissional disponível para este serviço.</p>
               ) : (
-                <div className="space-y-4">
-                  {service.providers.map((provider) => (
-                    <div
-                      key={provider.id}
-                      className={`p-4 border rounded-lg cursor-pointer transition-colors ${
-                        selectedProvider === provider.id
-                          ? 'border-blue-500 bg-blue-50'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => handleProviderSelect(provider.id)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <h3 className="font-medium text-gray-900">
-                            {provider.serviceProvider.user.name}
-                          </h3>
-                          <div className="flex items-center mt-1">
-                            <div className="flex text-yellow-400">
-                              {'★'.repeat(4)}
-                              {'☆'.repeat(1)}
-                            </div>
-                            <span className="ml-2 text-sm text-gray-500">
-                              (4.8 - Avaliação padrão)
+                (() => {
+                  const chosen = service?.providers?.find((p: any) => p.id === selectedProvider) || service?.providers?.[0]
+                  const name = providerProfile?.name || chosen?.serviceProvider?.user?.name || 'Profissional'
+                  const photo = providerProfile?.profileImage || chosen?.serviceProvider?.user?.profileImage || ''
+                  const city = providerProfile?.city || chosen?.serviceProvider?.user?.address?.city
+                  const state = providerProfile?.state || chosen?.serviceProvider?.user?.address?.state
+                  const price = (providerProfile?.basePrice ?? chosen?.basePrice)
+                  const desc = providerProfile?.description ?? chosen?.description
+
+                  return (
+                    <div className="flex items-start gap-4">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        {photo ? (
+                          <Image src={photo} alt={name} width={64} height={64} className="w-16 h-16 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-16 h-16 rounded-full bg-brand-cyan/10 flex items-center justify-center">
+                            <User className="h-8 w-8 text-brand-cyan" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1">
+                        <h3 className="font-semibold text-brand-navy text-lg">{name}</h3>
+                        <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
+                          {/* Placeholder Rating */}
+                          <span className="inline-flex items-center">
+                            <span className="text-yellow-500">★</span>
+                            <span className="ml-1 font-medium">{(providerProfile?.stats?.averageRating ?? 0).toFixed(1)}</span>
+                            <span className="ml-1 text-gray-500">({providerProfile?.stats?.totalReviews ?? 0})</span>
+                          </span>
+                          {city && state && (
+                            <span className="inline-flex items-center">
+                              <MapPin className="h-4 w-4 mr-1" />
+                              {city}, {state}
                             </span>
-                          </div>
-                          <p className="text-sm text-gray-600 mt-2">
-                            {provider.description}
-                          </p>
-                          <div className="flex items-center gap-4 mt-2">
-                            <p className="text-sm font-medium text-green-600">
-                              A partir de R$ {provider.basePrice.toFixed(2)}
-                            </p>
-                            {provider.serviceProvider.hasScheduling && (
-                              <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
-                                Agendamento
-                              </span>
-                            )}
-                            {provider.serviceProvider.hasQuoting && (
-                              <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded-full">
-                                Orçamento
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="ml-4">
-                          {provider.serviceProvider.user.profileImage ? (
-                            <Image
-                              src={provider.serviceProvider.user.profileImage}
-                              alt={provider.serviceProvider.user.name}
-                              width={48}
-                              height={48}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center">
-                              <User className="h-6 w-6 text-gray-400" />
-                            </div>
                           )}
                         </div>
+                        {desc && <p className="text-sm text-gray-600 mt-2 line-clamp-3">{desc}</p>}
+                        {typeof price === 'number' && (
+                          <p className="text-sm font-medium text-green-600 mt-2">
+                            A partir de R$ {price.toFixed(2)}
+                          </p>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  )
+                })()
+              )}
+
+              {!selectedProviderLocked && service?.providers?.length > 1 && (
+                <div className="mt-6 border-t pt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Outros profissionais deste serviço</h3>
+                  <div className="space-y-2">
+                    {service?.providers?.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => setSelectedProvider(p.id)}
+                        className={`w-full text-left px-3 py-2 rounded border ${selectedProvider === p.id ? 'border-brand-cyan bg-brand-cyan/5' : 'border-gray-200 hover:bg-gray-50'}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm">{p.serviceProvider.user.name}</span>
+                          <span className="text-xs text-gray-500">R$ {p.basePrice?.toFixed(2)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </Card>

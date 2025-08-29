@@ -12,6 +12,7 @@ import { useRouter } from 'next/navigation'
 import { Search, MapPin, Locate, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import ServiceSuggestInput from '@/components/services/service-suggest-input'
 import GoogleMapsService from '@/lib/maps-service'
 import { AlternativeGeocodingService } from '@/lib/alternative-geocoding'
 
@@ -22,6 +23,7 @@ interface HomepageSearchProps {
 export default function HomepageSearch({ className = '' }: HomepageSearchProps) {
   const router = useRouter()
   const [serviceQuery, setServiceQuery] = useState('')
+  const [leafId, setLeafId] = useState<string | undefined>(undefined)
   const [locationQuery, setLocationQuery] = useState('')
   const [isLoadingLocation, setIsLoadingLocation] = useState(false)
   const [hasLocationPermission, setHasLocationPermission] = useState<boolean | null>(null)
@@ -128,17 +130,15 @@ export default function HomepageSearch({ className = '' }: HomepageSearchProps) 
   }
 
   const handleSearch = () => {
-    if (!serviceQuery.trim()) {
+    if (!serviceQuery.trim() && !locationQuery.trim()) {
       alert('Por favor, digite o serviço que você precisa.')
       return
     }
 
     // Build search URL with parameters
     const params = new URLSearchParams()
-    
-    if (serviceQuery.trim()) {
-      params.set('q', serviceQuery.trim())
-    }
+    if (leafId) params.set('leafCategoryId', leafId)
+    else if (serviceQuery.trim()) params.set('q', serviceQuery.trim())
     
     if (locationQuery.trim()) {
       params.set('local', locationQuery.trim())
@@ -160,14 +160,21 @@ export default function HomepageSearch({ className = '' }: HomepageSearchProps) 
         {/* Service Search Input */}
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <Input
-            type="text"
-            value={serviceQuery}
-            onChange={(e) => setServiceQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Que serviço você precisa?"
-            className="pl-12 h-14 text-lg"
-          />
+          <div className="pl-12">
+            <ServiceSuggestInput
+              placeholder="Que serviço você precisa?"
+              defaultValue={serviceQuery}
+              onSelect={(item) => {
+                if (item.type === 'leaf' && item.id) {
+                  setLeafId(item.id)
+                  setServiceQuery(item.name)
+                } else {
+                  setLeafId(undefined)
+                  setServiceQuery(item.name)
+                }
+              }}
+            />
+          </div>
         </div>
 
         {/* Location Input */}
@@ -204,7 +211,7 @@ export default function HomepageSearch({ className = '' }: HomepageSearchProps) 
           size="lg" 
           className="h-14 px-8 text-lg"
           onClick={handleSearch}
-          disabled={!serviceQuery.trim()}
+          disabled={!serviceQuery.trim() && !locationQuery.trim()}
         >
           Buscar
         </Button>

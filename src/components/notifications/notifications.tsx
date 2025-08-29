@@ -37,11 +37,9 @@ export function NotificationsComponent({
 
   useEffect(() => {
     fetchNotifications()
-    
-    // Set up polling for real-time updates
-    const interval = setInterval(fetchNotifications, 30000) // Every 30 seconds
-    
-    return () => clearInterval(interval)
+    const onFocus = () => fetchNotifications()
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
   }, [userId])
 
   const fetchNotifications = async () => {

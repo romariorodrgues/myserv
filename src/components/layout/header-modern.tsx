@@ -18,6 +18,7 @@ import {
   Home, ListChecks, MessageSquare, HelpCircle,
   Briefcase, UserPlus
 } from 'lucide-react'
+import { NotificationDropdown } from '@/components/notifications/real-time-notifications'
 
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -235,37 +236,8 @@ export function Header() {
             <div className="h-8 w-24 bg-gray-200 animate-pulse rounded-md"></div>
           ) : isAuthenticated ? (
             <>
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative hover:bg-brand-cyan/10 transition-colors duration-200">
-                    <Bell className="h-5 w-5" />
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-brand-teal text-white text-[10px] animate-bounce">
-                      2
-                    </Badge>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <DropdownMenuLabel>Notificações</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <div className="max-h-80 overflow-y-auto">
-                    <div className="p-2 hover:bg-gray-50 cursor-pointer rounded transition-colors duration-200">
-                      <p className="text-sm font-medium">Agendamento confirmado</p>
-                      <p className="text-xs text-muted-foreground">Seu serviço de limpeza foi confirmado</p>
-                      <p className="text-xs text-muted-foreground">Há 5 minutos</p>
-                    </div>
-                    <div className="p-2 hover:bg-gray-50 cursor-pointer rounded transition-colors duration-200">
-                      <p className="text-sm font-medium">Nova mensagem</p>
-                      <p className="text-xs text-muted-foreground">Maria enviou uma mensagem sobre seu orçamento</p>
-                      <p className="text-xs text-muted-foreground">Há 1 hora</p>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <Link href="/notifications" className="block p-2 text-center text-sm text-secondary hover:underline">
-                    Ver todas
-                  </Link>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Notifications (reais) */}
+              <NotificationDropdown />
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

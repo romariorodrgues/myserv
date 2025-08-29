@@ -25,8 +25,9 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useNotifications, Notification } from '@/hooks/use-notifications'
+import { useNotifications, Notification, useNotificationCount } from '@/hooks/use-notifications'
 import { useSession } from 'next-auth/react'
 
 interface NotificationDropdownProps {
@@ -121,7 +122,7 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClick }: Not
 
   return (
     <div
-      className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors ${
+      className={`group relative p-4 border-b border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors w-full box-border ${
         !notification.isRead ? 'bg-blue-50/30' : ''
       }`}
       onClick={handleClick}
@@ -192,16 +193,20 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   
-  const { 
-    notifications, 
-    unreadCount, 
-    loading, 
+  const router = useRouter()
+  const {
+    notifications,
+    unreadCount,
+    loading,
     error,
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    refresh 
-  } = useNotifications({ limit: 10 })
+    refresh,
+    subscribe,
+    unsubscribe,
+  } = useNotifications({ limit: 10 }, { auto: false })
+  const { count } = useNotificationCount()
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -215,6 +220,16 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  useEffect(() => {
+    if (isOpen) {
+      refresh()
+      subscribe()
+    } else {
+      unsubscribe()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen])
+
   if (!session) return null
 
   return (
@@ -225,21 +240,21 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
         onClick={() => setIsOpen(!isOpen)}
         className="relative h-10 w-10 p-0"
       >
-        {unreadCount > 0 ? (
+        {(unreadCount || count) > 0 ? (
           <BellDot className="h-5 w-5" />
         ) : (
           <Bell className="h-5 w-5" />
         )}
         
-        {unreadCount > 0 && (
+        {(unreadCount || count) > 0 && (
           <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-            {unreadCount > 99 ? '99+' : unreadCount}
+            {(unreadCount || count) > 99 ? '99+' : (unreadCount || count)}
           </span>
         )}
       </Button>
 
       {isOpen && (
-        <Card className="absolute right-0 top-full mt-2 w-96 max-h-96 shadow-lg z-50">
+        <Card className="absolute right-0 top-full mt-2 w-96 max-h-96 shadow-lg z-50 bg-white text-brand-navy border border-gray-200 rounded-xl overflow-hidden">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="text-lg">Notificações</CardTitle>
@@ -284,7 +299,7 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
             )}
           </CardHeader>
 
-          <CardContent className="p-0 max-h-80 overflow-y-auto">
+          <CardContent className="p-0 max-h-80 overflow-y-auto overscroll-contain">
             {loading && notifications.length === 0 ? (
               <div className="flex items-center justify-center py-8">
                 <RefreshCw className="h-6 w-6 animate-spin text-gray-400" />
@@ -310,29 +325,38 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
                     onMarkAsRead={markAsRead}
                     onDelete={deleteNotification}
                     onClick={() => {
-                      // Handle notification click (navigate, show modal, etc.)
-                      console.log('Notification clicked:', notification)
+                      const isProvider = session?.user?.userType === 'SERVICE_PROVIDER'
+                      const dataAny: any = notification as any
+                      const bookingId = dataAny?.data?.bookingId
+                      const title = (notification.title || '').toLowerCase()
+                      if (isProvider) {
+                        router.push('/dashboard/profissional?tab=schedule&sub=appointments' + (dataAny?.data?.date ? `&date=${new Date(dataAny.data.date).toISOString().split('T')[0]}` : ''))
+                      } else {
+                        // Se for concluído, abre review modal via query
+                        if (bookingId && (title.includes('conclu'))) {
+                          router.push(`/dashboard/cliente?tab=history&reviewBookingId=${bookingId}`)
+                        } else {
+                          router.push('/dashboard/cliente?tab=history')
+                        }
+                      }
+                      setIsOpen(false)
                     }}
                   />
                 ))}
-                
-                <div className="p-4 border-t">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setIsOpen(false)
-                      // Navigate to notifications page
-                      window.location.href = '/notifications'
-                    }}
-                    className="w-full"
-                  >
-                    Ver todas as notificações
-                  </Button>
-                </div>
+              
               </div>
             )}
           </CardContent>
+          <div className="p-3 border-t">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setIsOpen(false); router.push('/notifications') }}
+              className="w-full"
+            >
+              Ver todas as notificações
+            </Button>
+          </div>
         </Card>
       )}
     </div>

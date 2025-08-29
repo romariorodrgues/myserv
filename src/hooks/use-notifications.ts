@@ -29,6 +29,11 @@ interface NotificationFilters {
   limit?: number
 }
 
+interface UseNotificationsOptions {
+  auto?: boolean
+  pollIntervalMs?: number
+}
+
 interface UseNotificationsReturn {
   notifications: Notification[]
   unreadCount: number
@@ -42,7 +47,10 @@ interface UseNotificationsReturn {
   unsubscribe: () => void
 }
 
-export function useNotifications(filters: NotificationFilters = {}): UseNotificationsReturn {
+export function useNotifications(
+  filters: NotificationFilters = {},
+  options: UseNotificationsOptions = {}
+): UseNotificationsReturn {
   const { data: session } = useSession()
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
@@ -50,6 +58,8 @@ export function useNotifications(filters: NotificationFilters = {}): UseNotifica
   const [error, setError] = useState<string | null>(null)
   const [pollInterval, setPollInterval] = useState<NodeJS.Timeout | null>(null)
   const [isSubscribed, setIsSubscribed] = useState(false)
+  const pollMs = options.pollIntervalMs ?? 30000
+  const [focusHandler, setFocusHandler] = useState<(() => void) | null>(null)
 
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
@@ -194,8 +204,7 @@ export function useNotifications(filters: NotificationFilters = {}): UseNotifica
     if (isSubscribed || !session?.user?.id) return
 
     setIsSubscribed(true)
-    
-    // Poll for new notifications every 30 seconds
+    // Poll for new notifications
     const interval = setInterval(async () => {
       if (!session?.user?.id) return
       
@@ -216,7 +225,7 @@ export function useNotifications(filters: NotificationFilters = {}): UseNotifica
       } catch (err) {
         console.error('Poll notifications error:', err)
       }
-    }, 30000)
+    }, pollMs)
     
     setPollInterval(interval)
 
@@ -244,11 +253,12 @@ export function useNotifications(filters: NotificationFilters = {}): UseNotifica
     }
     
     window.addEventListener('focus', handleFocus)
+    setFocusHandler(() => handleFocus)
     
     return () => {
       window.removeEventListener('focus', handleFocus)
     }
-  }, [isSubscribed, session?.user?.id, filters.unreadOnly, filters.type, filters.limit])
+  }, [isSubscribed, session?.user?.id, filters.unreadOnly, filters.type, filters.limit, pollMs])
 
   // Unsubscribe from real-time updates
   const unsubscribe = useCallback(() => {
@@ -256,18 +266,23 @@ export function useNotifications(filters: NotificationFilters = {}): UseNotifica
       clearInterval(pollInterval)
       setPollInterval(null)
     }
+    if (focusHandler) {
+      window.removeEventListener('focus', focusHandler)
+      setFocusHandler(null)
+    }
     setIsSubscribed(false)
   }, [pollInterval])
 
-  // Initial fetch and subscription
+  // Initial fetch (optional auto mode)
   useEffect(() => {
     if (!session?.user?.id) {
       setLoading(false)
       return
     }
 
-    // Initial fetch
-    const initialFetch = async () => {
+    let cleanup: (() => void) | undefined
+
+    const run = async () => {
       try {
         const params = new URLSearchParams()
         if (filters.unreadOnly) params.append('unreadOnly', 'true')
@@ -292,13 +307,19 @@ export function useNotifications(filters: NotificationFilters = {}): UseNotifica
       }
     }
 
-    initialFetch()
-    subscribe()
+    if (options.auto) {
+      run()
+      const unsub = subscribe()
+      cleanup = () => {
+        if (typeof unsub === 'function') unsub()
+        unsubscribe()
+      }
+    }
 
     return () => {
-      unsubscribe()
+      if (cleanup) cleanup()
     }
-  }, [session?.user?.id, filters.unreadOnly, filters.type, filters.limit])
+  }, [session?.user?.id, filters.unreadOnly, filters.type, filters.limit, options.auto, subscribe, unsubscribe])
 
   // Cleanup on unmount
   useEffect(() => {
@@ -326,6 +347,7 @@ export function useNotificationCount(): { count: number; loading: boolean } {
   const { data: session } = useSession()
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     if (!session?.user?.id) {
@@ -349,11 +371,31 @@ export function useNotificationCount(): { count: number; loading: boolean } {
     }
 
     fetchCount()
-
-    // Poll for count updates every 60 seconds
-    const interval = setInterval(fetchCount, 60000)
-
-    return () => clearInterval(interval)
+    // Poll for count updates (leve)
+    const start = () => {
+      const id = setInterval(() => {
+        if (document.hidden) return
+        fetchCount()
+      }, 90000)
+      setIntervalId(id)
+    }
+    const stop = () => {
+      if (intervalId) clearInterval(intervalId)
+      setIntervalId(null)
+    }
+    const onVisibility = () => {
+      if (document.hidden) {
+        stop()
+      } else if (!intervalId) {
+        start()
+      }
+    }
+    start()
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      stop()
+    }
   }, [session?.user?.id])
 
   return { count, loading }

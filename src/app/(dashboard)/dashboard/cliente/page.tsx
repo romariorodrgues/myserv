@@ -19,6 +19,7 @@ import { ClientFavorites } from '@/components/dashboard/client-favorites'
 import { ClientProfileSettings } from '@/components/dashboard/client-profile-settings'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
 import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
+import { ClientReviewModal } from '@/components/dashboard/client-review-modal'
 import { redirect } from 'next/navigation'
 
 
@@ -52,6 +53,8 @@ function ClientDashboardContent() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabOption>('overview')
+  const [pendingReviews, setPendingReviews] = useState(0)
+  const [reviewBookingId, setReviewBookingId] = useState<string | null>(null)
 
     type TabOption = 'overview' | 'history' | 'favorites' | 'settings'
 
@@ -129,6 +132,19 @@ if (!session) {
     }
   }, [session?.user?.id])
 
+  const fetchPendingReviews = useCallback(async () => {
+    try {
+      if (!session?.user?.id) return
+      const res = await fetch(`/api/reviews/pending?clientId=${session.user.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) setPendingReviews(data.data.count)
+      }
+    } catch (e) {
+      console.error('Error fetching pending reviews:', e)
+    }
+  }, [session?.user?.id])
+
   useEffect(() => {
     // Check URL params for active tab
     const tab = searchParams.get('tab')
@@ -137,7 +153,12 @@ if (!session) {
     }
     
     fetchBookings()
-  }, [searchParams, fetchBookings])
+    fetchPendingReviews()
+
+    // If notification pushed a reviewBookingId, open the modal
+    const rId = searchParams.get('reviewBookingId')
+    if (rId) setReviewBookingId(rId)
+  }, [searchParams, fetchBookings, fetchPendingReviews])
 
   const getStatusIcon = (status: Booking['status']) => {
     switch (status) {
@@ -301,7 +322,7 @@ if (!session) {
                   <Star className="h-5 w-5 text-yellow-500" />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Avaliações Pendentes</p>
-                    <p className="text-2xl font-bold">2</p>
+                    <p className="text-2xl font-bold">{pendingReviews}</p>
                   </div>
                 </div>
               </CardContent>
@@ -434,6 +455,16 @@ if (!session) {
 
       {activeTab === 'settings' && (
         <ClientProfileSettings />
+      )}
+
+      {reviewBookingId && (
+        <ClientReviewModal
+          bookingId={reviewBookingId}
+          onClose={() => setReviewBookingId(null)}
+          onSubmitted={() => {
+            fetchPendingReviews()
+          }}
+        />
       )}
     </div>
   )

@@ -11,6 +11,8 @@ import Link from 'next/link'
 import { Search, MapPin, Star } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import AddressSearch from '@/components/maps/address-search'
+import ServiceSuggestInput from '@/components/services/service-suggest-input'
 
 interface Service {
   id: string
@@ -36,12 +38,14 @@ function ServicesPageContent() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState(searchParams.get('q') || '')
   const [location, setLocation] = useState(searchParams.get('local') || searchParams.get('location') || '')
+  const [leafCategoryId, setLeafCategoryId] = useState<string | undefined>(undefined)
 
   const fetchServices = useCallback(async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (searchTerm) params.set('q', searchTerm)
+      if (leafCategoryId) params.set('leafCategoryId', leafCategoryId)
+      else if (searchTerm) params.set('q', searchTerm)
       if (location) params.set('local', location)
       
       const response = await fetch(`/api/services/search?${params}`)
@@ -81,12 +85,18 @@ function ServicesPageContent() {
           <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <Input
-                type="text"
+              <ServiceSuggestInput
                 placeholder="Que serviço você precisa?"
-                className="pl-10"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                defaultValue={searchTerm}
+                onSelect={(item) => {
+                  if (item.type === 'leaf' && item.id) {
+                    setLeafCategoryId(item.id)
+                    setSearchTerm(item.name)
+                  } else {
+                    setLeafCategoryId(undefined)
+                    setSearchTerm(item.name)
+                  }
+                }}
               />
             </div>
             

@@ -7,7 +7,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense, useMemo } from 'react'
+import { useEffect, useState, Suspense, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -63,11 +63,29 @@ function ProviderDashboardContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [avgRating, setAvgRating] = useState<number>(0)
+  const [totalReviews, setTotalReviews] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
-
 
   const fetchBookings = async (): Promise<Booking[]> => {
     const currentSession = session;
+  const [avgRating, setAvgRating] = useState<number>(0)
+  const [totalReviews, setTotalReviews] = useState<number>(0)
+  const [activeTab, setActiveTab] = useState<'overview' | 'schedule' | 'history' | 'metrics' | 'pricing' | 'settings'>('overview')
+  const subTab = useMemo(() => (searchParams.get('sub') as 'schedule'|'appointments'|'settings'|null), [searchParams])
+  const dateParam = useMemo(() => searchParams.get('date') || undefined, [searchParams])
+  
+
+// Temporary mock data for development
+// const mockSession = useMemo(() => ({
+//   user: { 
+//     name: 'João Prestador', 
+//     userType: 'SERVICE_PROVIDER', 
+//     id: 'provider-1' 
+//   }
+// }), [])
+
+
     if (!currentSession?.user?.id) {
       return []
     }
@@ -83,7 +101,7 @@ function ProviderDashboardContent() {
         return []
       } else {
         // Mock data for development with payment status
-        const mockBookings: Booking[] = [
+        /* const mockBookings: Booking[] = [
           {
             id: '1',
             status: 'ACCEPTED',
@@ -120,6 +138,8 @@ function ProviderDashboardContent() {
           }
         ]
         return mockBookings;
+        ]
+        return mockBookings;
       }
     } catch (error) {
       console.error('Error fetching bookings:', error)
@@ -132,6 +152,61 @@ function ProviderDashboardContent() {
     initialData: [],
     queryFn: fetchBookings,
   })
+  const fetchRatings = useCallback(async () => {
+    const currentSession = session
+    if (!currentSession?.user?.id) return
+    try {
+      const res = await fetch(`/api/reviews?serviceProviderId=${currentSession.user.id}&limit=1`)
+      if (res.ok) {
+        const data = await res.json()
+        const stats = data?.data?.statistics
+        if (stats) {
+          setAvgRating(stats.averageRating || 0)
+          setTotalReviews(stats.totalReviews || 0)
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching provider ratings:', e)
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (status === 'loading') return; // Sessão ainda está carregando
+    
+    const currentSession = session /* || mockSession; */
+    
+    if (!currentSession) {
+      router.push('/entrar');
+      return;
+    }
+    
+    if (currentSession.user.userType !== 'SERVICE_PROVIDER') {
+      router.push('/dashboard/cliente');
+      return;
+    }
+    
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'schedule', 'history', 'metrics', 'pricing', 'settings'].includes(tab)) {
+      setActiveTab(tab as 'overview' | 'schedule' | 'history' | 'metrics' | 'pricing' | 'settings');
+    }
+    
+    fetchRatings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [status, session, router, searchParams]);
+
+    /** 
+     * A função a baixo está sendo executada em looping
+     * fetchBookings()
+     * 
+     * Dicas para solução:
+     * 1 - entender o que a mesma retorna e qual a importância dela para o fluxo da página
+     * 2 - verificar se a função realmente deve ser chamada em umm useEffect
+     * 3 - verificar se todos os estados que estão como dependencia do useEffect realmente precisam estar lá
+     * 4 - Utilizar o react-query para fazer a requisição de dados poderá simplificar o fluxo além de evitar loops infinitos
+     * 
+     * OBS.: A página está quebrando devido a função está comentada
+    */
+
 
   const handleBookingAction = async (bookingId: string, newStatus: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
     try {
@@ -201,6 +276,7 @@ function ProviderDashboardContent() {
   }
 
   const currentSession = session
+  const currentSession = session
   const pendingBookings = bookings.filter(b => b.status === 'PENDING').length
   const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length
   const completedBookings = bookings.filter(b => b.status === 'COMPLETED').length
@@ -215,7 +291,8 @@ function ProviderDashboardContent() {
   ]
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
+ 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between">
         <div>
@@ -234,11 +311,12 @@ function ProviderDashboardContent() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TDashboardTab)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                  }`}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                }`}
               >
                 <Icon className="h-4 w-4" />
                 <span className="whitespace-nowrap">{tab.label}</span>
@@ -289,7 +367,7 @@ function ProviderDashboardContent() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Avaliação</p>
-                    <p className="text-2xl font-bold">4.8</p>
+                    <p className="text-2xl font-bold">{avgRating.toFixed(1)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -528,8 +606,8 @@ function ProviderDashboardContent() {
                     <Star className="w-8 h-8 text-green-600" />
                   </div>
                   <h3 className="font-semibold">Satisfação</h3>
-                  <p className="text-2xl font-bold text-green-600">4.8</p>
-                  <p className="text-sm text-muted-foreground">23 avaliações</p>
+                  <p className="text-2xl font-bold text-green-600">{avgRating.toFixed(1)}</p>
+                  <p className="text-sm text-muted-foreground">{totalReviews} avaliações</p>
                 </div>
 
                 <div className="text-center">
@@ -546,20 +624,20 @@ function ProviderDashboardContent() {
         </div>
       )}
 
-      {activeTab === 'schedule' && (
-        <ProviderSchedule providerId={session.user.id} />
+      {activeTab === 'schedule' && currentSession?.user?.id && (
+        <ProviderSchedule providerId={currentSession.user.id} />
       )}
 
-      {activeTab === 'history' && (
-        <ProviderServiceHistory providerId={session.user.id} />
+      {activeTab === 'history' && currentSession?.user?.id && (
+        <ProviderServiceHistory providerId={currentSession.user.id} />
       )}
 
-      {activeTab === 'metrics' && (
-        <ProviderMetrics providerId={session.user.id} />
+      {activeTab === 'metrics' && currentSession?.user?.id && (
+        <ProviderMetrics providerId={currentSession.user.id} />
       )}
 
-      {activeTab === 'pricing' && (
-        <ProviderPriceManagement providerId={session.user.id} />
+      {activeTab === 'pricing' && currentSession?.user?.id && (
+        <ProviderPriceManagement/>
       )}
 
       {activeTab === 'settings' && (
