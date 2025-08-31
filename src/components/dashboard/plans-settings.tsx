@@ -4,45 +4,31 @@ import { Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
-import { useCallback, useState } from "react";
-import { useRouter } from "next/navigation";
 import axios from "axios";
-import { TSubscribeResponde } from "@/app/api/payments/subscribe/route";
-import { useQuery } from "@tanstack/react-query";
-import { ClientProfileData } from "@/types";
+import { CreatePreferenceResponse } from "@/app/api/payments/subscribe/route";
+import { useMutation } from "@tanstack/react-query";
+import useVerifyPlan from "@/hooks/use-verify-plan";
 
-type TPlansSettingsProps = {
-  userId: string,
-}
+export default function PlansSettings() {
+  const { plan, subscription } = useVerifyPlan();
 
-export default function PlansSettings({ userId }: TPlansSettingsProps) {
-  const [plan, setPlan] = useState<'Start' | 'Enterprise'>('Start')
-  const router = useRouter()
+  const createPreferenceMutation = useMutation({
+    mutationFn: async () => {
+      const { data, status } = await axios.post<CreatePreferenceResponse>('/api/payments/subscribe');
 
-  const { data: user } = useQuery<ClientProfileData>({
-    queryKey: ['user'],
-    queryFn: async () => {
-      const { data } = await axios.get('/api/users/me');
-      setPlan(data.user.plan);
-      return data;
+      if (status !== 200) {
+        throw new Error('Erro ao criar preferência de pagamento');
+      }
+
+      return data
     },
-    staleTime: 1000 * 60 * 2, // 2 minutes
-  })
-
-  const createPreference = useCallback(async () => {
-    const { data, status } = await axios.post<TSubscribeResponde>('/api/payments/subscribe', {
-      payer: {
-        name: user?.name, userEmail: user?.email
-      },
-    });
-
-    if (status !== 200) {
-      throw new Error('Erro ao criar preferência de pagamento');
+    onSuccess: (data: CreatePreferenceResponse) => {
+      window.open(data.initialPoint);
+    },
+    onError: (e) => {
+      window.alert(e.message);
     }
-
-    router.push(data.initialPoint);
-  }, [])
-
+  })
 
   return (
     <Card className="">
@@ -74,7 +60,7 @@ export default function PlansSettings({ userId }: TPlansSettingsProps) {
                 <span className='font-semibold text-brand-navy text-base'>Controle de precificação de serviço</span>
               </li>
             </ul>
-            <Button disabled={plan === 'Start'} variant='outline' className='w-full mt-4 rounded-sm'>
+            <Button disabled={true} variant='outline' className='w-full mt-4 rounded-sm'>
               Assinar
             </Button>
           </div>
@@ -102,11 +88,22 @@ export default function PlansSettings({ userId }: TPlansSettingsProps) {
                 <span className='font-semibold text-brand-bg text-base'>Aumento do score</span>
               </li>
             </ul>
-            <Button disabled={plan === 'Enterprise'} variant='outline' className='w-full mt-4 rounded-sm' onClick={createPreference}>
-              Assinar
+            <Button disabled={plan === 'Enterprise' || createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutate()}>
+              {createPreferenceMutation.isPending ? 'Carregando...' : 'Assinar'}
             </Button>
           </div>
         </div>
+        {
+          subscription && (
+            <div className="w-full p-4 mt-8 bg-blue-100 rounded-md">
+              <p className="font-medium">O seu plano está em vigência até: { subscription.endDate ?  new Date(subscription.endDate || '').toLocaleString('pt-br', {
+                day: '2-digit',
+                month: '2-digit',
+                year: '2-digit',
+              }): 'Data invalida'}</p>
+            </div>
+          )
+        }
       </CardContent>
     </Card>
   )

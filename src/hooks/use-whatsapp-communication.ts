@@ -11,6 +11,7 @@ import {
   generateProviderMessage,
   type WhatsAppContactData 
 } from '@/lib/whatsapp-utils'
+import { SubscriptionResponse } from '@/app/api/payments/subscribe/route'
 
 interface Booking {
   id: string
@@ -29,25 +30,24 @@ interface Booking {
     }
   }
   payment?: {
-    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+    status: 'PENDING' | 'APPROVED' | 'FAILED' | 'REFUNDED'
   }
 }
 
 interface UseWhatsAppCommunicationProps {
   booking: Booking
   userType: 'CLIENT' | 'SERVICE_PROVIDER'
+  subscription: SubscriptionResponse | null | undefined
 }
 
-export function useWhatsAppCommunication({ booking, userType }: UseWhatsAppCommunicationProps) {
+export function useWhatsAppCommunication({ booking, userType, subscription }: UseWhatsAppCommunicationProps) {
   const canCommunicate = useMemo(() => {
-    // Only allow communication when:
-    // 1. Booking is accepted AND payment is completed
-    // 2. OR booking is completed (for post-service communication)
     return (
-      (booking.status === 'ACCEPTED' && booking.payment?.status === 'COMPLETED') ||
-      booking.status === 'COMPLETED'
+      (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') ||
+      booking.status === 'COMPLETED' 
+      || subscription && subscription.plan.name === 'Enterprise'
     )
-  }, [booking.status, booking.payment?.status])
+  }, [booking.status, booking.payment?.status, subscription])
 
   const contactData = useMemo(() => {
     if (!canCommunicate) return null
@@ -81,7 +81,7 @@ export function useWhatsAppCommunication({ booking, userType }: UseWhatsAppCommu
     }
 
     return null
-  }, [canCommunicate, userType, booking, booking.serviceProvider, booking.client])
+  }, [canCommunicate, userType, booking])
 
   const communicationStatus = useMemo(() => {
     if (booking.status === 'PENDING') {
@@ -98,7 +98,7 @@ export function useWhatsAppCommunication({ booking, userType }: UseWhatsAppCommu
       }
     }
 
-    if (booking.status === 'ACCEPTED' && booking.payment?.status !== 'COMPLETED') {
+    if (booking.status === 'ACCEPTED' && booking.payment?.status !== 'APPROVED') {
       return {
         canCommunicate: false,
         reason: 'Aguardando confirmação do pagamento'
@@ -117,7 +117,7 @@ export function useWhatsAppCommunication({ booking, userType }: UseWhatsAppCommu
       }
     }
 
-    if (booking.status === 'ACCEPTED' && booking.payment?.status === 'COMPLETED') {
+    if (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') {
       return {
         canCommunicate: true,
         reason: 'Pagamento confirmado - comunicação liberada'

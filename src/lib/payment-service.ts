@@ -28,6 +28,7 @@ export interface PaymentData {
   successUrl?: string
   failureUrl?: string
   pendingUrl?: string
+  metadata?: any
 }
 
 export interface PaymentResponse {
@@ -74,15 +75,16 @@ export class PaymentService {
         external_reference: data.externalReference,
         notification_url: data.notificationUrl,
         back_urls: {
-          success: data.successUrl || `${process.env.NEXTAUTH_URL}/pagamento/sucesso`,
-          failure: data.failureUrl || `${process.env.NEXTAUTH_URL}/pagamento/erro`,
-          pending: data.pendingUrl || `${process.env.NEXTAUTH_URL}/pagamento/pendente`
+          success: data.successUrl || `${process.env.BASE_URL}/pagamento/sucesso`,
+          failure: data.failureUrl || `${process.env.BASE_URL}/pagamento/erro`,
+          pending: data.pendingUrl || `${process.env.BASE_URL}/pagamento/pendente`
         },
         payment_methods: {
           excluded_payment_methods: [],
           excluded_payment_types: [],
           installments: 12
-        }
+        },
+        metadata: data.metadata
       }
       
       const response = await preference.create({ body: preferenceData })

@@ -46,6 +46,12 @@ model User {
   sentMessages     SupportMessage[]
   adminAssignments SupportAssignment[]
 
+  givenReviews     Review[]         @relation("ReviewGiver")
+  receivedReviews  Review[]         @relation("ReviewReceiver")
+  payments         Payment[]
+  notifications    Notification[]
+  favorites        Favorite[]
+
   @@map("users")
 }
 
@@ -263,7 +269,7 @@ model Payment {
   currency         String         @default("BRL")
   paymentMethod    PaymentMethod
   gateway          PaymentGateway
-  gatewayPaymentId String?
+  gatewayPaymentId String?        @unique
   status           PaymentStatus  @default(PENDING)
   description      String?
   createdAt        DateTime       @default(now())

@@ -7,7 +7,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense, useMemo, useCallback } from 'react'
+import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -33,6 +33,8 @@ import { ProviderPriceManagement } from '@/components/dashboard/provider-price-m
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
+import axios from 'axios'
+import PaymentHistory from '@/components/dashboard/payments-history'
 import React from 'react'
 
 interface Booking {
@@ -54,7 +56,7 @@ interface Booking {
     phone?: string
   }
   payment?: {
-    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+    status: 'PENDING' | 'APPROVED' | 'FAILED' | 'REFUNDED'
   }
 }
 
@@ -67,36 +69,13 @@ function ProviderDashboardContent() {
   const [avgRating, setAvgRating] = useState<number>(0)
   const [totalReviews, setTotalReviews] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
-
-  const fetchBookings = async (): Promise<Booking[]> => {
-    const currentSession = session
-    if (!currentSession?.user?.id) {
-      return []
-    }
-
-    try {
-      // Get providerId from authenticated session - using new API with payment info
-      const response = await fetch(`/api/bookings/with-payments?providerId=${currentSession.user.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.bookings) {
-          return data.bookings
-        }
-        return []
-      } else {
-        // Fallback: sem dados
-        return []
-      }
-    } catch (error) {
-      console.error('Error fetching bookings:', error)
-      return [];
-    }
-  }
-
   const { data: bookings, isLoading, isFetching, refetch: refetchBookings } = useQuery<Booking[]>({
-    queryKey: ['fetch-bookings'],
+    queryKey: ['bookings'],
     initialData: [],
-    queryFn: fetchBookings,
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/bookings/with-payments?providerId=${currentSession.user.id}`);
+      return data.bookings;
+    },
   })
   const fetchRatings = useCallback(async () => {
     const currentSession = session
@@ -534,10 +513,10 @@ function ProviderDashboardContent() {
             <CardContent>
               <div className="space-y-4">
                 {bookings
-                  .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'COMPLETED') || booking.status === 'COMPLETED')
+                  .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') || booking.status === 'COMPLETED')
                   .length > 0 ? (
                   bookings
-                    .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'COMPLETED') || booking.status === 'COMPLETED')
+                    .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') || booking.status === 'COMPLETED')
                     .slice(0, 3)
                     .map((booking) => (
                       <div key={booking.id} className="p-4 border rounded-lg">
@@ -655,8 +634,8 @@ function ProviderDashboardContent() {
               </div>
             </CardContent>
           </Card>
-
-          <PlansSettings userId={session.user.id} />
+          <PlansSettings />
+          <PaymentHistory />
         </div>
       )}
     </div>

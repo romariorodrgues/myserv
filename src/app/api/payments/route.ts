@@ -50,10 +50,18 @@ export async function POST(request: NextRequest) {
       payerPhone: booking.client.phone,
       payerDocument: booking.client.cpfCnpj,
       externalReference: bookingId,
-      notificationUrl: `${process.env.NEXTAUTH_URL}/api/payments/webhook`,
-      successUrl: `${process.env.NEXTAUTH_URL}/pagamento/sucesso?booking=${bookingId}`,
-      failureUrl: `${process.env.NEXTAUTH_URL}/pagamento/erro?booking=${bookingId}`,
-      pendingUrl: `${process.env.NEXTAUTH_URL}/pagamento/pendente?booking=${bookingId}`
+      notificationUrl: `${process.env.BASE_URL}/api/payments/webhook/booking`,
+      successUrl: `${process.env.BASE_URL}/pagamento/sucesso?booking=${bookingId}`,
+      failureUrl: `${process.env.BASE_URL}/pagamento/erro?booking=${bookingId}`,
+      pendingUrl: `${process.env.BASE_URL}/pagamento/pendente?booking=${bookingId}`,
+      metadata: {
+        booking: {
+          id: booking.id
+        },
+        payer: {
+          userId: booking.provider.id
+        }
+      }
     }
 
     let paymentResult
@@ -85,33 +93,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Create payment record
-    const payment = await prisma.payment.create({
-      data: {
-        userId: booking.clientId,
-        serviceRequestId: bookingId,
-        amount: fees.finalAmount,
-        gateway: gateway === 'mercadopago' ? 'MERCADO_PAGO' : 'PAGAR_ME',
-        paymentMethod: (paymentMethod === 'credit_card' ? 'CREDIT_CARD' : 
-                       paymentMethod === 'debit_card' ? 'DEBIT_CARD' :
-                       paymentMethod === 'pix' ? 'PIX' :
-                       paymentMethod === 'boleto' ? 'BOLETO' : 'CREDIT_CARD') as any,
-        gatewayPaymentId: paymentResult.paymentId || paymentResult.preferenceId || '',
-        status: paymentResult.paymentId ? 'APPROVED' : 'PENDING',
-        description: `Pagamento - ${booking.service.name}`
-      }
-    })
+    // const payment = await prisma.payment.create({
+    //   data: {
+    //     userId: booking.clientId,
+    //     serviceRequestId: bookingId,
+    //     amount: fees.finalAmount,
+    //     gateway: gateway === 'mercadopago' ? 'MERCADO_PAGO' : 'PAGAR_ME',
+    //     paymentMethod: (paymentMethod === 'credit_card' ? 'CREDIT_CARD' : 
+    //                    paymentMethod === 'debit_card' ? 'DEBIT_CARD' :
+    //                    paymentMethod === 'pix' ? 'PIX' :
+    //                    paymentMethod === 'boleto' ? 'BOLETO' : 'CREDIT_CARD') as any,
+    //     gatewayPaymentId: paymentResult.paymentId || paymentResult.preferenceId || '',
+    //     status: paymentResult.paymentId ? 'APPROVED' : 'PENDING',
+    //     description: `Pagamento - ${booking.service.name}`
+    //   }
+    // })
 
     return NextResponse.json({
       success: true,
-      payment: {
-        id: payment.id,
-        amount: payment.amount,
-        fees: {
-          commission: fees.commission,
-          schedulingFee: fees.schedulingFee,
-          total: fees.totalFees
-        }
-      },
+      // payment: {
+      //   id: payment.id,
+      //   amount: payment.amount,
+      //   fees: {
+      //     commission: fees.commission,
+      //     schedulingFee: fees.schedulingFee,
+      //     total: fees.totalFees
+      //   }
+      // },
       checkout: {
         preferenceId: paymentResult.preferenceId,
         initPoint: paymentResult.initPoint,

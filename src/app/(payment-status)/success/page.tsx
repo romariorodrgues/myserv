@@ -1,5 +1,9 @@
 "use client";
 
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { CircleCheck } from "lucide-react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 
@@ -10,15 +14,28 @@ function SucessoPage() {
   const merchantOrderId = params.get("merchant_order_id");
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen text-center p-4">
-      <h1 className="text-green-600 text-3xl font-bold mb-4">✅ Pagamento Aprovado!</h1>
-      <p className="mb-2">Obrigado pela sua compra!</p>
-      <div className="bg-gray-100 p-4 rounded shadow-md">
-        <p><strong>ID do Pagamento:</strong> {paymentId}</p>
-        <p><strong>Status:</strong> {status}</p>
-        <p><strong>Ordem:</strong> {merchantOrderId}</p>
-      </div>
-    </main>
+    <div className="flex justify-center items-center px-4 py-16">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <CardTitle>Pagamento aprovado!</CardTitle>
+            <CircleCheck className="text-brand-teal" />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <p><strong>ID do Pagamento:</strong> {paymentId}</p>
+          <p><strong>Status:</strong> {status}</p>
+          <p><strong>Ordem:</strong> {merchantOrderId}</p>
+        </CardContent>
+        <CardFooter>
+          <Button asChild className="w-full" variant='link'>
+            <Link href='/dashboard/profissional'>
+              Voltar para dashboard
+            </Link>
+          </Button>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }
 
