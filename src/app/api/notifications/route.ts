@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
       providerName: booking?.provider.name,
       clientName: booking?.client.name,
       scheduledDate: booking?.scheduledDate?.toLocaleDateString('pt-BR'),
-      amount: booking?.estimatedPrice || booking?.finalPrice,
+      amount: (booking?.estimatedPrice ?? booking?.finalPrice) ?? undefined,
       status: booking?.status
     }
 

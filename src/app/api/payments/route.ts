@@ -231,7 +231,7 @@ export async function GET(request: NextRequest) {
           id: payment.serviceRequest.id,
           service: payment.serviceRequest.service.name,
           client: payment.serviceRequest.client.name,
-          provider: payment.serviceRequest.provider.user.name
+          provider: payment.serviceRequest.provider.name
         } : null
       }
     })

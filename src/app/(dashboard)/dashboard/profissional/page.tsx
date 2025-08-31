@@ -31,13 +31,14 @@ import { ProviderServiceHistory } from '@/components/dashboard/provider-service-
 import { ProviderMetrics } from '@/components/dashboard/provider-metrics'
 import { ProviderPriceManagement } from '@/components/dashboard/provider-price-management'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
-import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
+import React from 'react'
 
 interface Booking {
   id: string
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED'
+  requestType?: 'SCHEDULING' | 'QUOTE'
   description: string
   preferredDate: string | null
   createdAt: string
@@ -100,46 +101,8 @@ function ProviderDashboardContent() {
         }
         return []
       } else {
-        // Mock data for development with payment status
-        /* const mockBookings: Booking[] = [
-          {
-            id: '1',
-            status: 'ACCEPTED',
-            description: 'Instalação de ar condicionado',
-            preferredDate: '2025-06-15T14:00:00Z',
-            createdAt: '2025-06-13T10:00:00Z',
-            address: 'Rua das Flores, 123',
-            city: 'São Paulo',
-            state: 'SP',
-            service: { name: 'Instalação de Ar Condicionado' },
-            client: {
-              name: 'Maria Silva',
-              profileImage: null,
-              phone: '(11) 99999-1111'
-            },
-            payment: { status: 'COMPLETED' }
-          },
-          {
-            id: '2',
-            status: 'ACCEPTED',
-            description: 'Reparo em sistema elétrico',
-            preferredDate: '2025-06-16T09:00:00Z',
-            createdAt: '2025-06-12T15:30:00Z',
-            address: 'Av. Paulista, 456',
-            city: 'São Paulo',
-            state: 'SP',
-            service: { name: 'Reparo Elétrico' },
-            client: {
-              name: 'Carlos Santos',
-              profileImage: null,
-              phone: '(11) 98888-2222'
-            },
-            payment: { status: 'PENDING' }
-          }
-        ]
-        return mockBookings;
-        ]
-        return mockBookings;
+        // Fallback: sem dados
+        return []
       }
     } catch (error) {
       console.error('Error fetching bookings:', error)
@@ -234,6 +197,27 @@ function ProviderDashboardContent() {
     }
   }
 
+  const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
+  const openScheduleFor = (id: string) => {
+    setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
+  }
+  const updateSchedField = (id: string, field: 'date'|'time', value: string) => {
+    setSchedMap((m) => ({ ...m, [id]: { ...(m[id] || { date: '', time: '' }), [field]: value } }))
+  }
+  const scheduleFromQuote = async (id: string) => {
+    const payload = schedMap[id]
+    if (!payload?.date || !payload?.time) { alert('Selecione data e horário'); return }
+    try {
+      const res = await fetch(`/api/bookings/${id}/schedule`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scheduledDate: payload.date, scheduledTime: payload.time }) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao agendar')
+      await refetchBookings()
+      alert('Orçamento agendado e aceito!')
+    } catch (e) {
+      alert((e as any)?.message || 'Erro ao agendar')
+    }
+  }
+
   useEffect(() => {
     if (status === 'loading') return // Still loading
 
@@ -275,7 +259,6 @@ function ProviderDashboardContent() {
     )
   }
 
-  const currentSession = session
   const currentSession = session
   const pendingBookings = bookings.filter(b => b.status === 'PENDING').length
   const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length
@@ -339,7 +322,7 @@ function ProviderDashboardContent() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Ganhos do Mês</p>
-                    <p className="text-2xl font-bold">R$ 2.850,00</p>
+                    <ProviderMonthlyEarnings />
                   </div>
                 </div>
               </CardContent>
@@ -489,28 +472,46 @@ function ProviderDashboardContent() {
                         <div key={booking.id} className="p-3 border rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <p className="font-medium">{booking.service.name}</p>
-                            <Badge variant="outline" className="text-yellow-600">
-                              Pendente
-                            </Badge>
+                            <div className="flex gap-2 items-center">
+                              {booking.requestType === 'QUOTE' && (
+                                <Badge className="bg-purple-100 text-purple-800">Orçamento</Badge>
+                              )}
+                              <Badge variant="outline" className="text-yellow-600">Pendente</Badge>
+                            </div>
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">{booking.client.name}</p>
                           <p className="text-sm text-muted-foreground mb-3">{booking.description}</p>
 
                           {/* Action buttons for pending bookings */}
-                          <div className="flex space-x-2 mb-3">
-                            <Button
-                              size="sm"
-                              onClick={() => handleBookingAction(booking.id, 'ACCEPTED')}
-                            >
-                              Aceitar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleBookingAction(booking.id, 'REJECTED')}
-                            >
-                              Rejeitar
-                            </Button>
+                          <div className="flex flex-col gap-2 mb-3">
+                            {booking.requestType === 'QUOTE' ? (
+                              <>
+                                {!schedMap[booking.id] ? (
+                                  <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => openScheduleFor(booking.id)}>Agendar</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleBookingAction(booking.id, 'REJECTED')}>Recusar</Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-wrap items-end gap-2">
+                                    <div>
+                                      <label className="text-xs text-gray-600">Data</label>
+                                      <input type="date" value={schedMap[booking.id]?.date || ''} onChange={(e) => updateSchedField(booking.id, 'date', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Hora</label>
+                                      <input type="time" value={schedMap[booking.id]?.time || ''} onChange={(e) => updateSchedField(booking.id, 'time', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
+                                    </div>
+                                    <Button size="sm" onClick={() => scheduleFromQuote(booking.id)}>Confirmar</Button>
+                                    <Button size="sm" variant="outline" onClick={() => setSchedMap((m) => { const { [booking.id]: _, ...rest } = m; return rest })}>Cancelar</Button>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleBookingAction(booking.id, 'ACCEPTED')}>Aceitar</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleBookingAction(booking.id, 'REJECTED')}>Rejeitar</Button>
+                              </div>
+                            )}
                           </div>
 
                           {/* WhatsApp Communication for accepted bookings with completed payment */}
@@ -528,7 +529,7 @@ function ProviderDashboardContent() {
                       <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                       <p>Nenhuma solicitação pendente</p>
                       <Button variant="outline" className="mt-4" asChild>
-                        <Link href="/prestador/perfil">
+                        <Link href="/dashboard/profissional?tab=settings">
                           Configurar Perfil
                         </Link>
                       </Button>
@@ -592,14 +593,24 @@ function ProviderDashboardContent() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <TrendingUp className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold">Taxa de Resposta</h3>
-                  <p className="text-2xl font-bold text-blue-600">95%</p>
-                  <p className="text-sm text-muted-foreground">Última semana</p>
-                </div>
+                {(() => {
+                  const now = new Date()
+                  const days30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+                  const inLast30 = (d?: string | null) => (d ? (new Date(d) >= days30 && new Date(d) <= now) : false)
+                  const recent = bookings.filter(b => inLast30(b.createdAt))
+                  const responded = recent.filter(b => b.status !== 'PENDING').length
+                  const rate = recent.length > 0 ? Math.round((responded / recent.length) * 100) : null
+                  return (
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <TrendingUp className="w-8 h-8 text-blue-600" />
+                      </div>
+                      <h3 className="font-semibold">Taxa de Resposta</h3>
+                      <p className="text-2xl font-bold text-blue-600">{rate === null ? '—' : `${rate}%`}</p>
+                      <p className="text-sm text-muted-foreground">Últimos 30 dias</p>
+                    </div>
+                  )
+                })()}
 
                 <div className="text-center">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -610,14 +621,7 @@ function ProviderDashboardContent() {
                   <p className="text-sm text-muted-foreground">{totalReviews} avaliações</p>
                 </div>
 
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <DollarSign className="w-8 h-8 text-purple-600" />
-                  </div>
-                  <h3 className="font-semibold">Receita Média</h3>
-                  <p className="text-2xl font-bold text-purple-600">R$ 180</p>
-                  <p className="text-sm text-muted-foreground">Por serviço</p>
-                </div>
+                <MonthlyAverageRevenueCard bookings={bookings} />
               </div>
             </CardContent>
           </Card>
@@ -653,13 +657,13 @@ function ProviderDashboardContent() {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Button variant="outline" asChild>
-                    <Link href="/prestador/perfil">
+                    <Link href="/dashboard/profissional?tab=settings">
                       <User className="h-4 w-4 mr-2" />
                       Editar Perfil
                     </Link>
                   </Button>
                   <Button variant="outline" asChild>
-                    <Link href="/prestador/servicos">
+                    <Link href="/dashboard/profissional?tab=pricing">
                       <Settings className="h-4 w-4 mr-2" />
                       Gerenciar Serviços
                     </Link>
@@ -681,5 +685,45 @@ export default function ProviderDashboard() {
     <Suspense fallback={<div>Loading...</div>}>
       <ProviderDashboardContent />
     </Suspense>
+  )
+}
+
+function ProviderMonthlyEarnings() {
+  const { data, isLoading } = useQuery<{ success: boolean; data?: { net: number } }>({
+    queryKey: ['provider-earnings'],
+    queryFn: async () => {
+      const res = await fetch('/api/providers/earnings')
+      return res.json()
+    },
+  })
+  const value = data?.data?.net ?? 0
+  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+  return <p className="text-2xl font-bold">{isLoading ? '—' : formatted}</p>
+}
+
+function MonthlyAverageRevenueCard({ bookings }: { bookings: Booking[] }) {
+  const { data } = useQuery<{ success: boolean; data?: { net: number } }>({
+    queryKey: ['provider-earnings'],
+    queryFn: async () => {
+      const res = await fetch('/api/providers/earnings')
+      return res.json()
+    },
+  })
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const inCurrentMonth = (d?: string | null) => (d ? (new Date(d) >= monthStart && new Date(d) <= now) : false)
+  const monthPaidCount = bookings.filter(b => inCurrentMonth(b.createdAt) && b.payment?.status === 'COMPLETED').length
+  const net = data?.data?.net ?? 0
+  const average = monthPaidCount > 0 ? net / monthPaidCount : 0
+  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(average)
+  return (
+    <div className="text-center">
+      <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <DollarSign className="w-8 h-8 text-purple-600" />
+      </div>
+      <h3 className="font-semibold">Receita Média</h3>
+      <p className="text-2xl font-bold text-purple-600">{formatted}</p>
+      <p className="text-sm text-muted-foreground">Por serviço (mês atual)</p>
+    </div>
   )
 }

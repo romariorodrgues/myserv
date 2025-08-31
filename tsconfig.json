@@ -37,6 +37,11 @@
     ".next/types/**/*.ts"
   ],
   "exclude": [
-    "node_modules"
+    "node_modules",
+    "src/app/api/chat/**",
+    "src/components/chat/**",
+    "src/lib/chat-store.ts",
+    "src/lib/socket.ts"
+    ,"src/app/api/payments/webhook/route_backup.ts"
   ]
 }

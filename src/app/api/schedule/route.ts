@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const rawProviderId = searchParams.get('providerId')
     const date = searchParams.get('date')
-    const type = searchParams.get('type') // 'schedule' or 'appointments'
+    const type = searchParams.get('type') // 'schedule' | 'appointments' | 'settings'
 
     if (!rawProviderId) {
       return NextResponse.json(
@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
         startTime: appointment.scheduledTime || '09:00',
         endTime: '10:00', // Default value since estimatedEndTime doesn't exist
         status: appointment.status,
+        type: appointment.requestType,
         client: {
           name: appointment.client.name,
           phone: appointment.client.phone,
@@ -124,6 +125,28 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    if (type === 'settings') {
+      // Per-provider settings stored as JSON in SystemSettings with namespaced key
+      const key = `provider_schedule_settings:${sp.userId}`
+      const existing = await prisma.systemSettings.findUnique({ where: { key } })
+      const defaults = {
+        autoAccept: false,
+        minAdvanceHours: 0,
+        maxAdvanceDays: 30,
+        bufferMinutes: 0,
+        maxDaily: 0,
+        notifyWhatsapp: true,
+        reminders: true,
+        welcomeMessage: '',
+        confirmationMessage: ''
+      }
+      let value = defaults
+      if (existing?.value) {
+        try { value = { ...defaults, ...(JSON.parse(existing.value)) } } catch {}
+      }
+      return NextResponse.json({ success: true, settings: value })
+    }
+
     // Get provider schedule (availability)
     const availability = await prisma.availability.findMany({
       where: {
@@ -135,19 +158,50 @@ export async function GET(request: NextRequest) {
       }
     })
 
+    // Optional: compute occupied slots for a specific date
+    let occupiedTimes: Set<string> | null = null
+    if (date) {
+      const targetDate = new Date(date)
+      const nextDay = new Date(targetDate)
+      nextDay.setDate(nextDay.getDate() + 1)
+
+      const dayBookings = await prisma.serviceRequest.findMany({
+        where: {
+          providerId: sp.userId, // ServiceRequest.providerId referencia User.id
+          scheduledDate: { gte: targetDate, lt: nextDay },
+          status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] },
+        },
+        select: { scheduledTime: true }
+      })
+      occupiedTimes = new Set(dayBookings.map(b => b.scheduledTime!).filter(Boolean))
+    }
+
     // Transform availability to schedule format
     const schedule = Array.from({ length: 7 }, (_, dayIndex) => {
       const dayAvailability = availability.filter(a => a.dayOfWeek === dayIndex)
-      
-      return {
-        dayOfWeek: dayIndex,
-        isWorkingDay: dayAvailability.length > 0,
-        timeSlots: dayAvailability.map(slot => ({
+      const isWorkingDay = dayAvailability.length > 0
+      const timeSlots = dayAvailability.map(slot => {
+        // If date provided and its weekday equals current dayIndex, mark conflicts as unavailable
+        let isAvailable = slot.isActive
+        if (isAvailable && date) {
+          const dateDow = new Date(date).getDay()
+          if (dateDow === dayIndex && occupiedTimes) {
+            if (occupiedTimes.has(slot.startTime)) {
+              isAvailable = false
+            }
+          }
+        }
+        return {
           id: slot.id,
           startTime: slot.startTime,
           endTime: slot.endTime,
-          isAvailable: slot.isActive
-        }))
+          isAvailable,
+        }
+      })
+      return {
+        dayOfWeek: dayIndex,
+        isWorkingDay,
+        timeSlots,
       }
     })
 
@@ -258,6 +312,29 @@ export async function POST(request: NextRequest) {
       const sp = spById ?? await prisma.serviceProvider.findUnique({ where: { userId: validatedData.providerId }, select: { id: true, userId: true } })
       if (!sp) return NextResponse.json({ success: false, error: 'Prestador não encontrado' }, { status: 404 })
 
+      // Load provider settings
+      const setKey = `provider_schedule_settings:${sp.userId}`
+      const setRec = await prisma.systemSettings.findUnique({ where: { key: setKey } })
+      const settings = (() => { try { return JSON.parse(setRec?.value || '{}') } catch { return {} } })() as any
+      const minAdvanceHours = Number(settings.minAdvanceHours ?? 0)
+      const maxAdvanceDays = Number(settings.maxAdvanceDays ?? 0)
+      const maxDaily = Number(settings.maxDaily ?? 0)
+
+      // Enforce min/max advance
+      const selectedDate = new Date(validatedData.date + 'T' + validatedData.startTime)
+      const now = new Date()
+      const diffMs = selectedDate.getTime() - now.getTime()
+      if (minAdvanceHours > 0 && diffMs < minAdvanceHours * 3600_000) {
+        return NextResponse.json({ success: false, error: 'Data/hora abaixo da antecedência mínima' }, { status: 400 })
+      }
+      if (maxAdvanceDays > 0) {
+        const maxDate = new Date(now)
+        maxDate.setDate(maxDate.getDate() + maxAdvanceDays)
+        if (selectedDate > maxDate) {
+          return NextResponse.json({ success: false, error: 'Data/hora acima da antecedência máxima' }, { status: 400 })
+        }
+      }
+
       // Check if slot is available
       const conflictingAppointment = await prisma.serviceRequest.findFirst({
         where: {
@@ -277,6 +354,21 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      if (maxDaily > 0) {
+        const sameDayStart = new Date(validatedData.date)
+        const nextDay = new Date(sameDayStart); nextDay.setDate(nextDay.getDate() + 1)
+        const countDay = await prisma.serviceRequest.count({
+          where: {
+            providerId: sp.userId,
+            scheduledDate: { gte: sameDayStart, lt: nextDay },
+            status: { not: 'CANCELLED' }
+          }
+        })
+        if (countDay >= maxDaily) {
+          return NextResponse.json({ success: false, error: 'Limite diário de agendamentos atingido' }, { status: 400 })
+        }
+      }
+
       const appointment = await prisma.serviceRequest.create({
         data: {
           clientId: validatedData.clientId,
@@ -286,7 +378,7 @@ export async function POST(request: NextRequest) {
           scheduledDate: new Date(validatedData.date),
           scheduledTime: validatedData.startTime,
           description: validatedData.notes,
-          status: 'PENDING'
+          status: settings.autoAccept ? 'ACCEPTED' : 'PENDING'
         },
         include: {
           client: {
@@ -448,6 +540,20 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const scheduleId = searchParams.get('scheduleId')
+    if (action === 'save_settings') {
+      // Resolve provider userId
+      const spById = await prisma.serviceProvider.findUnique({ where: { id: body.providerId }, select: { userId: true } })
+      const spByUser = spById ?? await prisma.serviceProvider.findUnique({ where: { userId: body.providerId }, select: { userId: true } })
+      if (!spByUser) return NextResponse.json({ success: false, error: 'Prestador não encontrado' }, { status: 404 })
+      const key = `provider_schedule_settings:${spByUser.userId}`
+      const value = JSON.stringify(body.settings || {})
+      await prisma.systemSettings.upsert({
+        where: { key },
+        create: { key, value, description: 'Provider schedule preferences' },
+        update: { value }
+      })
+      return NextResponse.json({ success: true })
+    }
     const appointmentId = searchParams.get('appointmentId')
 
     if (scheduleId) {

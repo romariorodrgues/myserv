@@ -14,7 +14,6 @@ import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "sonner";
 import { ClientLayoutWrapper } from "@/components/layout/client-layout-wrapper";
-import { SupportChatWidgetWrapper } from "@/components/chat/SupportChatWidgetWrapper";
 import ReactQueryProvider from "@/lib/react-query";
 
 const inter = Inter({
@@ -106,8 +105,7 @@ export default function RootLayout({
             <FooterModern />
             <MobileNavigation />
             
-            {/* Widget de Chat de Suporte Global */}
-            <SupportChatWidgetWrapper />
+            {/* Support chat desativado nesta release */}
             
             <Toaster 
               position="top-right"
@@ -120,6 +118,7 @@ export default function RootLayout({
               }}
             />
           </AuthProvider>
+        </div>
         </div>
          </ClientLayoutWrapper>
         </ReactQueryProvider>

@@ -79,6 +79,7 @@ export default function ServiceRequestPage() {
   }>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [successMsg, setSuccessMsg] = useState<string>('')
   const [bookingData, setBookingData] = useState<BookingData>({
     serviceId,
     providerId: '',
@@ -259,10 +260,8 @@ export default function ServiceRequestPage() {
       selectedProvider
     ]
 
-    // Se tem agendamento, data e hora são obrigatórios
-    if (hasScheduling) {
-      basicFields.push(bookingData.preferredDate, bookingData.preferredTime)
-    }
+    // Se NÃO tem agendamento, pode exigir preferência de data/hora (opcional manter)
+    // Quando tem agenda, não exigimos esses campos na tela de solicitar.
 
     return basicFields.every(field => field && field.length > 0)
   }
@@ -283,17 +282,32 @@ export default function ServiceRequestPage() {
     setSubmitting(true)
 
     try {
-      // SEMPRE abre a agenda para o cliente escolher dia/horário.
+      // Se o prestador tem agenda: botão separado já leva para a agenda.
+      // Aqui, o submit vira "Solicitar Orçamento" (QUOTE) — sem data/hora.
       const providerProfileId = selectedProviderProfileId || service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.id
       if (!providerProfileId) {
         alert('Não foi possível identificar o prestador. Tente novamente.')
         return
       }
 
-      const payload = { ...bookingData, serviceId, providerId: providerProfileId }
-      try { sessionStorage.setItem('pendingBooking', JSON.stringify(payload)) } catch {}
-      router.push(`/servico/${serviceId}/agendar?providerId=${providerProfileId}`)
-      return
+      const payload = {
+        serviceId,
+        providerId: providerProfileId,
+        description: bookingData.description,
+        clientName: bookingData.clientName,
+        clientPhone: bookingData.clientPhone,
+        clientEmail: bookingData.clientEmail,
+        address: bookingData.address,
+        city: bookingData.city,
+        state: bookingData.state,
+        zipCode: bookingData.zipCode,
+        // Não enviar preferredDate/Time para criar QUOTE
+      } as any
+
+      const res = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao criar solicitação')
+      setSuccessMsg('Orçamento enviado! O profissional será notificado para entrar em contato com você.')
     } catch (error) {
       console.error('Error submitting booking:', error)
       alert('Erro ao enviar solicitação')
@@ -443,17 +457,16 @@ export default function ServiceRequestPage() {
                   />
                 </div>
 
-                {/* Date and Time - Show only if provider has scheduling */}
-                {selectedProvider && service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling && (
+                {/* Date and Time - Show only if provider DOES NOT have scheduling */}
+                {selectedProvider && !service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Calendar className="inline h-4 w-4 mr-1" />
-                        Data Preferencial *
+                        Data Preferencial
                       </label>
                       <Input
                         type="date"
-                        required
                         value={bookingData.preferredDate}
                         onChange={(e) => handleInputChange('preferredDate', e.target.value)}
                         min={new Date().toISOString().split('T')[0]}
@@ -462,11 +475,10 @@ export default function ServiceRequestPage() {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
                         <Clock className="inline h-4 w-4 mr-1" />
-                        Horário Preferencial *
+                        Horário Preferencial
                       </label>
                       <Input
                         type="time"
-                        required
                         value={bookingData.preferredTime}
                         onChange={(e) => handleInputChange('preferredTime', e.target.value)}
                       />
@@ -591,8 +603,6 @@ export default function ServiceRequestPage() {
                       <p className="text-sm text-yellow-800">
                         <strong>Atenção:</strong> Preencha todos os campos obrigatórios para continuar.
                         {!selectedProvider && " Selecione um profissional."}
-                        {selectedProvider && service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling && 
-                         (!bookingData.preferredDate || !bookingData.preferredTime) && " Selecione data e horário."}
                       </p>
                     </div>
                   )}
@@ -616,6 +626,12 @@ export default function ServiceRequestPage() {
                       {submitting ? 'Enviando…' : 'Solicitar Orçamento'}
                     </Button>
                   </div>
+
+                  {successMsg && (
+                    <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg p-3">
+                      {successMsg}
+                    </div>
+                  )}
                 </div>
               </form>
             </Card>

@@ -81,6 +81,7 @@ export function Header() {
   const { data: session, status } = useSession()
   const isLoading = status === 'loading'
   const isAuthenticated = status === 'authenticated'
+  const [mobileOpen, setMobileOpen] = useState(false)
   
   // Handle scroll effect
   useEffect(() => {
@@ -109,9 +110,9 @@ export function Header() {
     if (session.user.userType === 'ADMIN') {
       return '/admin/dashboard'
     } else if (session.user.userType === 'SERVICE_PROVIDER') {
-      return '/prestador/dashboard' 
+      return '/dashboard/profissional' 
     } else {
-      return '/dashboard'
+      return '/dashboard/cliente'
     }
   }
 
@@ -132,7 +133,7 @@ export function Header() {
       <div className="relative h-20 w-full grid grid-cols-3 items-center px-2 md:px-6">
         {/* Mobile Navigation */}
         <div className="col-start-1 flex md:hidden">
-        <Sheet>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon" aria-label="Menu">
               <Menu className="h-6 w-6" />
@@ -160,16 +161,16 @@ export function Header() {
                   </div>
                 </Link>
               </div>
-              <MobileNavItem href="/" icon={Home}>Início</MobileNavItem>
-              <MobileNavItem href="/servicos" icon={ListChecks}>Serviços</MobileNavItem>
-              <MobileNavItem href="/como-funciona" icon={HelpCircle}>Como Funciona</MobileNavItem>
-              <MobileNavItem href="/seja-profissional" icon={Briefcase}>Seja um Profissional</MobileNavItem>
+              <MobileNavItem href="/" icon={Home} onClick={() => setMobileOpen(false)}>Início</MobileNavItem>
+              <MobileNavItem href="/servicos" icon={ListChecks} onClick={() => setMobileOpen(false)}>Serviços</MobileNavItem>
+              <MobileNavItem href="/como-funciona" icon={HelpCircle} onClick={() => setMobileOpen(false)}>Como Funciona</MobileNavItem>
+              <MobileNavItem href="/seja-profissional" icon={Briefcase} onClick={() => setMobileOpen(false)}>Seja um Profissional</MobileNavItem>
               <div className="border-t border-gray-200 my-2"></div>
               {isAuthenticated ? (
                 <>
-                  <MobileNavItem href={getDashboardUrl()} icon={User}>Minha Conta</MobileNavItem>
-                  <MobileNavItem href="/favoritos" icon={Heart}>Favoritos</MobileNavItem>
-                  <MobileNavItem href="/mensagens" icon={MessageSquare}>Mensagens</MobileNavItem>
+                  <MobileNavItem href={getDashboardUrl()} icon={User} onClick={() => setMobileOpen(false)}>Minha Conta</MobileNavItem>
+                  <MobileNavItem href="/favoritos" icon={Heart} onClick={() => setMobileOpen(false)}>Favoritos</MobileNavItem>
+                  <MobileNavItem href="/notifications" icon={Bell} onClick={() => setMobileOpen(false)}>Notificações</MobileNavItem>
                   <div className="border-t border-gray-200 my-2"></div>
                   <Button 
                     variant="ghost" 
@@ -182,8 +183,8 @@ export function Header() {
                 </>
               ) : (
                 <>
-                  <MobileNavItem href="/entrar" icon={User}>Entrar</MobileNavItem>
-                  <MobileNavItem href="/cadastrar" icon={UserPlus}>Cadastrar</MobileNavItem>
+                  <MobileNavItem href="/entrar" icon={User} onClick={() => setMobileOpen(false)}>Entrar</MobileNavItem>
+                  <MobileNavItem href="/cadastrar" icon={UserPlus} onClick={() => setMobileOpen(false)}>Cadastrar</MobileNavItem>
                 </>
               )}
             </nav>
@@ -270,13 +271,13 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/mensagens">
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      <span>Mensagens</span>
+                    <Link href="/notifications">
+                      <Bell className="mr-2 h-4 w-4" />
+                      <span>Notificações</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/configuracoes">
+                    <Link href={session?.user?.userType === 'SERVICE_PROVIDER' ? '/dashboard/profissional?tab=settings' : '/dashboard/cliente?tab=settings'}>
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Configurações</span>
                     </Link>

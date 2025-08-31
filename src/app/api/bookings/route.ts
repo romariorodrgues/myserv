@@ -109,6 +109,66 @@ export async function POST(request: NextRequest) {
     // Define request type (QUOTE by default; SCHEDULING when preferred date/time provided)
     const requestType = (validatedData.preferredDate || validatedData.preferredTime) ? 'SCHEDULING' : 'QUOTE'
 
+    // Load provider schedule settings
+    const settingsKey = `provider_schedule_settings:${serviceProvider.userId}`
+    const settingsRec = await prisma.systemSettings.findUnique({ where: { key: settingsKey } })
+    const settings = (() => { try { return JSON.parse(settingsRec?.value || '{}') } catch { return {} } })() as any
+    const minAdvanceHours = Number(settings.minAdvanceHours ?? 0)
+    const maxAdvanceDays = Number(settings.maxAdvanceDays ?? 0)
+    const maxDaily = Number(settings.maxDaily ?? 0)
+    const notifyWhatsapp = settings.notifyWhatsapp !== false
+    const autoAccept = settings.autoAccept === true
+
+    // If scheduling, validate slot availability to avoid double booking
+    if (requestType === 'SCHEDULING' && validatedData.preferredDate && validatedData.preferredTime) {
+      const sameDayStart = new Date(validatedData.preferredDate)
+      const nextDay = new Date(sameDayStart)
+      nextDay.setDate(nextDay.getDate() + 1)
+
+      // Enforce min/max advance
+      const selectedDate = new Date(`${validatedData.preferredDate}T${validatedData.preferredTime}`)
+      const now = new Date()
+      const diffMs = selectedDate.getTime() - now.getTime()
+      if (minAdvanceHours > 0 && diffMs < minAdvanceHours * 3600_000) {
+        return NextResponse.json({ success: false, error: 'Data/hora abaixo da antecedência mínima' }, { status: 400 })
+      }
+      if (maxAdvanceDays > 0) {
+        const maxDate = new Date(now)
+        maxDate.setDate(maxDate.getDate() + maxAdvanceDays)
+        if (selectedDate > maxDate) {
+          return NextResponse.json({ success: false, error: 'Data/hora acima da antecedência máxima' }, { status: 400 })
+        }
+      }
+
+      const conflicting = await prisma.serviceRequest.findFirst({
+        where: {
+          providerId: serviceProvider.userId,
+          scheduledDate: { gte: sameDayStart, lt: nextDay },
+          scheduledTime: validatedData.preferredTime,
+          status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] }
+        }
+      })
+      if (conflicting) {
+        return NextResponse.json(
+          { success: false, error: 'Horário indisponível. Escolha outro horário.' },
+          { status: 409 }
+        )
+      }
+
+      if (maxDaily > 0) {
+        const countDay = await prisma.serviceRequest.count({
+          where: {
+            providerId: serviceProvider.userId,
+            scheduledDate: { gte: sameDayStart, lt: nextDay },
+            status: { not: 'CANCELLED' }
+          }
+        })
+        if (countDay >= maxDaily) {
+          return NextResponse.json({ success: false, error: 'Limite diário de agendamentos atingido' }, { status: 400 })
+        }
+      }
+    }
+
     // Create the booking
     const booking = await prisma.serviceRequest.create({
       data: {
@@ -119,7 +179,7 @@ export async function POST(request: NextRequest) {
         scheduledDate: validatedData.preferredDate ? new Date(validatedData.preferredDate + 'T' + (validatedData.preferredTime || '10:00')) : null,
         scheduledTime: validatedData.preferredTime || null,
         requestType,
-        status: 'PENDING'
+        status: requestType === 'SCHEDULING' && autoAccept ? 'ACCEPTED' : 'PENDING'
       },
       include: {
         service: {
@@ -155,7 +215,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Send WhatsApp notification
-    await WhatsAppService.notifyBookingRequest(notificationData)
+    if (notifyWhatsapp) {
+      await WhatsAppService.notifyBookingRequest(notificationData)
+    }
 
     // Send email notification
     await EmailService.sendNewRequestNotificationEmail({
@@ -168,10 +230,12 @@ export async function POST(request: NextRequest) {
       data: {
         userId: serviceProvider.userId, // Use the User ID, not ServiceProvider ID
         type: 'SERVICE_REQUEST',
-        title: 'Nova Solicitação de Serviço',
-        message: `Nova solicitação para ${booking.service.name} de ${booking.client.name}`,
+        title: requestType === 'QUOTE' ? 'Orçamento pendente' : 'Nova Solicitação de Agendamento',
+        message: requestType === 'QUOTE'
+          ? `Novo pedido de orçamento para ${booking.service.name} de ${booking.client.name}`
+          : `Agendamento solicitado para ${booking.service.name} em ${booking.scheduledDate?.toLocaleDateString('pt-BR')} às ${booking.scheduledTime}`,
         isRead: false,
-        data: { bookingId: booking.id }
+        data: { bookingId: booking.id, type: requestType }
       }
     })
     

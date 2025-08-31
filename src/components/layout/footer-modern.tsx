@@ -76,13 +76,15 @@ export function FooterModern() {
           <div className="space-y-4">
             <div className="flex items-center">
               <div className="h-10 w-auto relative drop-shadow-lg">
+                <div className="absolute top-[-65px] left-[-16px] w-[12rem]">
                 <Image 
-                  src="/brand/logo-white.png" 
+                  src="/LOGOS/Prancheta 18.png" 
                   alt="MyServ Logo"
-                  width={120}
+                  width={140}
                   height={40}
-                  className="object-contain scale-100 hover:scale-105 transition-transform duration-300"
+                  className="h-auto"
                 />
+                </div>
               </div>
             </div>
             <p className="text-gray-50 text-sm">

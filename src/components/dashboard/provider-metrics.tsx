@@ -11,65 +11,21 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 
-interface PerformanceMetrics {
-  overview: {
-    totalServices: number
-    totalEarnings: number
-    averageRating: number
-    completionRate: number
-    responseTime: number // in hours
-    repeatClientRate: number
+type MetricsResponse = {
+  success: boolean
+  data: {
+    overview: {
+      totalServices: number
+      totalEarnings: number
+      averageRating: number
+      completionRate: number
+      responseTime: number | null
+      repeatClientRate: number
+    }
+    monthly: { current: { services: number; earnings: number; newClients: number; rating: number } }
+    responseRate: number | null
+    categories: Array<{ name: string; services: number; earnings: number; rating: number; growth: number }>
   }
-  monthly: {
-    current: {
-      services: number
-      earnings: number
-      newClients: number
-      rating: number
-    }
-    previous: {
-      services: number
-      earnings: number
-      newClients: number
-      rating: number
-    }
-    growth: {
-      services: number
-      earnings: number
-      newClients: number
-      rating: number
-    }
-  }
-  weekly: Array<{
-    week: string
-    services: number
-    earnings: number
-    rating: number
-  }>
-  categories: Array<{
-    name: string
-    services: number
-    earnings: number
-    rating: number
-    growth: number
-  }>
-  achievements: Array<{
-    id: string
-    title: string
-    description: string
-    icon: string
-    unlockedAt: string
-    progress?: number
-    target?: number
-  }>
-  goals: Array<{
-    id: string
-    title: string
-    current: number
-    target: number
-    deadline: string
-    type: 'services' | 'earnings' | 'rating' | 'clients'
-  }>
 }
 
 interface ProviderMetricsProps {
@@ -78,127 +34,25 @@ interface ProviderMetricsProps {
 
 export function ProviderMetrics({ providerId }: ProviderMetricsProps) {
   const [loading, setLoading] = useState(true)
-  const [metrics, setMetrics] = useState<PerformanceMetrics | null>(null)
+  const [metrics, setMetrics] = useState<MetricsResponse['data'] | null>(null)
   const [selectedPeriod, setSelectedPeriod] = useState<'week' | 'month' | 'quarter'>('month')
 
   useEffect(() => {
-    fetchMetrics()
+    (async () => {
+      try {
+        setLoading(true)
+        const res = await fetch(`/api/providers/metrics${providerId ? `?providerId=${providerId}` : ''}`)
+        const data: MetricsResponse = await res.json()
+        if (data.success) setMetrics(data.data)
+      } catch (error) {
+        console.error('Error fetching metrics:', error)
+      } finally {
+        setLoading(false)
+      }
+    })()
   }, [providerId, selectedPeriod])
 
-  const fetchMetrics = async () => {
-    try {
-      setLoading(true)
-      
-      // Mock data - replace with actual API call
-      const mockMetrics: PerformanceMetrics = {
-        overview: {
-          totalServices: 127,
-          totalEarnings: 18450,
-          averageRating: 4.8,
-          completionRate: 96.5,
-          responseTime: 2.5,
-          repeatClientRate: 68
-        },
-        monthly: {
-          current: {
-            services: 15,
-            earnings: 2100,
-            newClients: 8,
-            rating: 4.9
-          },
-          previous: {
-            services: 12,
-            earnings: 1680,
-            newClients: 6,
-            rating: 4.7
-          },
-          growth: {
-            services: 25,
-            earnings: 25,
-            newClients: 33.3,
-            rating: 4.3
-          }
-        },
-        weekly: [
-          { week: 'Sem 1', services: 4, earnings: 560, rating: 4.8 },
-          { week: 'Sem 2', services: 3, earnings: 420, rating: 4.9 },
-          { week: 'Sem 3', services: 5, earnings: 700, rating: 4.9 },
-          { week: 'Sem 4', services: 3, earnings: 420, rating: 5.0 }
-        ],
-        categories: [
-          { name: 'Limpeza Residencial', services: 45, earnings: 6750, rating: 4.9, growth: 15 },
-          { name: 'Limpeza Comercial', services: 32, earnings: 6400, rating: 4.7, growth: 8 },
-          { name: 'Limpeza Pós-Obra', services: 28, earnings: 4200, rating: 4.8, growth: 22 },
-          { name: 'Limpeza de Escritório', services: 22, earnings: 1100, rating: 4.6, growth: -5 }
-        ],
-        achievements: [
-          {
-            id: '1',
-            title: 'Primeira Avaliação 5 Estrelas',
-            description: 'Recebeu sua primeira avaliação perfeita',
-            icon: 'star',
-            unlockedAt: '2025-01-15T10:00:00Z'
-          },
-          {
-            id: '2',
-            title: 'Cliente Fiel',
-            description: 'Teve um cliente que contratou seus serviços 5 vezes',
-            icon: 'heart',
-            unlockedAt: '2025-02-20T14:30:00Z'
-          },
-          {
-            id: '3',
-            title: 'Resposta Rápida',
-            description: 'Manteve tempo de resposta abaixo de 2 horas por 30 dias',
-            icon: 'lightning',
-            unlockedAt: '2025-03-10T09:15:00Z'
-          },
-          {
-            id: '4',
-            title: 'Profissional 100+',
-            description: 'Completou mais de 100 serviços',
-            icon: 'trophy',
-            unlockedAt: '2025-05-01T16:45:00Z'
-          }
-        ],
-        goals: [
-          {
-            id: '1',
-            title: 'Serviços Este Mês',
-            current: 15,
-            target: 20,
-            deadline: '2025-06-30',
-            type: 'services'
-          },
-          {
-            id: '2',
-            title: 'Ganhos Este Mês',
-            current: 2100,
-            target: 2500,
-            deadline: '2025-06-30',
-            type: 'earnings'
-          },
-          {
-            id: '3',
-            title: 'Manter Avaliação',
-            current: 4.9,
-            target: 4.8,
-            deadline: '2025-06-30',
-            type: 'rating'
-          }
-        ]
-      }
-
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setMetrics(mockMetrics)
-      
-    } catch (error) {
-      console.error('Error fetching metrics:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+  // (fetchMetrics removido: agora usamos fetch inline no useEffect)
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('pt-BR', {
@@ -276,9 +130,7 @@ export function ProviderMetrics({ providerId }: ProviderMetricsProps) {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total de Serviços</p>
                 <p className="text-2xl font-bold">{metrics.overview.totalServices}</p>
-                <p className={`text-sm ${getGrowthColor(metrics.monthly.growth.services)}`}>
-                  {formatGrowth(metrics.monthly.growth.services)} este mês
-                </p>
+                <p className="text-sm text-gray-600">Este mês: {metrics.monthly.current.services}</p>
               </div>
             </div>
           </CardContent>
@@ -293,9 +145,7 @@ export function ProviderMetrics({ providerId }: ProviderMetricsProps) {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Ganho</p>
                 <p className="text-2xl font-bold">{formatCurrency(metrics.overview.totalEarnings)}</p>
-                <p className={`text-sm ${getGrowthColor(metrics.monthly.growth.earnings)}`}>
-                  {formatGrowth(metrics.monthly.growth.earnings)} este mês
-                </p>
+                <p className="text-sm text-gray-600">Este mês: {formatCurrency(metrics.monthly.current.earnings)}</p>
               </div>
             </div>
           </CardContent>
@@ -373,55 +223,7 @@ export function ProviderMetrics({ providerId }: ProviderMetricsProps) {
         </Card>
       </div>
 
-      {/* Goals Progress */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Target className="w-5 h-5" />
-            <span>Metas do Mês</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-6">
-            {metrics.goals.map((goal) => {
-              const IconComponent = getGoalIcon(goal.type)
-              const progress = (goal.current / goal.target) * 100
-              const isCompleted = goal.current >= goal.target
-              
-              return (
-                <div key={goal.id} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <IconComponent className="w-5 h-5 text-gray-600" />
-                      <div>
-                        <h3 className="font-medium">{goal.title}</h3>
-                        <p className="text-sm text-gray-500">
-                          {goal.type === 'earnings' ? formatCurrency(goal.current) : goal.current} de{' '}
-                          {goal.type === 'earnings' ? formatCurrency(goal.target) : goal.target}
-                        </p>
-                      </div>
-                    </div>
-                    {isCompleted && (
-                      <Badge className="bg-green-100 text-green-800">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Concluída
-                      </Badge>
-                    )}
-                  </div>
-                  
-                  <div className="space-y-2">
-                    <Progress value={Math.min(progress, 100)} className="h-2" />
-                    <div className="flex justify-between text-sm text-gray-500">
-                      <span>{progress.toFixed(1)}% concluída</span>
-                      <span>Prazo: {new Date(goal.deadline).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Goals removidos nesta versão (a API não retorna metas definidas) */}
 
       {/* Category Performance */}
       <Card>
@@ -459,33 +261,7 @@ export function ProviderMetrics({ providerId }: ProviderMetricsProps) {
         </CardContent>
       </Card>
 
-      {/* Achievements */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <Award className="w-5 h-5" />
-            <span>Conquistas Recentes</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {metrics.achievements.map((achievement) => (
-              <div key={achievement.id} className="flex items-center space-x-3 p-4 border rounded-lg bg-gradient-to-r from-yellow-50 to-orange-50">
-                <div className="p-2 bg-yellow-100 rounded-lg">
-                  <Award className="w-6 h-6 text-yellow-600" />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium">{achievement.title}</h3>
-                  <p className="text-sm text-gray-600">{achievement.description}</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Desbloqueado em {new Date(achievement.unlockedAt).toLocaleDateString('pt-BR')}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Achievements removidos nesta versão */}
     </div>
   )
 }

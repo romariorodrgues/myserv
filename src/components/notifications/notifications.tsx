@@ -8,6 +8,7 @@
 import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { useRouter } from 'next/navigation'
 
 interface Notification {
   id: string
@@ -17,6 +18,7 @@ interface Notification {
   isRead: boolean
   createdAt: string
   sentVia: string
+  data?: any
 }
 
 interface NotificationsComponentProps {
@@ -34,6 +36,7 @@ export function NotificationsComponent({
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [showAll, setShowAll] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
     fetchNotifications()
@@ -46,10 +49,11 @@ export function NotificationsComponent({
     try {
       const response = await fetch(`/api/notifications?userId=${userId}`)
       const data = await response.json()
-      
       if (data.success) {
-        setNotifications(data.notifications)
-        setUnreadCount(data.unreadCount)
+        const list = Array.isArray(data.notifications) ? data.notifications : data.data?.notifications || []
+        const unread = typeof data.unreadCount === 'number' ? data.unreadCount : (data.data?.unreadCount || 0)
+        setNotifications(list)
+        setUnreadCount(unread)
       }
     } catch (error) {
       console.error('Erro ao carregar notificações:', error)
@@ -173,7 +177,13 @@ export function NotificationsComponent({
               className={`transition-all duration-200 hover:shadow-md cursor-pointer ${
                 !notification.isRead ? 'border-l-4 border-l-blue-500 bg-blue-50/30' : ''
               }`}
-              onClick={() => !notification.isRead && markAsRead([notification.id])}
+              onClick={async () => {
+                if (!notification.isRead) await markAsRead([notification.id])
+                // Navegação: serviço/agendamento
+                if (notification.type === 'SERVICE_REQUEST') {
+                  router.push('/agenda?open=true')
+                }
+              }}
             >
               <CardContent className="p-4">
                 <div className="flex items-start gap-3">

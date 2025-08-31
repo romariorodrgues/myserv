@@ -1,0 +1,84 @@
+[1mdiff --git a/package-lock.json b/package-lock.json[m
+[1mindex b4fb6a6..1b9c473 100644[m
+[1m--- a/package-lock.json[m
+[1m+++ b/package-lock.json[m
+[36m@@ -12,6 +12,7 @@[m
+         "@googlemaps/js-api-loader": "^1.16.8",[m
+         "@headlessui/react": "^2.2.4",[m
+         "@hookform/resolvers": "^5.1.1",[m
+[32m+[m[32m        "@mercadopago/sdk-react": "^1.0.3",[m
+         "@next-auth/prisma-adapter": "^1.0.7",[m
+         "@prisma/client": "^6.13.0",[m
+         "@radix-ui/react-avatar": "^1.1.10",[m
+[36m@@ -19,6 +20,7 @@[m
+         "@radix-ui/react-dropdown-menu": "^2.1.15",[m
+         "@radix-ui/react-label": "^2.1.7",[m
+         "@radix-ui/react-progress": "^1.1.7",[m
+[32m+[m[32m        "@radix-ui/react-scroll-area": "^1.2.9",[m
+         "@radix-ui/react-separator": "^1.1.7",[m
+         "@radix-ui/react-slot": "^1.2.3",[m
+         "@radix-ui/react-switch": "^1.2.5",[m
+[36m@@ -46,9 +48,12 @@[m
+         "react-hook-form": "^7.57.0",[m
+         "recharts": "^2.15.3",[m
+         "sharp": "^0.34.2",[m
+[32m+[m[32m        "socket.io": "^4.8.1",[m
+[32m+[m[32m        "socket.io-client": "^4.8.1",[m
+         "sonner": "^2.0.5",[m
+         "tailwind-merge": "^3.3.1",[m
+[31m-        "zod": "^3.25.58"[m
+[32m+[m[32m        "zod": "^3.25.58",[m
+[32m+[m[32m        "zustand": "^5.0.7"[m
+       },[m
+       "devDependencies": {[m
+         "@eslint/eslintrc": "^3",[m
+[36m@@ -1521,6 +1526,25 @@[m
+         "@jridgewell/sourcemap-codec": "^1.4.14"[m
+       }[m
+     },[m
+[32m+[m[32m    "node_modules/@mercadopago/sdk-js": {[m
+[32m+[m[32m      "version": "0.0.3",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@mercadopago/sdk-js/-/sdk-js-0.0.3.tgz",[m
+[32m+[m[32m      "integrity": "sha512-kO48DNLHdfFAp3on12nuKdqNlEmw1x3+nM6wLd04BdWOXoFcAhkNMQV3AyUIanXdO/bB/dENakdacLT29297EQ==",[m
+[32m+[m[32m      "license": "Apache-2.0"[m
+[32m+[m[32m    },[m
+[32m+[m[32m    "node_modules/@mercadopago/sdk-react": {[m
+[32m+[m[32m      "version": "1.0.4",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@mercadopago/sdk-react/-/sdk-react-1.0.4.tgz",[m
+[32m+[m[32m      "integrity": "sha512-LCRuZxSl092fyGvfuxQwkoRwCmB+GSRH8cLeSWherRtE0D/yOXrky6GZvfoM3weVGVtcqIsO1mTei1QyJmuw+A==",[m
+[32m+[m[32m      "license": "Apache-2.0",[m
+[32m+[m[32m      "dependencies": {[m
+[32m+[m[32m        "@mercadopago/sdk-js": "^0.0.3"[m
+[32m+[m[32m      },[m
+[32m+[m[32m      "peerDependencies": {[m
+[32m+[m[32m        "react": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0",[m
+[32m+[m[32m        "react-dom": "^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0"[m
+[32m+[m[32m      }[m
+[32m+[m[32m    },[m
+     "node_modules/@napi-rs/wasm-runtime": {[m
+       "version": "0.2.11",[m
+       "resolved": "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-0.2.11.tgz",[m
+[36m@@ -1835,6 +1859,12 @@[m
+         "@prisma/debug": "6.13.0"[m
+       }[m
+     },[m
+[32m+[m[32m    "node_modules/@radix-ui/number": {[m
+[32m+[m[32m      "version": "1.1.1",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@radix-ui/number/-/number-1.1.1.tgz",[m
+[32m+[m[32m      "integrity": "sha512-MkKCwxlXTgz6CFoJx3pCwn07GKp36+aZyu/u2Ln2VrA5DcdyCZkASEDBTd8x5whTQQL5CiYf4prXKLcgQdv29g==",[m
+[32m+[m[32m      "license": "MIT"[m
+[32m+[m[32m    },[m
+     "node_modules/@radix-ui/primitive": {[m
+       "version": "1.1.2",[m
+       "resolved": "https://registry.npmjs.org/@radix-ui/primitive/-/primitive-1.1.2.tgz",[m
+[36m@@ -2333,6 +2363,67 @@[m
+         }[m
+       }[m
+     },[m
+[32m+[m[32m    "node_modules/@radix-ui/react-scroll-area": {[m
+[32m+[m[32m      "version": "1.2.10",[m
+[32m+[m[32m      "resolved": "https://registry.npmjs.org/@radix-ui/react-scroll-area/-/react-scroll-area-1.2.10.tgz",[m
+[32m+[m[32m      "integrity": "sha512-tAXIa1g3sM5CGpVT0uIbUx/U3Gs5N8T52IICuCtObaos1S8fzsrPXG5WObkQN3S6NVl6wKgPhAIiBGbWnvc97A==",[m
+[32m+[m[32m      "license": "MIT",[m
+[32m+[m[32m      "dependencies": {[m
+[32m+[m
