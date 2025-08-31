@@ -11,7 +11,11 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { WhatsAppButton } from '@/components/whatsapp/whatsapp-button'
 import { useWhatsAppCommunication } from '@/hooks/use-whatsapp-communication'
-import { MessageCircle, User, Phone, CheckCircle2, Clock, XCircle } from 'lucide-react'
+import { MessageCircle, User, Phone, CheckCircle2, Clock, XCircle, LockKeyholeOpen } from 'lucide-react'
+import { Button } from '../ui/button'
+import { useMutation } from '@tanstack/react-query'
+import axios from 'axios'
+import useVerifyPlan from '@/hooks/use-verify-plan'
 
 interface Booking {
   id: string
@@ -30,7 +34,7 @@ interface Booking {
     }
   }
   payment?: {
-    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+    status: 'PENDING' | 'APPROVED' | 'FAILED' | 'REFUNDED'
   }
 }
 
@@ -40,22 +44,50 @@ interface BookingWhatsAppContactProps {
   variant?: 'compact' | 'full'
 }
 
-export function BookingWhatsAppContact({ 
-  booking, 
-  userType, 
-  variant = 'compact' 
+export function BookingWhatsAppContact({
+  booking,
+  userType,
+  variant = 'compact'
 }: BookingWhatsAppContactProps) {
+  const { subscription } = useVerifyPlan();
+
   const { canCommunicate, contactData, communicationStatus } = useWhatsAppCommunication({
     booking,
-    userType
+    userType,
+    subscription
+  })
+
+  const createPreferenceMutation = useMutation({
+    mutationFn: async () => {
+      const { data } = await axios.post('/api/payments', { bookingId: booking.id, amount: 19.90, gateway: 'mercadopago' })
+      return data
+    },
+    onSuccess: (data) => {
+      window.open(data.checkout.initPoint);
+    },
+    onError: (error) => {
+      console.error('Error creating payment preference:', error)
+    }
   })
 
   if (!canCommunicate) {
     if (variant === 'compact') {
       return (
-        <div className="flex items-center space-x-2 text-sm text-muted-foreground">
-          <MessageCircle className="w-4 h-4" />
-          <span>{communicationStatus.reason}</span>
+        <div className="space-y-4 text-sm text-muted-foreground">
+          <div className='flex items-center gap-1'>
+            <MessageCircle className="w-4 h-4" />
+            <span>{communicationStatus.reason}</span>
+          </div>
+          <div>
+            <Button onClick={() => createPreferenceMutation.mutate()} variant="secondary" className='gap-2'>
+              {createPreferenceMutation.isPending ? <span>Redirecionando...</span> : (
+                <>
+                  <LockKeyholeOpen size={16} />
+                  <span>Liberar contato</span>
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       )
     }
@@ -67,7 +99,7 @@ export function BookingWhatsAppContact({
             <div className="flex-shrink-0">
               {booking.status === 'PENDING' && <Clock className="w-5 h-5 text-yellow-500" />}
               {booking.status === 'REJECTED' && <XCircle className="w-5 h-5 text-red-500" />}
-              {booking.status === 'ACCEPTED' && booking.payment?.status !== 'COMPLETED' && (
+              {booking.status === 'ACCEPTED' && booking.payment?.status !== 'APPROVED' && (
                 <Clock className="w-5 h-5 text-yellow-500" />
               )}
             </div>
@@ -89,8 +121,8 @@ export function BookingWhatsAppContact({
     return null
   }
 
-  const contactName = userType === 'CLIENT' 
-    ? booking.serviceProvider?.user.name 
+  const contactName = userType === 'CLIENT'
+    ? booking.serviceProvider?.user.name
     : booking.client?.name
 
   const contactPhone = userType === 'CLIENT'
@@ -127,26 +159,26 @@ export function BookingWhatsAppContact({
                 Comunicação via WhatsApp Disponível
               </h4>
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex items-center space-x-2 text-sm text-green-700">
                 <User className="w-4 h-4" />
                 <span>{contactName}</span>
               </div>
-              
+
               {contactPhone && (
                 <div className="flex items-center space-x-2 text-sm text-green-700">
                   <Phone className="w-4 h-4" />
                   <span>{contactPhone}</span>
                 </div>
               )}
-              
+
               <Badge variant="secondary" className="bg-green-100 text-green-800">
                 {userType === 'CLIENT' ? 'Profissional' : 'Cliente'}
               </Badge>
             </div>
           </div>
-          
+
           <div className="flex-shrink-0 ml-4">
             <WhatsAppButton
               contact={contactData}
@@ -158,10 +190,10 @@ export function BookingWhatsAppContact({
             </WhatsAppButton>
           </div>
         </div>
-        
+
         <div className="mt-3 pt-3 border-t border-green-200">
           <p className="text-xs text-green-600">
-            {booking.status === 'COMPLETED' 
+            {booking.status === 'COMPLETED'
               ? 'Serviço concluído - Entre em contato para dúvidas ou avaliação'
               : 'Pagamento confirmado - Converse diretamente para alinhar detalhes'
             }

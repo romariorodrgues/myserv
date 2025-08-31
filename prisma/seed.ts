@@ -268,14 +268,6 @@ await prisma.clientPrivacy.upsert({
     },
   })
 
-//   console.log(JSON.stringify({
-//       serviceProviderId: provider.id,
-//       planId: startPlan.id,
-//       startDate: new Date(),
-//       status: 'ACTIVE',
-//       isAutoRenew: false,
-// }))
-
   await prisma.subscription.create({
     data: {
       serviceProviderId: serviceProvider.id,

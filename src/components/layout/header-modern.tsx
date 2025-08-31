@@ -108,7 +108,7 @@ export function Header() {
     if (session.user.userType === 'ADMIN') {
       return '/admin/dashboard'
     } else if (session.user.userType === 'SERVICE_PROVIDER') {
-      return '/prestador/dashboard' 
+      return '/dashboard/profissional' 
     } else {
       return '/dashboard'
     }

@@ -7,7 +7,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense, useMemo } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -34,6 +34,8 @@ import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-c
 import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
+import axios from 'axios'
+import PaymentHistory from '@/components/dashboard/payments-history'
 
 interface Booking {
   id: string
@@ -53,7 +55,7 @@ interface Booking {
     phone?: string
   }
   payment?: {
-    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+    status: 'PENDING' | 'APPROVED' | 'FAILED' | 'REFUNDED'
   }
 }
 
@@ -65,72 +67,13 @@ function ProviderDashboardContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
 
-
-  const fetchBookings = async (): Promise<Booking[]> => {
-    const currentSession = session;
-    if (!currentSession?.user?.id) {
-      return []
-    }
-
-    try {
-      // Get providerId from authenticated session - using new API with payment info
-      const response = await fetch(`/api/bookings/with-payments?providerId=${currentSession.user.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.success && data.bookings) {
-          return data.bookings
-        }
-        return []
-      } else {
-        // Mock data for development with payment status
-        const mockBookings: Booking[] = [
-          {
-            id: '1',
-            status: 'ACCEPTED',
-            description: 'Instalação de ar condicionado',
-            preferredDate: '2025-06-15T14:00:00Z',
-            createdAt: '2025-06-13T10:00:00Z',
-            address: 'Rua das Flores, 123',
-            city: 'São Paulo',
-            state: 'SP',
-            service: { name: 'Instalação de Ar Condicionado' },
-            client: {
-              name: 'Maria Silva',
-              profileImage: null,
-              phone: '(11) 99999-1111'
-            },
-            payment: { status: 'COMPLETED' }
-          },
-          {
-            id: '2',
-            status: 'ACCEPTED',
-            description: 'Reparo em sistema elétrico',
-            preferredDate: '2025-06-16T09:00:00Z',
-            createdAt: '2025-06-12T15:30:00Z',
-            address: 'Av. Paulista, 456',
-            city: 'São Paulo',
-            state: 'SP',
-            service: { name: 'Reparo Elétrico' },
-            client: {
-              name: 'Carlos Santos',
-              profileImage: null,
-              phone: '(11) 98888-2222'
-            },
-            payment: { status: 'PENDING' }
-          }
-        ]
-        return mockBookings;
-      }
-    } catch (error) {
-      console.error('Error fetching bookings:', error)
-      return [];
-    }
-  }
-
   const { data: bookings, isLoading, isFetching, refetch: refetchBookings } = useQuery<Booking[]>({
-    queryKey: ['fetch-bookings'],
+    queryKey: ['bookings'],
     initialData: [],
-    queryFn: fetchBookings,
+    queryFn: async () => {
+      const { data } = await axios.get(`/api/bookings/with-payments?providerId=${currentSession.user.id}`);
+      return data.bookings;
+    },
   })
 
   const handleBookingAction = async (bookingId: string, newStatus: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
@@ -472,10 +415,10 @@ function ProviderDashboardContent() {
             <CardContent>
               <div className="space-y-4">
                 {bookings
-                  .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'COMPLETED') || booking.status === 'COMPLETED')
+                  .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') || booking.status === 'COMPLETED')
                   .length > 0 ? (
                   bookings
-                    .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'COMPLETED') || booking.status === 'COMPLETED')
+                    .filter(booking => (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') || booking.status === 'COMPLETED')
                     .slice(0, 3)
                     .map((booking) => (
                       <div key={booking.id} className="p-4 border rounded-lg">
@@ -590,8 +533,8 @@ function ProviderDashboardContent() {
               </div>
             </CardContent>
           </Card>
-
-          <PlansSettings userId={session.user.id} />
+          <PlansSettings />
+          <PaymentHistory />
         </div>
       )}
     </div>
