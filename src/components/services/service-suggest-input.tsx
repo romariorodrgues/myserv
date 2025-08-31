@@ -1,9 +1,11 @@
+// ServiceSuggestInput.tsx
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Search } from 'lucide-react'
+import { cn } from '@/lib/utils' // se já tiver; senão, troque por `${}` simples
 
 type SuggestItem = {
   id: string
@@ -16,10 +18,12 @@ export default function ServiceSuggestInput({
   placeholder = 'Ex.: lavagem de estofados',
   defaultValue = '',
   onSelect,
+  inputClassName, // <-- novo
 }: {
   placeholder?: string
   defaultValue?: string
   onSelect: (item: { type: 'leaf' | 'text'; id?: string; name: string }) => void
+  inputClassName?: string
 }) {
   const [query, setQuery] = useState(defaultValue)
   const [items, setItems] = useState<SuggestItem[]>([])
@@ -38,7 +42,6 @@ export default function ServiceSuggestInput({
         setOpen(false)
         return
       }
-
       abortRef.current?.abort()
       const ctrl = new AbortController()
       abortRef.current = ctrl
@@ -59,7 +62,6 @@ export default function ServiceSuggestInput({
         setLoading(false)
       }
     }, 200)
-
     return () => clearTimeout(handler)
   }, [query])
 
@@ -91,7 +93,6 @@ export default function ServiceSuggestInput({
       return
     }
     if (!open) return
-
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHighlight((h) => (items.length ? (h + 1) % items.length : -1))
@@ -110,14 +111,17 @@ export default function ServiceSuggestInput({
   return (
     <div className="relative" ref={containerRef}>
       <div className="relative">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+        {/* Ícone com as mesmas medidas do outro campo */}
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+
+        {/* Input com mesmas dimensões: pl-12 pr-12 h-14 text-lg */}
         <Input
           placeholder={placeholder}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onFocus={() => setOpen(items.length > 0)}
           onKeyDown={onKeyDown}
-          className="pl-9"
+          className={cn('pl-12 pr-12 h-14 text-lg', inputClassName)}
         />
       </div>
 
@@ -161,4 +165,3 @@ export default function ServiceSuggestInput({
     </div>
   )
 }
-

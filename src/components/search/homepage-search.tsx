@@ -159,11 +159,11 @@ export default function HomepageSearch({ className = '' }: HomepageSearchProps) 
       <div className="flex flex-col sm:flex-row gap-4">
         {/* Service Search Input */}
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <div className="pl-12">
+          <div>
             <ServiceSuggestInput
               placeholder="Que serviço você precisa?"
               defaultValue={serviceQuery}
+              inputClassName="h-14 text-lg pl-12 pr-12"
               onSelect={(item) => {
                 if (item.type === 'leaf' && item.id) {
                   setLeafId(item.id)
