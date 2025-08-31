@@ -1,7 +1,3 @@
-// MyServ Database Schema
-// Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
-// Service marketplace platform connecting service providers with clients
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,77 +7,62 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// User model for both clients and service providers
 model User {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  phone         String
-  name          String
-  cpfCnpj       String         @unique
-  password      String
-  profileImage  String?
-  userType      UserType
-  isActive      Boolean        @default(true)
-  isApproved    Boolean        @default(false)
-  gender        Gender?
-  maritalStatus MaritalStatus?
-  description   String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-
-  // Relations
+  id               String              @id @default(uuid())
+  email            String              @unique
+  phone            String
+  name             String
+  cpfCnpj          String              @unique
+  password         String
+  profileImage     String?
+  userType         String
+  isActive         Boolean             @default(true)
+  isApproved       Boolean             @default(false)
+  gender           String?
+  maritalStatus    String?
+  description      String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
   address          Address?
-  serviceProvider  ServiceProvider?
   clientProfile    ClientProfile?
-  sentRequests     ServiceRequest[] @relation("ClientRequests")
-  receivedRequests ServiceRequest[] @relation("ProviderRequests")
-  givenReviews     Review[]         @relation("ReviewGiver")
-  receivedReviews  Review[]         @relation("ReviewReceiver")
-  payments         Payment[]
-  notifications    Notification[]
   favorites        Favorite[]
-  
-  // Support Chat Relations
+  notifications    Notification[]
+  payments         Payment[]
+  receivedReviews  Review[]            @relation("ReviewReceiver")
+  givenReviews     Review[]            @relation("ReviewGiver")
+  serviceProvider  ServiceProvider?
+  receivedRequests ServiceRequest[]    @relation("ProviderRequests")
+  sentRequests     ServiceRequest[]    @relation("ClientRequests")
+  adminAssignments SupportAssignment[]
   supportChats     SupportChat[]
   sentMessages     SupportMessage[]
-  adminAssignments SupportAssignment[]
-
-  givenReviews     Review[]         @relation("ReviewGiver")
-  receivedReviews  Review[]         @relation("ReviewReceiver")
-  payments         Payment[]
-  notifications    Notification[]
-  favorites        Favorite[]
 
   @@map("users")
 }
 
-// Service Provider specific data
 model ServiceProvider {
-  id                 String    @id @default(uuid())
-  userId             String    @unique
-  hasScheduling      Boolean   @default(false)
-  hasQuoting         Boolean   @default(true)
-  chargesTravel      Boolean   @default(false)
-  travelCost         Float? // SQLite compatible pricing
-  waivesTravelOnHire Boolean   @default(false)
-  isHighlighted      Boolean   @default(false)
+  id                 String                   @id @default(uuid())
+  userId             String                   @unique
+  hasScheduling      Boolean                  @default(false)
+  hasQuoting         Boolean                  @default(true)
+  chargesTravel      Boolean                  @default(false)
+  travelCost         Float?
+  waivesTravelOnHire Boolean                  @default(false)
+  isHighlighted      Boolean                  @default(false)
   highlightUntil     DateTime?
-  activePlan         Plan?     @relation(fields: [planId], references: [id])
   planId             String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
-
-  // Relations  
-  user          User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  services      ServiceProviderService[]
-  availability  Availability[]
-  subscriptions Subscription[]
-  favoritedBy   Favorite[]
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  availability       Availability[]
+  favoritedBy        Favorite[]
+  services           ServiceProviderService[]
+  user               User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  activePlan         Plan?                    @relation(fields: [planId], references: [id])
+  subscriptions      Subscription[]
 
   @@map("service_providers")
 }
 
-// Client specific data
 model ClientProfile {
   id          String             @id @default(uuid())
   userId      String             @unique
@@ -89,44 +70,37 @@ model ClientProfile {
   updatedAt   DateTime           @updatedAt
   preferences ClientPreferences?
   privacy     ClientPrivacy?
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("client_profiles")
 }
 
 model ClientPreferences {
-  id                    String  @id @default(uuid())
-  clientProfileId       String  @unique
-  emailNotifications    Boolean @default(false)
-  smsNotifications      Boolean @default(false)
-  whatsappNotifications Boolean @default(false)
-  marketingEmails       Boolean @default(false)
-  serviceReminders      Boolean @default(false)
-  reviewRequests        Boolean @default(false)
-
-  // Relations
-  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+  id                    String        @id @default(uuid())
+  clientProfileId       String        @unique
+  emailNotifications    Boolean       @default(false)
+  smsNotifications      Boolean       @default(false)
+  whatsappNotifications Boolean       @default(false)
+  marketingEmails       Boolean       @default(false)
+  serviceReminders      Boolean       @default(false)
+  reviewRequests        Boolean       @default(false)
+  clientProfile         ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
 
   @@map("client_preferences")
 }
 
 model ClientPrivacy {
-  id                String  @id @default(uuid())
-  clientProfileId   String  @unique
-  profileVisibility String  @default("PUBLIC") // ou enum se preferir
-  showPhone         Boolean @default(false)
-  showEmail         Boolean @default(false)
-  showLocation      Boolean @default(false)
-
-  // Relations
-  clientProfile ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
+  id                String        @id @default(uuid())
+  clientProfileId   String        @unique
+  profileVisibility String        @default("PUBLIC")
+  showPhone         Boolean       @default(false)
+  showEmail         Boolean       @default(false)
+  showLocation      Boolean       @default(false)
+  clientProfile     ClientProfile @relation(fields: [clientProfileId], references: [id], onDelete: Cascade)
 
   @@map("client_privacy")
 }
 
-// Address model
 model Address {
   id         String   @id @default(uuid())
   userId     String   @unique
@@ -136,232 +110,194 @@ model Address {
   street     String
   number     String
   zipCode    String
-  complement String?
   latitude   Float?
   longitude  Float?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complement String?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("addresses")
 }
 
-// Service categories
 model ServiceCategory {
-  id          String  @id @default(uuid())
-  name        String  @unique
-  description String?
-  icon        String?
-  isActive    Boolean @default(true)
-
-  // HIERARQUIA
+  id           String            @id @default(uuid())
+  name         String            @unique
+  description  String?
+  icon         String?
+  isActive     Boolean           @default(true)
   parentId     String?
-  parent       ServiceCategory?  @relation("CategoryToParent", fields: [parentId], references: [id])
-  children     ServiceCategory[] @relation("CategoryToParent")
   level        Int               @default(0)
   isLeaf       Boolean           @default(false)
   displayOrder Int               @default(0)
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  services Service[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  parent       ServiceCategory?  @relation("CategoryToParent", fields: [parentId], references: [id])
+  children     ServiceCategory[] @relation("CategoryToParent")
+  services     Service?
 
   @@map("service_categories")
 }
 
-// Individual services
 model Service {
-  id          String   @id @default(uuid())
+  id          String                   @id @default(uuid())
   name        String
   description String?
-  categoryId  String
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  categoryId  String                   @unique
+  isActive    Boolean                  @default(true)
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  providers   ServiceProviderService[]
+  requests    ServiceRequest[]
+  category    ServiceCategory          @relation(fields: [categoryId], references: [id])
 
-  category  ServiceCategory          @relation(fields: [categoryId], references: [id])
-  providers ServiceProviderService[]
-  requests  ServiceRequest[]
-
-  @@unique([categoryId], name: "service_unique_per_leaf") // 👈 garante 1 Service por leaf
   @@map("services")
 }
 
-
-// Junction table for service providers and their services
 model ServiceProviderService {
-  id                String   @id @default(uuid())
+  id                String          @id @default(uuid())
   serviceProviderId String
   serviceId         String
-  basePrice         Float? // SQLite compatible pricing
+  basePrice         Float?
   unit              String
   description       String?
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Relations
-  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
-  service         Service         @relation(fields: [serviceId], references: [id])
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  service           Service         @relation(fields: [serviceId], references: [id])
+  serviceProvider   ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
 
   @@unique([serviceProviderId, serviceId])
   @@map("service_provider_services")
 }
 
-// Service requests/bookings
 model ServiceRequest {
-  id             String        @id @default(uuid())
+  id             String    @id @default(uuid())
   clientId       String
   providerId     String
   serviceId      String
-  requestType    RequestType
+  requestType    String
   scheduledDate  DateTime?
   scheduledTime  String?
   description    String?
-  status         RequestStatus @default(PENDING)
-  estimatedPrice Float? // SQLite compatible pricing
-  finalPrice     Float? // SQLite compatible pricing
-  travelCost     Float? // SQLite compatible pricing
-  schedulingFee  Float? // SQLite compatible pricing
-  isVisitVirtual Boolean       @default(false)
+  status         String    @default("PENDING")
+  estimatedPrice Float?
+  finalPrice     Float?
+  travelCost     Float?
+  schedulingFee  Float?
+  isVisitVirtual Boolean   @default(false)
   expiresAt      DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-
-  // Relations
-  client   User      @relation("ClientRequests", fields: [clientId], references: [id])
-  provider User      @relation("ProviderRequests", fields: [providerId], references: [id])
-  service  Service   @relation(fields: [serviceId], references: [id])
-  payments Payment[]
-  review   Review?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  payments       Payment[]
+  review         Review?
+  service        Service   @relation(fields: [serviceId], references: [id])
+  provider       User      @relation("ProviderRequests", fields: [providerId], references: [id])
+  client         User      @relation("ClientRequests", fields: [clientId], references: [id])
 
   @@map("service_requests")
 }
 
-// Availability for service providers
 model Availability {
-  id                String   @id @default(uuid())
+  id                String          @id @default(uuid())
   serviceProviderId String
-  dayOfWeek         Int // 0-6 (Sunday-Saturday)
-  startTime         String // HH:MM format
-  endTime           String // HH:MM format
-  isActive          Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Relations
-  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
+  dayOfWeek         Int
+  startTime         String
+  endTime           String
+  isActive          Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  serviceProvider   ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
 
   @@map("availability")
 }
 
-// Payment records
 model Payment {
-  id               String         @id @default(uuid())
+  id               String          @id @default(uuid())
   userId           String
   serviceRequestId String?
   subscriptionId   String?
-  amount           Float // SQLite compatible pricing
-  currency         String         @default("BRL")
-  paymentMethod    PaymentMethod
-  gateway          PaymentGateway
-  gatewayPaymentId String?        @unique
-  status           PaymentStatus  @default(PENDING)
+  amount           Float
+  currency         String          @default("BRL")
+  paymentMethod    String
+  gateway          String
+  gatewayPaymentId String?         @unique
+  status           String          @default("PENDING")
   description      String?
-  createdAt        DateTime       @default(now())
-  updatedAt        DateTime       @updatedAt
-
-  // Relations
-  user           User            @relation(fields: [userId], references: [id])
-  serviceRequest ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
-  subscription   Subscription?   @relation(fields: [subscriptionId], references: [id])
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  subscription     Subscription?   @relation(fields: [subscriptionId], references: [id])
+  serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
+  user             User            @relation(fields: [userId], references: [id])
 
   @@map("payments")
 }
 
-// Subscription plans
 model Plan {
-  id           String       @id @default(uuid())
-  name         String       @unique
-  description  String?
-  price        Float // SQLite compatible pricing
-  billingCycle BillingCycle
-  features     String // JSON string of features (SQLite compatible)
-  isActive     Boolean      @default(true)
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
-
-  // Relations
-  subscriptions    Subscription[]
+  id               String            @id @default(uuid())
+  name             String            @unique
+  description      String?
+  price            Float
+  billingCycle     String
+  features         String
+  isActive         Boolean           @default(true)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
   serviceProviders ServiceProvider[]
+  subscriptions    Subscription[]
 
   @@map("plans")
 }
 
-// User subscriptions
 model Subscription {
-  id                String             @id @default(uuid())
+  id                String          @id @default(uuid())
   serviceProviderId String
   planId            String
-  status            SubscriptionStatus @default(ACTIVE)
+  status            String          @default("ACTIVE")
   startDate         DateTime
   endDate           DateTime?
-  isAutoRenew       Boolean            @default(true)
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-
-  // Relations
-  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
-  plan            Plan            @relation(fields: [planId], references: [id])
-  payments        Payment[]
+  isAutoRenew       Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  payments          Payment[]
+  plan              Plan            @relation(fields: [planId], references: [id])
+  serviceProvider   ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
 
   @@map("subscriptions")
 }
 
-// Reviews and ratings
 model Review {
-  id               String   @id @default(uuid())
-  serviceRequestId String   @unique
+  id               String         @id @default(uuid())
+  serviceRequestId String         @unique
   giverId          String
   receiverId       String
-  rating           Int // 1-5 stars
+  rating           Int
   comment          String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  // Relations
-  serviceRequest ServiceRequest @relation(fields: [serviceRequestId], references: [id])
-  giver          User           @relation("ReviewGiver", fields: [giverId], references: [id])
-  receiver       User           @relation("ReviewReceiver", fields: [receiverId], references: [id])
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  receiver         User           @relation("ReviewReceiver", fields: [receiverId], references: [id])
+  giver            User           @relation("ReviewGiver", fields: [giverId], references: [id])
+  serviceRequest   ServiceRequest @relation(fields: [serviceRequestId], references: [id])
 
   @@map("reviews")
 }
 
-// System notifications
 model Notification {
-  id        String           @id @default(uuid())
+  id        String   @id @default(uuid())
   userId    String
-  type      NotificationType
+  type      String
   title     String
   message   String
-  isRead    Boolean          @default(false)
-  // Channels used to send this notification (e.g., "whatsapp,email")
+  isRead    Boolean  @default(false)
+  data      Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
   sentVia   String?
-  data      Json? // Additional data for the notification
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
-
-  // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("notifications")
 }
 
-// System settings
 model SystemSettings {
   id          String   @id @default(uuid())
   key         String   @unique
@@ -373,7 +309,6 @@ model SystemSettings {
   @@map("system_settings")
 }
 
-// Supported regions
 model SupportedRegion {
   id        String   @id @default(uuid())
   state     String
@@ -386,151 +321,48 @@ model SupportedRegion {
   @@map("supported_regions")
 }
 
-// User favorites
 model Favorite {
-  id                String   @id @default(uuid())
+  id                String          @id @default(uuid())
   userId            String
   serviceProviderId String
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-
-  // Relations
-  user            User            @relation(fields: [userId], references: [id], onDelete: Cascade)
-  serviceProvider ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  serviceProvider   ServiceProvider @relation(fields: [serviceProviderId], references: [id], onDelete: Cascade)
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, serviceProviderId])
   @@map("favorites")
 }
 
-// Enums
-enum UserType {
-  CLIENT
-  SERVICE_PROVIDER
-  ADMIN
-}
-
-enum Gender {
-  MALE
-  FEMALE
-  OTHER
-  PREFER_NOT_TO_SAY
-}
-
-enum MaritalStatus {
-  SINGLE
-  MARRIED
-  DIVORCED
-  WIDOWED
-  OTHER
-}
-
-enum RequestType {
-  SCHEDULING
-  QUOTE
-}
-
-enum RequestStatus {
-  PENDING
-  ACCEPTED
-  REJECTED
-  COMPLETED
-  CANCELLED
-  EXPIRED
-}
-
-enum PaymentMethod {
-  CREDIT_CARD
-  DEBIT_CARD
-  PIX
-  BANK_TRANSFER
-  BOLETO
-}
-
-enum PaymentGateway {
-  MERCADO_PAGO
-  PAGAR_ME
-}
-
-enum PaymentStatus {
-  PENDING
-  PROCESSING
-  APPROVED
-  REJECTED
-  CANCELLED
-  REFUNDED
-}
-
-enum BillingCycle {
-  MONTHLY
-  QUARTERLY
-  ANNUALLY
-}
-
-enum SubscriptionStatus {
-  ACTIVE
-  CANCELLED
-  EXPIRED
-  SUSPENDED
-}
-
-enum NotificationType {
-  SERVICE_REQUEST
-  PAYMENT
-  SYSTEM
-  PROMOTIONAL
-}
-
-enum ChatStatus {
-  OPEN
-  IN_PROGRESS
-  CLOSED
-}
-
-enum Priority {
-  LOW
-  MEDIUM
-  HIGH
-  URGENT
-}
-
-enum MessageType {
-  TEXT
-  IMAGE
-  FILE
-}
-
-// Support Chat System Models
 model SupportChat {
-  id          String     @id @default(cuid())
-  userId      String     // Cliente ou Prestador
-  status      ChatStatus @default(OPEN) // OPEN, IN_PROGRESS, CLOSED
-  priority    Priority   @default(MEDIUM) // LOW, MEDIUM, HIGH, URGENT
-  subject     String?    // Assunto do suporte
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  id          String              @id @default(cuid())
+  userId      String
+  status      String              @default("OPEN")
+  priority    String              @default("MEDIUM")
+  subject     String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   closedAt    DateTime?
-  closedBy    String?    // Admin que fechou
-  
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages    SupportMessage[]
+  closedBy    String?
   assignments SupportAssignment[]
-  
+  user        User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    SupportMessage[]
+
   @@map("support_chats")
 }
 
 model SupportMessage {
   id          String      @id @default(cuid())
   chatId      String
-  senderId    String      // Quem enviou (user ou admin)
+  senderId    String
   content     String
-  type        MessageType @default(TEXT) // TEXT, IMAGE, FILE
+  type        String      @default("TEXT")
   isFromAdmin Boolean     @default(false)
   readAt      DateTime?
   createdAt   DateTime    @default(now())
-  
-  chat        SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   sender      User        @relation(fields: [senderId], references: [id])
-  
+  chat        SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
   @@map("support_messages")
 }
 
@@ -540,9 +372,8 @@ model SupportAssignment {
   adminId    String
   assignedAt DateTime    @default(now())
   isActive   Boolean     @default(true)
-  
-  chat       SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
   admin      User        @relation(fields: [adminId], references: [id])
-  
+  chat       SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+
   @@map("support_assignments")
 }
