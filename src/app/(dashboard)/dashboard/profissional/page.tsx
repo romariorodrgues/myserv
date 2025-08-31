@@ -69,24 +69,7 @@ function ProviderDashboardContent() {
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
 
   const fetchBookings = async (): Promise<Booking[]> => {
-    const currentSession = session;
-  const [avgRating, setAvgRating] = useState<number>(0)
-  const [totalReviews, setTotalReviews] = useState<number>(0)
-  const [activeTab, setActiveTab] = useState<'overview' | 'schedule' | 'history' | 'metrics' | 'pricing' | 'settings'>('overview')
-  const subTab = useMemo(() => (searchParams.get('sub') as 'schedule'|'appointments'|'settings'|null), [searchParams])
-  const dateParam = useMemo(() => searchParams.get('date') || undefined, [searchParams])
-  
-
-// Temporary mock data for development
-// const mockSession = useMemo(() => ({
-//   user: { 
-//     name: 'João Prestador', 
-//     userType: 'SERVICE_PROVIDER', 
-//     id: 'provider-1' 
-//   }
-// }), [])
-
-
+    const currentSession = session
     if (!currentSession?.user?.id) {
       return []
     }
