@@ -154,7 +154,7 @@ export default function AgendaPage() {
                 Entre na sua conta para acessar seus agendamentos
               </p>
               <Button asChild>
-                <a href="/auth/signin">Fazer Login</a>
+                <a href="/entrar">Fazer Login</a>
               </Button>
             </CardContent>
           </Card>

@@ -205,7 +205,7 @@ export function AdminDashboardStats() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <Button 
           size="lg" 
           className="h-24 flex flex-col items-center justify-center space-y-2"
@@ -218,6 +218,16 @@ export function AdminDashboardStats() {
               {stats.overview.pendingProviders}
             </span>
           )}
+        </Button>
+        
+        <Button 
+          variant="outline" 
+          size="lg" 
+          className="h-24 flex flex-col items-center justify-center space-y-2"
+          onClick={() => window.location.href = '/admin/chat'}
+        >
+          <Activity className="w-6 h-6" />
+          <span>Gerenciar Chats</span>
         </Button>
         
         <Button 

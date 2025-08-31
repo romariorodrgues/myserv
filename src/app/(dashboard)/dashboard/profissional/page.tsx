@@ -31,6 +31,7 @@ import { ProviderServiceHistory } from '@/components/dashboard/provider-service-
 import { ProviderMetrics } from '@/components/dashboard/provider-metrics'
 import { ProviderPriceManagement } from '@/components/dashboard/provider-price-management'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
+import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
 import axios from 'axios'

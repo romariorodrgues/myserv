@@ -18,6 +18,7 @@ import { ClientHistory } from '@/components/dashboard/client-history'
 import { ClientFavorites } from '@/components/dashboard/client-favorites'
 import { ClientProfileSettings } from '@/components/dashboard/client-profile-settings'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
+import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
 import { redirect } from 'next/navigation'
 
 
@@ -61,7 +62,7 @@ function ClientDashboardContent() {
   { id: 'settings', label: 'Configurações', icon: Settings }
 ]
 if (!session) {
-    redirect('/login') // já redireciona no servidor, sem flash de tela
+    redirect('/entrar') // redireciona para a página de login correta
   }
   const fetchBookings = useCallback(async () => {
     try {
