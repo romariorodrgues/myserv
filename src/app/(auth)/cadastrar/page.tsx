@@ -101,12 +101,12 @@ if (passwordInput.value !== confirmInput.value) {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         <div className="text-center mb-8">
-          <Link href="/" className="inline-flex items-center">
+          {/* <Link href="/" className="inline-flex items-center">
             <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-lg">MS</span>
             </div>
             <span className="ml-3 text-2xl font-bold text-gray-900">MyServ</span>
-          </Link>
+          </Link> */}
           <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
             Crie sua conta
           </h2>

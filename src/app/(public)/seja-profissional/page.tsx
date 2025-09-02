@@ -22,12 +22,17 @@ export default function SejaProfissionalPage() {
                 <span className="text-green-600"> renda extra</span>
               </h1>
               <p className="text-xl text-gray-600 mb-8">
-                Cadastre-se gratuitamente na MyServ e comece a receber solicitações 
-                de clientes qualificados na sua região. Sem mensalidades, você só paga quando fechar negócio.
+                Voce é um prestador de serviço, tem uma empresa de prestação de serviço ou até mesmo faz serviço de free lancer?
+              </p>
+              <p className="text-xl text-gray-600 mb-8">
+                Se você é uma pessoa física cadastre-se gratuitamente na Myserv e comece a receber solicitações de serviço na região em que atende. Pague somente quando fechar negocio.
+              </p>
+              <p className="text-xl text-gray-600 mb-8">
+                Se você é uma pessoa jurídica cadastre-se com plano mensal e aceite serviços ILIMITADOS o mês inteiro.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button size="lg" asChild>
-                  <Link href="/cadastrar">Cadastrar-se grátis</Link>
+                  <Link href="/cadastrar">Cadastrar-se</Link>
                 </Button>
                 <Button size="lg" variant="outline">
                   Ver como funciona
@@ -224,8 +229,10 @@ export default function SejaProfissionalPage() {
             Comece hoje mesmo!
           </h2>
           <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
-            Cadastre-se gratuitamente e comece a receber solicitações ainda hoje. 
-            Sem mensalidades, sem compromisso.
+            Cadastre-se e comece a receber solicitações.
+          </p>
+          <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
+            Aprovação com até 24 horas – suporte dedicado.
           </p>
           <Button size="lg" variant="secondary" asChild>
             <Link href="/cadastrar">Criar conta de profissional</Link>

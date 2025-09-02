@@ -186,7 +186,7 @@ const clientSteps = [
   {
     icon: CreditCard,
     title: 'Faça o agendamento',
-    description: 'Escolha data e hora disponível e efetue o pagamento de forma segura'
+    description: 'solicite um orçamento ou agende um serviço com data e horário conforme disponibilidade do profissional. Pague somente após o serviço/orçamento concluído.'
   },
   {
     icon: Star,
@@ -222,7 +222,7 @@ const features = [
   {
     icon: Shield,
     title: 'Segurança garantida',
-    description: 'Todos os profissionais passam por verificação e os pagamentos são processados com segurança'
+    description: 'Todos os profissionais e clientes passam por verificação, possuímos termos rigorosos podendo qualquer cadastrado ser bloqueado do sistema em caso de não cumprimento das regras'
   },
   {
     icon: MapPin,
@@ -242,12 +242,12 @@ const features = [
   {
     icon: MessageCircle,
     title: 'Comunicação direta',
-    description: 'Converse diretamente com o profissional via WhatsApp após a contratação'
+    description: 'Converse diretamente com o profissional via chat ou whatsapp após a contratação'
   },
   {
     icon: CreditCard,
     title: 'Pagamento seguro',
-    description: 'Múltiplas formas de pagamento com proteção total das suas informações'
+    description: 'Aceite pagar direto ao profissional somente após a conclusão do serviço/orçamento contratado'
   }
 ]
 

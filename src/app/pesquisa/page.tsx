@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Search, MapPin, Filter, Star, Heart, Phone, MessageCircle, Loader2, Crosshair } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -48,7 +48,7 @@ type Filters = {
   sortBy?: SortByUI
 }
 
-export default function PesquisaPage() {
+function PesquisaPage() {
   const { data: session } = useSession()
   const { getCurrentLocation, address, loading: locationLoading } = useGeolocation()
 
@@ -372,3 +372,13 @@ export default function PesquisaPage() {
     </div>
   )
 }
+
+const SearchPage: React.FC = () => {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <PesquisaPage />
+    </Suspense>
+  );
+}
+
+export default SearchPage;

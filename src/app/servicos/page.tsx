@@ -79,7 +79,7 @@ function ServicesPageContent() {
         {/* Search Header */}
         <div className="bg-white rounded-lg shadow p-6 mb-8">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            Encontre o profissional perfeito
+            Encontre o profissional ideal para você
           </h1>
           
           <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-3 gap-4">

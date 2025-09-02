@@ -104,7 +104,6 @@ export function FooterModern() {
             <ul className="space-y-2 text-sm">
               <FooterLink href="/como-funciona">Como funciona</FooterLink>
               <FooterLink href="/categorias">Categorias de serviços</FooterLink>
-              <FooterLink href="/dicas">Dicas e tutoriais</FooterLink>
               <FooterLink href="/seguranca">Segurança</FooterLink>
               <FooterLink href="/ajuda">Central de ajuda</FooterLink>
             </ul>
@@ -114,10 +113,9 @@ export function FooterModern() {
           <FooterSection title="Para Profissionais">
             <ul className="space-y-2 text-sm">
               <FooterLink href="/seja-profissional">Seja um profissional</FooterLink>
-              <FooterLink href="/planos">Planos e preços</FooterLink>
-              <FooterLink href="/central-ajuda">Central de ajuda</FooterLink>
-              <FooterLink href="/sucesso">Histórias de sucesso</FooterLink>
+              <FooterLink href="/planos">Planos e taxas</FooterLink>
               <FooterLink href="/termos-profissionais">Termos de uso</FooterLink>
+              <FooterLink href="/central-ajuda">Central de ajuda</FooterLink>
             </ul>
           </FooterSection>
 

@@ -22,13 +22,15 @@ export default function Home() {
             <h1 className="text-4xl md:text-6xl font-bold text-gray-900">
               Encontre o <span className="text-blue-600">profissional</span>
               <br />
-              perfeito para você
+              mais perto e adequado para você
             </h1>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Conectamos você aos melhores prestadores de serviços da sua região. 
-              Agendamento online, pagamento seguro e profissionais qualificados.
+              Conectamos você aos melhores prestadores de serviços da sua região.
             </p>
-            
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Escolha o profissional qualificado ideal para você, agende seu orçamento/serviço online
+e pague direto ao prestador.
+            </p>
             {/* Search Bar with Geolocation */}
             <HomepageSearch />
 
@@ -118,8 +120,7 @@ export default function Home() {
             Pronto para encontrar seu profissional?
           </h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Junte-se a milhares de clientes satisfeitos que já encontraram 
-            os melhores serviços através da MyServ.
+            Junte-se a outros clientes satisfeitos que já encontraram os melhores serviços atras da Myserv.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" variant="secondary" asChild>
@@ -147,15 +148,15 @@ const categories = [
 
 const steps = [
   {
-    title: 'Descreva seu projeto',
-    description: 'Conte o que você precisa e receba orçamentos de profissionais qualificados'
+    title: 'Buscar',
+    description: 'Faça sua busca pelo serviço ou profissional que deseja'
   },
   {
     title: 'Compare e escolha',
     description: 'Analise perfis, avaliações e escolha o profissional ideal para você'
   },
   {
-    title: 'Contrate com segurança',
-    description: 'Faça o pagamento de forma segura e acompanhe o andamento do seu projeto'
+    title: 'Agendamento',
+    description: 'Agende seu serviço ou orçamento online. Pague direto ao prestador após o serviço concluído'
   }
 ]
