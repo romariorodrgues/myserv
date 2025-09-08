@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -18,13 +18,55 @@ export default function AdminSettingsPage() {
     requestExpiryHours: '24',
     maxServiceRadius: '50',
     minServicePrice: '20.00',
-    maxServicePrice: '5000.00'
+    maxServicePrice: '5000.00',
+    // Contatos
+    contactEmail: '',
+    contactPhone: '',
+    contactAddress: '',
+    socialFacebook: '',
+    socialInstagram: '',
   })
 
-  const handleSave = () => {
-    // Save settings to database
-    console.log('Saving settings:', settings)
-    alert('Configurações salvas com sucesso!')
+  useEffect(() => {
+    // Carrega system settings para contatos
+    const load = async () => {
+      try {
+        const res = await fetch('/api/system-settings', { cache: 'no-store' })
+        const data = await res.json()
+        const s = data.settings || {}
+        setSettings(prev => ({
+          ...prev,
+          contactEmail: s.CONTACT_EMAIL || prev.contactEmail,
+          contactPhone: s.CONTACT_PHONE || prev.contactPhone,
+          contactAddress: s.CONTACT_ADDRESS || prev.contactAddress,
+          socialFacebook: s.SOCIAL_FACEBOOK_URL || prev.socialFacebook,
+          socialInstagram: s.SOCIAL_INSTAGRAM_URL || prev.socialInstagram,
+        }))
+      } catch { /* noop */ }
+    }
+    load()
+  }, [])
+
+  const handleSave = async () => {
+    // Salva apenas contatos no endpoint de system-settings
+    try {
+      await fetch('/api/system-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          updates: {
+            CONTACT_EMAIL: settings.contactEmail,
+            CONTACT_PHONE: settings.contactPhone,
+            CONTACT_ADDRESS: settings.contactAddress,
+            SOCIAL_FACEBOOK_URL: settings.socialFacebook,
+            SOCIAL_INSTAGRAM_URL: settings.socialInstagram,
+          }
+        })
+      })
+      alert('Configurações salvas com sucesso!')
+    } catch (e) {
+      alert('Erro ao salvar configurações')
+    }
   }
 
   return (
@@ -227,6 +269,38 @@ export default function AdminSettingsPage() {
                   <p className="text-xs text-gray-500 mt-1">
                     Distância máxima para busca de profissionais
                   </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Contatos (Footer) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Contato exibido no site</CardTitle>
+              <CardDescription>Edite os dados mostrados no rodapé do site</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">E-mail de contato</label>
+                  <Input value={settings.contactEmail} onChange={(e) => setSettings(p => ({...p, contactEmail: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Telefone/WhatsApp</label>
+                  <Input value={settings.contactPhone} onChange={(e) => setSettings(p => ({...p, contactPhone: e.target.value}))} />
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Endereço</label>
+                  <Input value={settings.contactAddress} onChange={(e) => setSettings(p => ({...p, contactAddress: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Facebook URL</label>
+                  <Input value={settings.socialFacebook} onChange={(e) => setSettings(p => ({...p, socialFacebook: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Instagram URL</label>
+                  <Input value={settings.socialInstagram} onChange={(e) => setSettings(p => ({...p, socialInstagram: e.target.value}))} />
                 </div>
               </div>
             </CardContent>

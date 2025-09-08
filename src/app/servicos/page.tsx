@@ -62,7 +62,7 @@ function ServicesPageContent() {
     } finally {
       setLoading(false)
     }
-  }, [searchTerm, location])
+  }, [searchTerm, location, leafCategoryId])
 
   useEffect(() => {
     fetchServices()

@@ -30,7 +30,7 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "MyServ - Conectando você aos melhores profissionais",
-  description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, pagamento seguro e profissionais qualificados.",
+  description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, contato direto e profissionais qualificados.",
   keywords: ["serviços", "profissionais", "agendamento", "prestadores", "home services"],
   authors: [{ name: "Romário Rodrigues" }],
   creator: "Romário Rodrigues",
@@ -46,7 +46,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "MyServ - Conectando você aos melhores profissionais",
-    description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, pagamento seguro e profissionais qualificados.",
+    description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, contato direto e profissionais qualificados.",
     url: "https://myserv.com.br",
     siteName: "MyServ",
     type: "website",

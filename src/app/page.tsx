@@ -8,11 +8,33 @@
 // creates development branch
 
 import Link from "next/link"
-import { Star, Shield, Users } from "lucide-react"
+import { Shield, Users } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import HomepageSearch from "@/components/search/homepage-search"
 
-export default function Home() {
+type Category = { id: string; name: string }
+
+async function getTopCategories(): Promise<Category[]> {
+  try {
+    const base = process.env.NEXTAUTH_URL ?? ''
+    const res = await fetch(`${base}/api/categories?active=true`, { next: { revalidate: 600 } })
+    if (!res.ok) return fallbackCategories
+    const data = await res.json()
+    const cats: Category[] = (data.categories || []).map((c: any) => ({ id: c.id, name: c.name }))
+    // Prefer commonly procurados se existirem
+    const preferred = ['Limpeza', 'Reformas', 'Beleza', 'Tecnologia', 'Educação', 'Saúde']
+    const mapped = preferred
+      .map((p) => cats.find((c) => c.name.toLowerCase() === p.toLowerCase()))
+      .filter(Boolean) as Category[]
+    const rest = cats.filter((c) => !mapped.some((m) => m.id === c.id))
+    return (mapped.length ? mapped : cats).slice(0, 6)
+  } catch {
+    return fallbackCategories
+  }
+}
+
+export default async function Home() {
+  const categories = await getTopCategories()
   return (
     <div className="space-y-16">
       {/* Hero Section */}
@@ -34,18 +56,15 @@ e pague direto ao prestador.
             {/* Search Bar with Geolocation */}
             <HomepageSearch />
 
-            <div className="flex justify-center space-x-8 text-sm text-gray-600">
-              <div className="flex items-center space-x-2">
+            {/* Trust notes (sem números exagerados nesta fase) */}
+            <div className="flex justify-center gap-6 flex-wrap text-sm text-gray-600">
+              <div className="flex items-center gap-2">
                 <Users className="w-4 h-4" />
-                <span>+10.000 profissionais</span>
+                <span>Profissionais qualificados</span>
               </div>
-              <div className="flex items-center space-x-2">
-                <Star className="w-4 h-4" />
-                <span>Avaliação 4.8/5</span>
-              </div>
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center gap-2">
                 <Shield className="w-4 h-4" />
-                <span>100% seguro</span>
+                <span>Contato direto com o prestador</span>
               </div>
             </div>
           </div>
@@ -68,11 +87,12 @@ e pague direto ao prestador.
             {categories.map((category) => (
               <Link
                 key={category.id}
-                href={`/categoria/${category.slug}`}
+                href={`/servicos?q=${encodeURIComponent(category.name)}`}
                 className="group bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow p-6 text-center"
               >
                 <div className="w-16 h-16 mx-auto mb-4 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200 transition-colors">
-                  <category.icon className="w-8 h-8 text-blue-600" />
+                  {/* simple avatar icon placeholder */}
+                  <Users className="w-8 h-8 text-blue-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">
                   {category.name}
@@ -120,7 +140,7 @@ e pague direto ao prestador.
             Pronto para encontrar seu profissional?
           </h2>
           <p className="text-xl opacity-90 max-w-2xl mx-auto">
-            Junte-se a outros clientes satisfeitos que já encontraram os melhores serviços atras da Myserv.
+            Crie sua conta grátis e encontre profissionais na sua região.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" variant="secondary" asChild>
@@ -137,13 +157,13 @@ e pague direto ao prestador.
 }
 
 // Sample data - In production, this would come from your database
-const categories = [
-  { id: 1, name: 'Limpeza', slug: 'limpeza', icon: Users },
-  { id: 2, name: 'Reformas', slug: 'reformas', icon: Users },
-  { id: 3, name: 'Beleza', slug: 'beleza', icon: Users },
-  { id: 4, name: 'Tecnologia', slug: 'tecnologia', icon: Users },
-  { id: 5, name: 'Educação', slug: 'educacao', icon: Users },
-  { id: 6, name: 'Saúde', slug: 'saude', icon: Users },
+const fallbackCategories: Category[] = [
+  { id: 'limpeza', name: 'Limpeza' },
+  { id: 'reformas', name: 'Reformas' },
+  { id: 'beleza', name: 'Beleza' },
+  { id: 'tecnologia', name: 'Tecnologia' },
+  { id: 'educacao', name: 'Educação' },
+  { id: 'saude', name: 'Saúde' },
 ]
 
 const steps = [

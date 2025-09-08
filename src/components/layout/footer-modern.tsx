@@ -13,12 +13,11 @@ import {
   MapPin, 
   Facebook, 
   Instagram, 
-  Twitter, 
-  Linkedin,
   ArrowRight,
   Send
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { prisma } from '@/lib/prisma'
 
 interface FooterSectionProps {
   title: string
@@ -65,7 +64,38 @@ const SocialLink = ({ href, icon: Icon, label }: SocialLinkProps) => (
   </Link>
 )
 
-export function FooterModern() {
+async function getSettings() {
+  try {
+    const items = await prisma.systemSettings.findMany({
+      where: { key: { in: [
+        'CONTACT_EMAIL',
+        'CONTACT_PHONE',
+        'CONTACT_ADDRESS',
+        'SOCIAL_FACEBOOK_URL',
+        'SOCIAL_INSTAGRAM_URL',
+      ] } }
+    })
+    const map = Object.fromEntries(items.map(i => [i.key, i.value])) as Record<string, string>
+    return {
+      email: map.CONTACT_EMAIL || 'contato@myserv.com.br',
+      phone: map.CONTACT_PHONE || '(11) 99999-9999',
+      address: map.CONTACT_ADDRESS || 'São Paulo - SP, Brasil',
+      facebook: map.SOCIAL_FACEBOOK_URL || 'https://facebook.com/myserv',
+      instagram: map.SOCIAL_INSTAGRAM_URL || 'https://instagram.com/myserv',
+    }
+  } catch {
+    return {
+      email: 'contato@myserv.com.br',
+      phone: '(11) 99999-9999',
+      address: 'São Paulo - SP, Brasil',
+      facebook: 'https://facebook.com/myserv',
+      instagram: 'https://instagram.com/myserv',
+    }
+  }
+}
+
+export async function FooterModern() {
+  const settings = await getSettings()
   const currentYear = new Date().getFullYear()
   
   return (
@@ -91,11 +121,10 @@ export function FooterModern() {
               Conectamos você aos melhores profissionais da sua região. 
               Encontre o serviço que precisa de forma rápida e segura.
             </p>
+            {/* Somente Instagram e Facebook neste momento */}
             <div className="flex space-x-3">
-              <SocialLink href="https://facebook.com/myserv" icon={Facebook} label="Facebook" />
-              <SocialLink href="https://instagram.com/myserv" icon={Instagram} label="Instagram" />
-              <SocialLink href="https://twitter.com/myserv" icon={Twitter} label="Twitter" />
-              <SocialLink href="https://linkedin.com/company/myserv" icon={Linkedin} label="LinkedIn" />
+              <SocialLink href={settings.facebook} icon={Facebook} label="Facebook" />
+              <SocialLink href={settings.instagram} icon={Instagram} label="Instagram" />
             </div>
           </div>
 
@@ -124,22 +153,19 @@ export function FooterModern() {
             <div className="space-y-3 text-sm">
               <div className="flex items-center space-x-3">
                 <Mail className="w-5 h-5  !text-brand-teal text-secondary" />
-                <a href="mailto:contato@myserv.com.br" className="text-gray-50 hover:text-white transition-colors">
-                  contato@myserv.com.br
+                <a href={`mailto:${settings.email}`} className="text-gray-50 hover:text-white transition-colors">
+                  {settings.email}
                 </a>
               </div>
               <div className="flex items-center space-x-3">
                 <Phone className="w-5 h-5 !text-brand-teal text-secondary" />
-                <a href="tel:+551199999999" className="text-gray-50 hover:text-white transition-colors">
-                  (11) 99999-9999
+                <a href={`tel:${settings.phone.replace(/[^\d+]/g,'')}`} className="text-gray-50 hover:text-white transition-colors">
+                  {settings.phone}
                 </a>
               </div>
               <div className="flex items-start space-x-3">
                 <MapPin className="w-5 h-5 text-secondary !text-brand-teal flex-shrink-0 mt-1" />
-                <span className="text-gray-50">
-                  Av. Paulista, 1000 - Bela Vista<br />
-                  São Paulo - SP, 01310-100
-                </span>
+                <span className="text-gray-50">{settings.address}</span>
               </div>
             </div>
             

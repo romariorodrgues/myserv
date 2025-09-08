@@ -344,13 +344,13 @@ export function useNotifications(
 
 // Hook for notification count only (lighter weight)
 export function useNotificationCount(): { count: number; loading: boolean } {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    if (!session?.user?.id) {
+    if (status !== 'authenticated' || !session?.user?.id) {
       setLoading(false)
       return
     }
@@ -396,7 +396,7 @@ export function useNotificationCount(): { count: number; loading: boolean } {
       document.removeEventListener('visibilitychange', onVisibility)
       stop()
     }
-  }, [session?.user?.id])
+  }, [status, session?.user?.id])
 
   return { count, loading }
 }
