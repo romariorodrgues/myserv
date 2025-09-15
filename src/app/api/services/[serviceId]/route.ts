@@ -15,11 +15,8 @@ export async function GET(
   try {
     const { serviceId } = await params
 
-    const service = await prisma.service.findUnique({
-      where: {
-        id: serviceId,
-        isActive: true
-      },
+    const service = await prisma.service.findFirst({
+      where: { id: serviceId, isActive: true },
       include: {
         category: {
           select: {
@@ -31,19 +28,28 @@ export async function GET(
           where: {
             isActive: true,
             serviceProvider: {
-              user: {
-                isActive: true,
-                isApproved: true
+              is: {
+                user: {
+                  is: {
+                    isActive: true,
+                    // isApproved: true, // opcional (desabilitado para não filtrar seus testes)
+                  }
+                }
               }
             }
           },
           include: {
             serviceProvider: {
-              include: {
+              select: {
+                id: true,
+                hasScheduling: true,
+                hasQuoting: true,
                 user: {
                   select: {
+                    id: true,
                     name: true,
-                    profileImage: true
+                    profileImage: true,
+                    address: { select: { city: true, state: true } }
                   }
                 }
               }

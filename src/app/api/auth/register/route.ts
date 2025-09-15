@@ -21,6 +21,14 @@ const registerSchema = z.object({
   acceptTerms: z.literal(true, {
     errorMap: () => ({ message: "Deve aceitar os termos" }),
   }),
+  // Campos opcionais adicionais (principalmente para prestador)
+  gender: z.string().optional(),
+  maritalStatus: z.string().optional(),
+  dateOfBirth: z.string().optional(), // ISO date
+  hasDriverLicense: z.coerce.boolean().optional(),
+  driverLicenseNumber: z.string().optional(),
+  driverLicenseCategory: z.string().optional(),
+  driverLicenseExpiresAt: z.string().optional(), // ISO date
 });
 
 export async function POST(request: NextRequest) {
@@ -74,9 +82,16 @@ export async function POST(request: NextRequest) {
     try {
       user = await prisma.user.create({
         data: {
-          ...validatedData,
+          name: validatedData.name,
+          email: validatedData.email,
+          phone: validatedData.phone,
+          cpfCnpj: validatedData.cpfCnpj,
+          userType: validatedData.userType,
           password: hashedPassword,
           isApproved: validatedData.userType === UserTypeValues.CLIENT,
+          gender: validatedData.gender || null,
+          maritalStatus: validatedData.maritalStatus || null,
+          dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : null,
         },
       });
     } catch (err) {
@@ -94,14 +109,13 @@ export async function POST(request: NextRequest) {
           hasScheduling: false,
           hasQuoting: true,
           chargesTravel: false,
-          subscriptions: {
-            create: {
-              planId: 'cmekbe32x000q4rbwcskidkvu',
-              status: 'ACTIVE',
-              startDate: new Date(),
-              isAutoRenew: true,
-            }
-          }
+          hasDriverLicense: !!validatedData.hasDriverLicense,
+          driverLicenseNumber: validatedData.hasDriverLicense ? (validatedData.driverLicenseNumber || null) : null,
+          driverLicenseCategory: validatedData.hasDriverLicense ? (validatedData.driverLicenseCategory || null) : null,
+          driverLicenseExpiresAt: validatedData.hasDriverLicense && validatedData.driverLicenseExpiresAt
+            ? new Date(validatedData.driverLicenseExpiresAt)
+            : null,
+          // assinatura será criada após aprovação ou na tela de planos
         },
       });
     }

@@ -34,7 +34,8 @@ interface Appointment {
   date: string
   startTime: string
   endTime: string
-  status: 'CONFIRMED' | 'PENDING' | 'CANCELLED' | 'COMPLETED'
+  status: 'ACCEPTED' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | 'REJECTED'
+  type?: 'SCHEDULING' | 'QUOTE'
   client: {
     name: string
     phone?: string
@@ -66,25 +67,44 @@ const DEFAULT_TIME_SLOTS = [
   { startTime: '17:00', endTime: '18:00' }
 ]
 
-export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
+export function ProviderSchedule({ providerId, initialTab, initialDate }: ProviderScheduleProps & { initialTab?: 'schedule'|'appointments'|'settings'; initialDate?: string }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments' | 'settings'>('schedule')
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0])
+  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments' | 'settings'>(initialTab || 'schedule')
+  const [selectedDate, setSelectedDate] = useState(initialDate || new Date().toISOString().split('T')[0])
   const [showTimeSlotForm, setShowTimeSlotForm] = useState<number | null>(null)
   
   // Schedule data
   const [schedule, setSchedule] = useState<ScheduleDay[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
+  const [showAllDates, setShowAllDates] = useState(false)
+  const [apptStatusFilter, setApptStatusFilter] = useState<'ALL'|'PENDING'|'ACCEPTED'>('ALL')
   
   // Form data
   const [newTimeSlot, setNewTimeSlot] = useState({ startTime: '', endTime: '' })
   const [editingTimeSlot, setEditingTimeSlot] = useState<{ dayIndex: number, slotId: string } | null>(null)
+  // Provider settings state
+  const [autoAccept, setAutoAccept] = useState(false)
+  const [notifyWhatsapp, setNotifyWhatsapp] = useState(true)
+  const [reminders, setReminders] = useState(true)
+  const [minAdvanceHours, setMinAdvanceHours] = useState<string>('0')
+  const [maxAdvanceDays, setMaxAdvanceDays] = useState<string>('30')
+  const [bufferMinutes, setBufferMinutes] = useState<string>('0')
+  const [maxDaily, setMaxDaily] = useState<string>('0')
+  const [welcomeMessage, setWelcomeMessage] = useState('')
+  const [confirmationMessage, setConfirmationMessage] = useState('')
+  const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
 
   useEffect(() => {
     initializeSchedule()
     fetchAppointments()
+    fetchSettings()
   }, [providerId])
+
+  // Recarrega agendamentos ao trocar a data
+  useEffect(() => {
+    if (activeTab === 'appointments') fetchAppointments()
+  }, [selectedDate, activeTab, showAllDates])
 
   const initializeSchedule = () => {
     // Initialize with default working days (Monday to Friday)
@@ -105,7 +125,9 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
 
   const fetchAppointments = async () => {
     try {
-      const response = await fetch(`/api/schedule?providerId=${providerId}&type=appointments`)
+      const qs = new URLSearchParams({ providerId: providerId || '', type: 'appointments' })
+      if (!showAllDates && selectedDate) qs.set('date', selectedDate)
+      const response = await fetch(`/api/schedule?${qs.toString()}`)
       if (response.ok) {
         const data = await response.json()
         setAppointments(data.appointments || [])
@@ -147,6 +169,55 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
       console.error('Error fetching appointments:', error)
       // Set empty appointments on error
       setAppointments([])
+    }
+  }
+
+  const fetchSettings = async () => {
+    try {
+      const qs = new URLSearchParams({ providerId: providerId || '', type: 'settings' })
+      const res = await fetch(`/api/schedule?${qs.toString()}`)
+      const data = await res.json()
+      if (data?.success && data?.settings) {
+        const s = data.settings
+        setAutoAccept(!!s.autoAccept)
+        setNotifyWhatsapp(s.notifyWhatsapp !== false)
+        setReminders(s.reminders !== false)
+        setMinAdvanceHours(String(Number(s.minAdvanceHours ?? 0)))
+        setMaxAdvanceDays(String(Number(s.maxAdvanceDays ?? 30)))
+        setBufferMinutes(String(Number(s.bufferMinutes ?? 0)))
+        setMaxDaily(String(Number(s.maxDaily ?? 0)))
+        setWelcomeMessage(s.welcomeMessage || '')
+        setConfirmationMessage(s.confirmationMessage || '')
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  const saveSettings = async () => {
+    try {
+      const payload = {
+        action: 'save_settings',
+        providerId,
+        settings: {
+          autoAccept,
+          notifyWhatsapp,
+          reminders,
+          minAdvanceHours: Number(minAdvanceHours || '0'),
+          maxAdvanceDays: Number(maxAdvanceDays || '0'),
+          bufferMinutes: Number(bufferMinutes || '0'),
+          maxDaily: Number(maxDaily || '0'),
+          welcomeMessage,
+          confirmationMessage,
+        }
+      }
+      const res = await fetch('/api/schedule', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao salvar')
+      toast.success('Configurações salvas')
+    } catch (e) {
+      console.error(e)
+      toast.error('Erro ao salvar configurações')
     }
   }
 
@@ -258,16 +329,54 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
     }
   }
 
+  // Agendar a partir de orçamento (QUOTE)
+  const openScheduleFor = (id: string) => {
+    setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
+  }
+  const updateSchedField = (id: string, field: 'date'|'time', value: string) => {
+    setSchedMap((m) => ({ ...m, [id]: { ...(m[id] || { date: '', time: '' }), [field]: value } }))
+  }
+  const scheduleFromQuote = async (id: string) => {
+    const payload = schedMap[id]
+    if (!payload?.date || !payload?.time) { toast.error('Selecione data e horário'); return }
+    try {
+      const res = await fetch(`/api/bookings/${id}/schedule`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scheduledDate: payload.date, scheduledTime: payload.time }) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao agendar')
+      toast.success('Orçamento agendado e aceito!')
+      setSchedMap((m) => { const { [id]: _, ...rest } = m; return rest })
+      await fetchAppointments()
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao agendar')
+    }
+  }
+
   const getAppointmentsForDate = (date: string) => {
-    return appointments.filter(apt => apt.date === date)
+    const list = showAllDates ? appointments : appointments.filter(apt => apt.date === date)
+    return list.filter((apt) => apptStatusFilter === 'ALL' ? true : apt.status === apptStatusFilter)
+  }
+
+  // Ações: aceitar/recusar/concluir
+  const updateAppointmentStatus = async (id: string, status: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
+    try {
+      const res = await fetch(`/api/bookings/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao atualizar')
+      toast.success(status === 'ACCEPTED' ? 'Agendamento aceito' : status === 'REJECTED' ? 'Agendamento recusado' : 'Serviço marcado como concluído')
+      await fetchAppointments()
+    } catch (e) {
+      console.error(e)
+      toast.error('Erro ao atualizar agendamento')
+    }
   }
 
   const getStatusBadge = (status: Appointment['status']) => {
     const config = {
-      CONFIRMED: { label: 'Confirmado', className: 'bg-green-100 text-green-800' },
+      ACCEPTED: { label: 'Aceito', className: 'bg-green-100 text-green-800' },
       PENDING: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
       CANCELLED: { label: 'Cancelado', className: 'bg-red-100 text-red-800' },
-      COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' }
+      COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' },
+      REJECTED: { label: 'Recusado', className: 'bg-gray-100 text-gray-800' }
     }
     
     return (
@@ -466,15 +575,27 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                 <span>Agendamentos</span>
               </CardTitle>
               
-              <div className="flex items-center space-x-2">
-                <Label htmlFor="date-filter">Data:</Label>
-                <Input
-                  id="date-filter"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="w-auto"
-                />
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="date-filter">Data:</Label>
+                  <Input
+                    id="date-filter"
+                    type="date"
+                    value={selectedDate}
+                    onChange={(e) => setSelectedDate(e.target.value)}
+                    className="w-auto"
+                    disabled={showAllDates}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch checked={showAllDates} onCheckedChange={setShowAllDates} />
+                  <span className="text-sm text-gray-600">Sem data específica</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant={apptStatusFilter === 'ALL' ? 'default' : 'outline'} onClick={() => setApptStatusFilter('ALL')}>Todos</Button>
+                  <Button size="sm" variant={apptStatusFilter === 'PENDING' ? 'default' : 'outline'} onClick={() => setApptStatusFilter('PENDING')}>Pendentes</Button>
+                  <Button size="sm" variant={apptStatusFilter === 'ACCEPTED' ? 'default' : 'outline'} onClick={() => setApptStatusFilter('ACCEPTED')}>Aceitos</Button>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -483,9 +604,7 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
               {getAppointmentsForDate(selectedDate).length === 0 ? (
                 <div className="text-center py-8">
                   <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-500">
-                    Nenhum agendamento encontrado para esta data
-                  </p>
+                  <p className="text-gray-500">Nenhum agendamento encontrado</p>
                 </div>
               ) : (
                 getAppointmentsForDate(selectedDate).map((appointment) => (
@@ -494,6 +613,9 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
                           <h3 className="font-medium text-lg">{appointment.service.name}</h3>
+                          {appointment.type === 'QUOTE' && (
+                            <Badge className="bg-purple-100 text-purple-800">Orçamento</Badge>
+                          )}
                           {getStatusBadge(appointment.status)}
                         </div>
                         
@@ -520,21 +642,50 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                       </div>
                       
                       <div className="flex space-x-2">
-                        {appointment.status === 'PENDING' && (
+                        {appointment.status === 'PENDING' && appointment.type !== 'QUOTE' && (
                           <>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'ACCEPTED')}>
                               <CheckCircle className="w-4 h-4 mr-1" />
                               Aceitar
                             </Button>
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'REJECTED')}>
                               <X className="w-4 h-4 mr-1" />
                               Recusar
                             </Button>
                           </>
                         )}
+                        {appointment.status === 'PENDING' && appointment.type === 'QUOTE' && (
+                          <div className="flex flex-wrap items-end gap-2">
+                            {!schedMap[appointment.id] ? (
+                              <Button size="sm" variant="outline" onClick={() => openScheduleFor(appointment.id)}>
+                                <Clock className="w-4 h-4 mr-1" />
+                                Agendar
+                              </Button>
+                            ) : (
+                              <>
+                                <div>
+                                  <Label className="text-xs text-gray-600">Data</Label>
+                                  <Input type="date" value={schedMap[appointment.id]?.date || ''} onChange={(e) => updateSchedField(appointment.id, 'date', e.target.value)} className="w-auto" />
+                                </div>
+                                <div>
+                                  <Label className="text-xs text-gray-600">Hora</Label>
+                                  <Input type="time" value={schedMap[appointment.id]?.time || ''} onChange={(e) => updateSchedField(appointment.id, 'time', e.target.value)} className="w-auto" />
+                                </div>
+                                <Button size="sm" onClick={() => scheduleFromQuote(appointment.id)}>
+                                  <CheckCircle className="w-4 h-4 mr-1" />
+                                  Confirmar
+                                </Button>
+                                <Button size="sm" variant="ghost" onClick={() => setSchedMap((m) => { const { [appointment.id]: _, ...rest } = m; return rest })}>
+                                  <X className="w-4 h-4 mr-1" />
+                                  Cancelar
+                                </Button>
+                              </>
+                            )}
+                          </div>
+                        )}
                         
-                        {appointment.status === 'CONFIRMED' && (
-                          <Button size="sm" variant="outline">
+                        {appointment.status === 'ACCEPTED' && (
+                          <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'COMPLETED')}>
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Marcar como Concluído
                           </Button>
@@ -574,6 +725,8 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                     placeholder="2"
                     min="0"
                     max="168"
+                    value={minAdvanceHours}
+                    onChange={(e) => setMinAdvanceHours(e.target.value)}
                   />
                   <p className="text-sm text-gray-500">
                     Tempo mínimo necessário entre o agendamento e o serviço
@@ -588,6 +741,8 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                     placeholder="30"
                     min="1"
                     max="365"
+                    value={maxAdvanceDays}
+                    onChange={(e) => setMaxAdvanceDays(e.target.value)}
                   />
                   <p className="text-sm text-gray-500">
                     Até quantos dias no futuro aceitar agendamentos
@@ -602,6 +757,8 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                     placeholder="15"
                     min="0"
                     max="120"
+                    value={bufferMinutes}
+                    onChange={(e) => setBufferMinutes(e.target.value)}
                   />
                   <p className="text-sm text-gray-500">
                     Tempo de intervalo entre agendamentos
@@ -614,8 +771,10 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                     id="max-daily"
                     type="number"
                     placeholder="10"
-                    min="1"
+                    min="0"
                     max="50"
+                    value={maxDaily}
+                    onChange={(e) => setMaxDaily(e.target.value)}
                   />
                   <p className="text-sm text-gray-500">
                     Limite de serviços por dia
@@ -633,7 +792,7 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                       Novos agendamentos serão aceitos automaticamente se dentro dos horários disponíveis
                     </p>
                   </div>
-                  <Switch />
+                  <Switch checked={autoAccept} onCheckedChange={setAutoAccept} />
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -643,7 +802,7 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                       Receber notificações de novos agendamentos via WhatsApp
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch checked={notifyWhatsapp} onCheckedChange={setNotifyWhatsapp} />
                 </div>
 
                 <div className="flex items-center justify-between">
@@ -653,7 +812,7 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                       Enviar lembretes automáticos antes dos agendamentos
                     </p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch checked={reminders} onCheckedChange={setReminders} />
                 </div>
               </div>
 
@@ -666,6 +825,8 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                     id="welcome-message"
                     placeholder="Olá! Obrigado por escolher nossos serviços..."
                     rows={3}
+                    value={welcomeMessage}
+                    onChange={(e) => setWelcomeMessage(e.target.value)}
                   />
                 </div>
 
@@ -675,12 +836,14 @@ export function ProviderSchedule({ providerId }: ProviderScheduleProps) {
                     id="confirmation-message"
                     placeholder="Seu agendamento foi confirmado para..."
                     rows={3}
+                    value={confirmationMessage}
+                    onChange={(e) => setConfirmationMessage(e.target.value)}
                   />
                 </div>
               </div>
 
               <div className="flex justify-end">
-                <Button>
+                <Button onClick={saveSettings}>
                   <Save className="w-4 h-4 mr-2" />
                   Salvar Configurações
                 </Button>

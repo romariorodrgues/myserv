@@ -14,6 +14,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { z } from 'zod'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { EmailService } from '@/lib/email-service'
@@ -82,7 +84,7 @@ export async function POST(request: NextRequest) {
       providerName: booking?.provider.name,
       clientName: booking?.client.name,
       scheduledDate: booking?.scheduledDate?.toLocaleDateString('pt-BR'),
-      amount: booking?.estimatedPrice || booking?.finalPrice,
+      amount: (booking?.estimatedPrice ?? booking?.finalPrice) ?? undefined,
       status: booking?.status
     }
 
@@ -175,44 +177,32 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
+    const session = await getServerSession(authOptions)
     const { searchParams } = new URL(request.url)
-    const userId = searchParams.get('userId')
+    const userIdParam = searchParams.get('userId')
     const unreadOnly = searchParams.get('unreadOnly') === 'true'
+    const limit = Number(searchParams.get('limit') || '50')
 
-    if (!userId) {
-      return NextResponse.json(
-        { success: false, error: 'userId requerido' },
-        { status: 400 }
-      )
+    const resolvedUserId = userIdParam || session?.user?.id || null
+
+    if (!resolvedUserId) {
+      // Não retorna erro para não poluir a UI em visitantes; apenas vazio
+      return NextResponse.json({ success: true, data: { notifications: [], unreadCount: 0 } })
     }
 
-    const where: { userId: string; isRead?: boolean } = { userId }
-    if (unreadOnly) {
-      where.isRead = false
-    }
+    const where: { userId: string; isRead?: boolean } = { userId: resolvedUserId }
+    if (unreadOnly) where.isRead = false
 
-    const notifications = await prisma.notification.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 50
-    })
+    const [notifications, unreadCount] = await Promise.all([
+      prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: Math.min(Math.max(limit, 1), 100) }),
+      prisma.notification.count({ where: { userId: resolvedUserId, isRead: false } })
+    ])
 
-    const unreadCount = await prisma.notification.count({
-      where: { userId, isRead: false }
-    })
-
-    return NextResponse.json({
-      success: true,
-      notifications,
-      unreadCount
-    })
+    return NextResponse.json({ success: true, data: { notifications, unreadCount } })
 
   } catch (error) {
     console.error('Get notifications error:', error)
-    return NextResponse.json(
-      { success: false, error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
 

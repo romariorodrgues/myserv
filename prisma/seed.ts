@@ -111,105 +111,40 @@ await prisma.clientPrivacy.upsert({
     },
   })
 
-  // Create service categories
-  const cleaningCategory = await prisma.serviceCategory.upsert({
-    where: { name: 'Limpeza' },
-    update: {},
-    create: {
-      name: 'Limpeza',
-      description: 'Serviços de limpeza residencial e comercial',
-      icon: '🧹',
-      isActive: true,
-    },
-  })
+  // Linkar o provedor a serviços CANÔNICOS (folhas) já criados pelo seed de categorias
+  // Execute antes: `npm run db:seed:categories` para popular a árvore + Services por leaf.
+  const targetServiceNames = [
+    // boas opções conforme o seed-categories.ts
+    'Diarista/Limpeza de casa',
+    'Manicure/Pedicure',
+  ] as const
 
-  const beautyCategory = await prisma.serviceCategory.upsert({
-    where: { name: 'Beleza e Bem-estar' },
-    update: {},
-    create: {
-      name: 'Beleza e Bem-estar',
-      description: 'Serviços de beleza, estética e bem-estar',
-      icon: '💅',
-      isActive: true,
-    },
+  const servicesToAttach = await prisma.service.findMany({
+    where: { name: { in: targetServiceNames as unknown as string[] }, isActive: true },
+    select: { id: true, name: true },
   })
-
-  const maintenanceCategory = await prisma.serviceCategory.upsert({
-    where: { name: 'Manutenção e Reparos' },
-    update: {},
-    create: {
-      name: 'Manutenção e Reparos',
-      description: 'Serviços de manutenção, reparos e reformas',
-      icon: '🔧',
-      isActive: true,
-    },
-  })
-
-  // Create services
-  let cleaningService = await prisma.service.findFirst({
-    where: { name: 'Limpeza Residencial Completa' }
-  })
-  
-  if (!cleaningService) {
-    cleaningService = await prisma.service.create({
-      data: {
-        name: 'Limpeza Residencial Completa',
-        description: 'Limpeza completa de residências incluindo todos os cômodos, janelas e áreas externas.',
-        categoryId: cleaningCategory.id,
-        isActive: true,
-      },
-    })
-  }
-
-  let beautyService = await prisma.service.findFirst({
-    where: { name: 'Manicure e Pedicure' }
-  })
-  
-  if (!beautyService) {
-    beautyService = await prisma.service.create({
-      data: {
-        name: 'Manicure e Pedicure',
-        description: 'Serviços de manicure e pedicure a domicílio com produtos de alta qualidade.',
-        categoryId: beautyCategory.id,
-        isActive: true,
-      },
-    })
-  }
 
   // Create ServiceProviderService relationships
-  await prisma.serviceProviderService.upsert({
-    where: { 
-      serviceProviderId_serviceId: {
+  for (const svc of servicesToAttach) {
+    const basePrice = svc.name.includes('Manicure') ? 80.0 : 150.0
+    await prisma.serviceProviderService.upsert({
+      where: {
+        serviceProviderId_serviceId: {
+          serviceProviderId: serviceProvider.id,
+          serviceId: svc.id,
+        },
+      },
+      update: {},
+      create: {
         serviceProviderId: serviceProvider.id,
-        serviceId: cleaningService.id
-      }
-    },
-    update: {},
-    create: {
-      serviceProviderId: serviceProvider.id,
-      serviceId: cleaningService.id,
-      basePrice: 150.00, // R$ 150,00
-      description: 'Limpeza completa com produtos de qualidade',
-      isActive: true,
-    },
-  })
-
-  await prisma.serviceProviderService.upsert({
-    where: { 
-      serviceProviderId_serviceId: {
-        serviceProviderId: serviceProvider.id,
-        serviceId: beautyService.id
-      }
-    },
-    update: {},
-    create: {
-      serviceProviderId: serviceProvider.id,
-      serviceId: beautyService.id,
-      basePrice: 80.00, // R$ 80,00
-      description: 'Manicure e pedicure profissional',
-      isActive: true,
-    },
-  })
+        serviceId: svc.id,
+        basePrice,
+        unit: 'FIXED',
+        description: `Atendimento para ${svc.name.toLowerCase()}`,
+        isActive: true,
+      },
+    })
+  }
 
   // Create addresses
   await prisma.address.upsert({
@@ -237,6 +172,9 @@ await prisma.clientPrivacy.upsert({
       city: 'São Paulo',
       state: 'SP',
       zipCode: '01310-100',
+      // opcional: incluir coordenadas para liberar filtro por distância
+      latitude: -23.561684,
+      longitude: -46.656139,
     },
   })
 

@@ -7,7 +7,7 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, Suspense } from 'react'
+import { useEffect, useState, Suspense, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -31,15 +31,16 @@ import { ProviderServiceHistory } from '@/components/dashboard/provider-service-
 import { ProviderMetrics } from '@/components/dashboard/provider-metrics'
 import { ProviderPriceManagement } from '@/components/dashboard/provider-price-management'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
-import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
 import axios from 'axios'
 import PaymentHistory from '@/components/dashboard/payments-history'
+import React from 'react'
 
 interface Booking {
   id: string
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED'
+  requestType?: 'SCHEDULING' | 'QUOTE'
   description: string
   preferredDate: string | null
   createdAt: string
@@ -65,8 +66,9 @@ function ProviderDashboardContent() {
   const { data: session, status } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const [avgRating, setAvgRating] = useState<number>(0)
+  const [totalReviews, setTotalReviews] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
-
   const { data: bookings, isLoading, isFetching, refetch: refetchBookings } = useQuery<Booking[]>({
     queryKey: ['bookings'],
     initialData: [],
@@ -75,6 +77,61 @@ function ProviderDashboardContent() {
       return data.bookings;
     },
   })
+  const fetchRatings = useCallback(async () => {
+    const currentSession = session
+    if (!currentSession?.user?.id) return
+    try {
+      const res = await fetch(`/api/reviews?serviceProviderId=${currentSession.user.id}&limit=1`)
+      if (res.ok) {
+        const data = await res.json()
+        const stats = data?.data?.statistics
+        if (stats) {
+          setAvgRating(stats.averageRating || 0)
+          setTotalReviews(stats.totalReviews || 0)
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching provider ratings:', e)
+    }
+  }, [session])
+
+  useEffect(() => {
+    if (status === 'loading') return; // Sessão ainda está carregando
+    
+    const currentSession = session /* || mockSession; */
+    
+    if (!currentSession) {
+      router.push('/entrar');
+      return;
+    }
+    
+    if (currentSession.user.userType !== 'SERVICE_PROVIDER') {
+      router.push('/dashboard/cliente');
+      return;
+    }
+    
+    const tab = searchParams.get('tab');
+    if (tab && ['overview', 'schedule', 'history', 'metrics', 'pricing', 'settings'].includes(tab)) {
+      setActiveTab(tab as 'overview' | 'schedule' | 'history' | 'metrics' | 'pricing' | 'settings');
+    }
+    
+    fetchRatings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [status, session, router, searchParams]);
+
+    /** 
+     * A função a baixo está sendo executada em looping
+     * fetchBookings()
+     * 
+     * Dicas para solução:
+     * 1 - entender o que a mesma retorna e qual a importância dela para o fluxo da página
+     * 2 - verificar se a função realmente deve ser chamada em umm useEffect
+     * 3 - verificar se todos os estados que estão como dependencia do useEffect realmente precisam estar lá
+     * 4 - Utilizar o react-query para fazer a requisição de dados poderá simplificar o fluxo além de evitar loops infinitos
+     * 
+     * OBS.: A página está quebrando devido a função está comentada
+    */
+
 
   const handleBookingAction = async (bookingId: string, newStatus: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
     try {
@@ -99,6 +156,27 @@ function ProviderDashboardContent() {
     } catch (error) {
       console.error('Error updating booking:', error)
       alert('Erro ao atualizar status')
+    }
+  }
+
+  const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
+  const openScheduleFor = (id: string) => {
+    setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
+  }
+  const updateSchedField = (id: string, field: 'date'|'time', value: string) => {
+    setSchedMap((m) => ({ ...m, [id]: { ...(m[id] || { date: '', time: '' }), [field]: value } }))
+  }
+  const scheduleFromQuote = async (id: string) => {
+    const payload = schedMap[id]
+    if (!payload?.date || !payload?.time) { alert('Selecione data e horário'); return }
+    try {
+      const res = await fetch(`/api/bookings/${id}/schedule`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scheduledDate: payload.date, scheduledTime: payload.time }) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao agendar')
+      await refetchBookings()
+      alert('Orçamento agendado e aceito!')
+    } catch (e) {
+      alert((e as any)?.message || 'Erro ao agendar')
     }
   }
 
@@ -158,7 +236,8 @@ function ProviderDashboardContent() {
   ]
 
   return (
-    <div className="space-y-6 p-4">
+    <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
+ 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between">
         <div>
@@ -177,11 +256,12 @@ function ProviderDashboardContent() {
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id as TDashboardTab)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === tab.id
-                  ? 'border-primary text-primary'
-                  : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
-                  }`}
+                onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-primary text-primary'
+                    : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                }`}
               >
                 <Icon className="h-4 w-4" />
                 <span className="whitespace-nowrap">{tab.label}</span>
@@ -204,7 +284,7 @@ function ProviderDashboardContent() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Ganhos do Mês</p>
-                    <p className="text-2xl font-bold">R$ 2.850,00</p>
+                    <ProviderMonthlyEarnings />
                   </div>
                 </div>
               </CardContent>
@@ -232,7 +312,7 @@ function ProviderDashboardContent() {
                   </div>
                   <div className="ml-4">
                     <p className="text-sm text-muted-foreground">Avaliação</p>
-                    <p className="text-2xl font-bold">4.8</p>
+                    <p className="text-2xl font-bold">{avgRating.toFixed(1)}</p>
                   </div>
                 </div>
               </CardContent>
@@ -354,28 +434,46 @@ function ProviderDashboardContent() {
                         <div key={booking.id} className="p-3 border rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <p className="font-medium">{booking.service.name}</p>
-                            <Badge variant="outline" className="text-yellow-600">
-                              Pendente
-                            </Badge>
+                            <div className="flex gap-2 items-center">
+                              {booking.requestType === 'QUOTE' && (
+                                <Badge className="bg-purple-100 text-purple-800">Orçamento</Badge>
+                              )}
+                              <Badge variant="outline" className="text-yellow-600">Pendente</Badge>
+                            </div>
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">{booking.client.name}</p>
                           <p className="text-sm text-muted-foreground mb-3">{booking.description}</p>
 
                           {/* Action buttons for pending bookings */}
-                          <div className="flex space-x-2 mb-3">
-                            <Button
-                              size="sm"
-                              onClick={() => handleBookingAction(booking.id, 'ACCEPTED')}
-                            >
-                              Aceitar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleBookingAction(booking.id, 'REJECTED')}
-                            >
-                              Rejeitar
-                            </Button>
+                          <div className="flex flex-col gap-2 mb-3">
+                            {booking.requestType === 'QUOTE' ? (
+                              <>
+                                {!schedMap[booking.id] ? (
+                                  <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => openScheduleFor(booking.id)}>Agendar</Button>
+                                    <Button size="sm" variant="outline" onClick={() => handleBookingAction(booking.id, 'REJECTED')}>Recusar</Button>
+                                  </div>
+                                ) : (
+                                  <div className="flex flex-wrap items-end gap-2">
+                                    <div>
+                                      <label className="text-xs text-gray-600">Data</label>
+                                      <input type="date" value={schedMap[booking.id]?.date || ''} onChange={(e) => updateSchedField(booking.id, 'date', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
+                                    </div>
+                                    <div>
+                                      <label className="text-xs text-gray-600">Hora</label>
+                                      <input type="time" value={schedMap[booking.id]?.time || ''} onChange={(e) => updateSchedField(booking.id, 'time', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
+                                    </div>
+                                    <Button size="sm" onClick={() => scheduleFromQuote(booking.id)}>Confirmar</Button>
+                                    <Button size="sm" variant="outline" onClick={() => setSchedMap((m) => { const { [booking.id]: _, ...rest } = m; return rest })}>Cancelar</Button>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="flex gap-2">
+                                <Button size="sm" onClick={() => handleBookingAction(booking.id, 'ACCEPTED')}>Aceitar</Button>
+                                <Button size="sm" variant="outline" onClick={() => handleBookingAction(booking.id, 'REJECTED')}>Rejeitar</Button>
+                              </div>
+                            )}
                           </div>
 
                           {/* WhatsApp Communication for accepted bookings with completed payment */}
@@ -393,7 +491,7 @@ function ProviderDashboardContent() {
                       <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />
                       <p>Nenhuma solicitação pendente</p>
                       <Button variant="outline" className="mt-4" asChild>
-                        <Link href="/prestador/perfil">
+                        <Link href="/dashboard/profissional?tab=settings">
                           Configurar Perfil
                         </Link>
                       </Button>
@@ -457,52 +555,55 @@ function ProviderDashboardContent() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <TrendingUp className="w-8 h-8 text-blue-600" />
-                  </div>
-                  <h3 className="font-semibold">Taxa de Resposta</h3>
-                  <p className="text-2xl font-bold text-blue-600">95%</p>
-                  <p className="text-sm text-muted-foreground">Última semana</p>
-                </div>
+                {(() => {
+                  const now = new Date()
+                  const days30 = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+                  const inLast30 = (d?: string | null) => (d ? (new Date(d) >= days30 && new Date(d) <= now) : false)
+                  const recent = bookings.filter(b => inLast30(b.createdAt))
+                  const responded = recent.filter(b => b.status !== 'PENDING').length
+                  const rate = recent.length > 0 ? Math.round((responded / recent.length) * 100) : null
+                  return (
+                    <div className="text-center">
+                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <TrendingUp className="w-8 h-8 text-blue-600" />
+                      </div>
+                      <h3 className="font-semibold">Taxa de Resposta</h3>
+                      <p className="text-2xl font-bold text-blue-600">{rate === null ? '—' : `${rate}%`}</p>
+                      <p className="text-sm text-muted-foreground">Últimos 30 dias</p>
+                    </div>
+                  )
+                })()}
 
                 <div className="text-center">
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
                     <Star className="w-8 h-8 text-green-600" />
                   </div>
                   <h3 className="font-semibold">Satisfação</h3>
-                  <p className="text-2xl font-bold text-green-600">4.8</p>
-                  <p className="text-sm text-muted-foreground">23 avaliações</p>
+                  <p className="text-2xl font-bold text-green-600">{avgRating.toFixed(1)}</p>
+                  <p className="text-sm text-muted-foreground">{totalReviews} avaliações</p>
                 </div>
 
-                <div className="text-center">
-                  <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <DollarSign className="w-8 h-8 text-purple-600" />
-                  </div>
-                  <h3 className="font-semibold">Receita Média</h3>
-                  <p className="text-2xl font-bold text-purple-600">R$ 180</p>
-                  <p className="text-sm text-muted-foreground">Por serviço</p>
-                </div>
+                <MonthlyAverageRevenueCard bookings={bookings} />
               </div>
             </CardContent>
           </Card>
         </div>
       )}
 
-      {activeTab === 'schedule' && (
-        <ProviderSchedule providerId={session.user.id} />
+      {activeTab === 'schedule' && currentSession?.user?.id && (
+        <ProviderSchedule providerId={currentSession.user.id} />
       )}
 
-      {activeTab === 'history' && (
-        <ProviderServiceHistory providerId={session.user.id} />
+      {activeTab === 'history' && currentSession?.user?.id && (
+        <ProviderServiceHistory providerId={currentSession.user.id} />
       )}
 
-      {activeTab === 'metrics' && (
-        <ProviderMetrics providerId={session.user.id} />
+      {activeTab === 'metrics' && currentSession?.user?.id && (
+        <ProviderMetrics providerId={currentSession.user.id} />
       )}
 
-      {activeTab === 'pricing' && (
-        <ProviderPriceManagement providerId={session.user.id} />
+      {activeTab === 'pricing' && currentSession?.user?.id && (
+        <ProviderPriceManagement/>
       )}
 
       {activeTab === 'settings' && (
@@ -518,13 +619,13 @@ function ProviderDashboardContent() {
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <Button variant="outline" asChild>
-                    <Link href="/prestador/perfil">
+                    <Link href="/dashboard/profissional?tab=settings">
                       <User className="h-4 w-4 mr-2" />
                       Editar Perfil
                     </Link>
                   </Button>
                   <Button variant="outline" asChild>
-                    <Link href="/prestador/servicos">
+                    <Link href="/dashboard/profissional?tab=pricing">
                       <Settings className="h-4 w-4 mr-2" />
                       Gerenciar Serviços
                     </Link>
@@ -546,5 +647,45 @@ export default function ProviderDashboard() {
     <Suspense fallback={<div>Loading...</div>}>
       <ProviderDashboardContent />
     </Suspense>
+  )
+}
+
+function ProviderMonthlyEarnings() {
+  const { data, isLoading } = useQuery<{ success: boolean; data?: { net: number } }>({
+    queryKey: ['provider-earnings'],
+    queryFn: async () => {
+      const res = await fetch('/api/providers/earnings')
+      return res.json()
+    },
+  })
+  const value = data?.data?.net ?? 0
+  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value)
+  return <p className="text-2xl font-bold">{isLoading ? '—' : formatted}</p>
+}
+
+function MonthlyAverageRevenueCard({ bookings }: { bookings: Booking[] }) {
+  const { data } = useQuery<{ success: boolean; data?: { net: number } }>({
+    queryKey: ['provider-earnings'],
+    queryFn: async () => {
+      const res = await fetch('/api/providers/earnings')
+      return res.json()
+    },
+  })
+  const now = new Date()
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const inCurrentMonth = (d?: string | null) => (d ? (new Date(d) >= monthStart && new Date(d) <= now) : false)
+  const monthPaidCount = bookings.filter(b => inCurrentMonth(b.createdAt) && b.payment?.status === 'COMPLETED').length
+  const net = data?.data?.net ?? 0
+  const average = monthPaidCount > 0 ? net / monthPaidCount : 0
+  const formatted = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(average)
+  return (
+    <div className="text-center">
+      <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
+        <DollarSign className="w-8 h-8 text-purple-600" />
+      </div>
+      <h3 className="font-semibold">Receita Média</h3>
+      <p className="text-2xl font-bold text-purple-600">{formatted}</p>
+      <p className="text-sm text-muted-foreground">Por serviço (mês atual)</p>
+    </div>
   )
 }

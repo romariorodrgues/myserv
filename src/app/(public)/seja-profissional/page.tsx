@@ -22,51 +22,32 @@ export default function SejaProfissionalPage() {
                 <span className="text-green-600"> renda extra</span>
               </h1>
               <p className="text-xl text-gray-600 mb-8">
-                Cadastre-se gratuitamente na MyServ e comece a receber solicitações 
-                de clientes qualificados na sua região. Sem mensalidades, você só paga quando fechar negócio.
+                É profissional autônomo ou tem empresa de serviços? Cadastre-se gratuitamente e receba solicitações de clientes da sua região.
+              </p>
+              <p className="text-xl text-gray-600 mb-8">
+                Para visualizar os contatos de quem te procurou e negociar diretamente, assine o plano mensal para profissionais.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button size="lg" asChild>
-                  <Link href="/cadastrar">Cadastrar-se grátis</Link>
+                  <Link href="/cadastrar">Cadastrar-se</Link>
                 </Button>
                 <Button size="lg" variant="outline">
                   Ver como funciona
                 </Button>
               </div>
-              <div className="mt-8 flex flex-wrap gap-6 text-sm text-gray-600">
-                <div className="flex items-center gap-2">
-                  <Users className="w-4 h-4 text-green-600" />
-                  <span>+5.000 profissionais ativos</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4 text-green-600" />
-                  <span>Média R$ 2.500/mês</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Star className="w-4 h-4 text-green-600" />
-                  <span>4.8/5 satisfação</span>
-                </div>
-              </div>
+              {/* Métricas promocionais removidas até termos dados reais */}
             </div>
             <div className="lg:text-right">
-              <div className="inline-block bg-white rounded-2xl shadow-xl p-8">
-                <h3 className="text-2xl font-bold text-gray-900 mb-6">
-                  Seus ganhos em números
+              <div className="inline-block bg-white rounded-2xl shadow-xl p-8 text-left lg:text-left">
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  Como funciona para profissionais
                 </h3>
-                <div className="space-y-4">
-                  {earnings.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center">
-                      <span className="text-gray-600">{item.service}</span>
-                      <span className="font-bold text-green-600">{item.price}</span>
-                    </div>
-                  ))}
-                </div>
-                <div className="border-t pt-4 mt-4">
-                  <div className="flex justify-between items-center text-lg font-bold">
-                    <span>Potencial mensal:</span>
-                    <span className="text-green-600">R$ 3.200+</span>
-                  </div>
-                </div>
+                <ul className="list-disc pl-6 text-gray-700 space-y-2">
+                  <li>Cadastre seu perfil e serviços gratuitamente</li>
+                  <li>Receba solicitações de clientes da sua região</li>
+                  <li>Assine o plano mensal para ver contatos e negociar</li>
+                  <li>Pagamento do serviço é feito diretamente com o cliente</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -81,7 +62,7 @@ export default function SejaProfissionalPage() {
               Por que trabalhar conosco?
             </h2>
             <p className="text-xl text-gray-600">
-              Oferecemos as melhores condições para profissionais independentes
+              Receba solicitações qualificadas e negocie diretamente com o cliente
             </p>
           </div>
 
@@ -144,78 +125,42 @@ export default function SejaProfissionalPage() {
               Planos transparentes
             </h2>
             <p className="text-xl text-gray-600">
-              Escolha o modelo que melhor se adapta ao seu negócio
+              Plano mensal para desbloquear contatos e fechar mais serviços
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {plans.map((plan, index) => (
-              <div key={index} className={`rounded-lg shadow-lg p-8 ${plan.popular ? 'border-2 border-green-500 bg-green-50' : 'bg-white'}`}>
-                {plan.popular && (
-                  <div className="text-center mb-4">
-                    <span className="bg-green-500 text-white px-3 py-1 rounded-full text-sm font-medium">
-                      Mais popular
-                    </span>
-                  </div>
-                )}
-                <div className="text-center mb-6">
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-                  <div className="text-3xl font-bold text-green-600 mb-2">{plan.price}</div>
-                  <p className="text-gray-600">{plan.description}</p>
-                </div>
-                <ul className="space-y-3 mb-8">
-                  {plan.features.map((feature, featureIndex) => (
-                    <li key={featureIndex} className="flex items-start">
-                      <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
-                <Button className="w-full" variant={plan.popular ? 'default' : 'outline'}>
-                  {plan.cta}
-                </Button>
+          <div className="max-w-3xl mx-auto">
+            <div className="rounded-lg shadow-lg p-8 border-2 border-green-500 bg-green-50">
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Plano Mensal</h3>
+                <div className="text-3xl font-bold text-green-600 mb-2">R$ 39,90/mês</div>
+                <p className="text-gray-600">Acesso aos contatos dos clientes que solicitaram seus serviços</p>
               </div>
-            ))}
+              <ul className="space-y-3 mb-8">
+                {[
+                  'Perfil profissional completo',
+                  'Receba solicitações ilimitadas',
+                  'Acesso aos contatos para negociar',
+                  'Sistema de avaliações',
+                  'Suporte por e-mail',
+                ].map((feature, i) => (
+                  <li key={i} className="flex items-start">
+                    <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-gray-700">{feature}</span>
+                  </li>
+                ))}
+              </ul>
+              <Button className="w-full">
+                Assinar agora
+              </Button>
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Success Stories */}
-      <section className="bg-gray-50 py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Histórias de sucesso
-            </h2>
-            <p className="text-xl text-gray-600">
-              Conheça profissionais que transformaram suas vidas
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {testimonials.map((testimonial, index) => (
-              <div key={index} className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex items-center mb-4">
-                  <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mr-4">
-                    <span className="text-green-600 font-bold">{testimonial.name[0]}</span>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900">{testimonial.name}</h4>
-                    <p className="text-sm text-gray-600">{testimonial.service}</p>
-                  </div>
-                </div>
-                <p className="text-gray-700 mb-4">&ldquo;{testimonial.quote}&rdquo;</p>
-                <div className="flex items-center text-sm text-gray-600">
-                  <DollarSign className="w-4 h-4 mr-1" />
-                  <span>{testimonial.earnings} por mês</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* Histórias de sucesso: deixar para o futuro quando houver dados reais */}
 
       {/* CTA Section */}
       <section className="bg-green-600 py-16 text-white">
@@ -224,8 +169,10 @@ export default function SejaProfissionalPage() {
             Comece hoje mesmo!
           </h2>
           <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
-            Cadastre-se gratuitamente e comece a receber solicitações ainda hoje. 
-            Sem mensalidades, sem compromisso.
+            Cadastre-se e comece a receber solicitações.
+          </p>
+          <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
+            Aprovação com até 24 horas – suporte dedicado.
           </p>
           <Button size="lg" variant="secondary" asChild>
             <Link href="/cadastrar">Criar conta de profissional</Link>
@@ -238,13 +185,6 @@ export default function SejaProfissionalPage() {
     </div>
   )
 }
-
-const earnings = [
-  { service: 'Limpeza residencial', price: 'R$ 80-120' },
-  { service: 'Manutenção elétrica', price: 'R$ 150-300' },
-  { service: 'Personal trainer', price: 'R$ 60-100' },
-  { service: 'Aulas particulares', price: 'R$ 40-80' },
-]
 
 const benefits = [
   {
@@ -259,8 +199,8 @@ const benefits = [
   },
   {
     icon: Shield,
-    title: 'Segurança garantida',
-    description: 'Plataforma segura com sistema de avaliações e pagamentos protegidos'
+    title: 'Segurança e transparência',
+    description: 'Avaliações e denúncias ajudam a manter a qualidade. A negociação de valores é direta entre você e o cliente.'
   },
   {
     icon: Users,
@@ -302,55 +242,4 @@ const steps = [
   }
 ]
 
-const plans = [
-  {
-    name: 'Por Solicitação',
-    price: 'R$ 4,90',
-    description: 'Por solicitação aceita',
-    popular: false,
-    features: [
-      'Perfil profissional completo',
-      'Recebimento de propostas',
-      'Sistema de avaliações',
-      'Suporte por email',
-      'Pagamento apenas quando aceitar'
-    ],
-    cta: 'Começar grátis'
-  },
-  {
-    name: 'Plano Mensal',
-    price: 'R$ 39,90',
-    description: 'Por mês',
-    popular: true,
-    features: [
-      'Tudo do plano anterior',
-      'Propostas ilimitadas',
-      'Sem taxa por solicitação',
-      'Destaque na busca',
-      'Suporte prioritário',
-      'Analytics detalhado'
-    ],
-    cta: 'Assinar agora'
-  }
-]
-
-const testimonials = [
-  {
-    name: 'Maria Silva',
-    service: 'Limpeza residencial',
-    quote: 'Triplicou minha renda! Agora tenho uma agenda cheia de clientes fixos.',
-    earnings: 'R$ 3.200'
-  },
-  {
-    name: 'João Santos',
-    service: 'Eletricista',
-    quote: 'Plataforma excelente, clientes sérios e pagamento garantido.',
-    earnings: 'R$ 4.500'
-  },
-  {
-    name: 'Ana Costa',
-    service: 'Personal trainer',
-    quote: 'Consegui construir minha base de alunos rapidamente.',
-    earnings: 'R$ 2.800'
-  }
-]
+// Planos e depoimentos removidos/ajustados até que haja dados e regras finais

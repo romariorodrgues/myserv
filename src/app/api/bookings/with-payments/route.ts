@@ -73,6 +73,7 @@ export async function GET(request: NextRequest) {
     const transformedBookings = bookings.map((booking) => ({
       id: booking.id,
       status: booking.status,
+      requestType: booking.requestType,
       description: booking.description,
       preferredDate: booking.scheduledDate?.toISOString(),
       createdAt: booking.createdAt.toISOString(),

@@ -98,8 +98,17 @@ export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryPro
   const fetchServiceHistory = async () => {
     try {
       setLoading(true)
-      
-      // Mock data - replace with actual API call
+      const params = new URLSearchParams()
+      if (providerId) params.set('providerId', providerId)
+      params.set('limit', '50')
+      const res = await fetch(`/api/providers/history?${params.toString()}`)
+      const data = await res.json()
+      if (data.success) {
+        setServiceHistory(data.data.items)
+        setStats(data.data.stats)
+        return
+      }
+      // fallback vazio
       const mockHistory: ServiceHistory[] = [
         {
           id: '1',
@@ -199,8 +208,6 @@ export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryPro
         }
       ]
 
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000))
       setServiceHistory(mockHistory)
       
     } catch (error) {

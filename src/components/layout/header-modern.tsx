@@ -18,6 +18,7 @@ import {
   Home, ListChecks, MessageSquare, HelpCircle,
   Briefcase, UserPlus
 } from 'lucide-react'
+import { NotificationDropdown } from '@/components/notifications/real-time-notifications'
 
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -80,6 +81,7 @@ export function Header() {
   const { data: session, status } = useSession()
   const isLoading = status === 'loading'
   const isAuthenticated = status === 'authenticated'
+  const [mobileOpen, setMobileOpen] = useState(false)
   
   // Handle scroll effect
   useEffect(() => {
@@ -110,7 +112,7 @@ export function Header() {
     } else if (session.user.userType === 'SERVICE_PROVIDER') {
       return '/dashboard/profissional' 
     } else {
-      return '/dashboard'
+      return '/dashboard/cliente'
     }
   }
 
@@ -131,7 +133,7 @@ export function Header() {
       <div className="relative h-20 w-full grid grid-cols-3 items-center px-2 md:px-6">
         {/* Mobile Navigation */}
         <div className="col-start-1 flex md:hidden">
-        <Sheet>
+        <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild className="md:hidden">
             <Button variant="ghost" size="icon" aria-label="Menu">
               <Menu className="h-6 w-6" />
@@ -159,16 +161,16 @@ export function Header() {
                   </div>
                 </Link>
               </div>
-              <MobileNavItem href="/" icon={Home}>Início</MobileNavItem>
-              <MobileNavItem href="/servicos" icon={ListChecks}>Serviços</MobileNavItem>
-              <MobileNavItem href="/como-funciona" icon={HelpCircle}>Como Funciona</MobileNavItem>
-              <MobileNavItem href="/seja-profissional" icon={Briefcase}>Seja um Profissional</MobileNavItem>
+              <MobileNavItem href="/" icon={Home} onClick={() => setMobileOpen(false)}>Início</MobileNavItem>
+              <MobileNavItem href="/servicos" icon={ListChecks} onClick={() => setMobileOpen(false)}>Serviços</MobileNavItem>
+              <MobileNavItem href="/como-funciona" icon={HelpCircle} onClick={() => setMobileOpen(false)}>Como Funciona</MobileNavItem>
+              <MobileNavItem href="/seja-profissional" icon={Briefcase} onClick={() => setMobileOpen(false)}>Seja um Profissional</MobileNavItem>
               <div className="border-t border-gray-200 my-2"></div>
               {isAuthenticated ? (
                 <>
-                  <MobileNavItem href={getDashboardUrl()} icon={User}>Minha Conta</MobileNavItem>
-                  <MobileNavItem href="/favoritos" icon={Heart}>Favoritos</MobileNavItem>
-                  <MobileNavItem href="/mensagens" icon={MessageSquare}>Mensagens</MobileNavItem>
+                  <MobileNavItem href={getDashboardUrl()} icon={User} onClick={() => setMobileOpen(false)}>Minha Conta</MobileNavItem>
+                  <MobileNavItem href="/favoritos" icon={Heart} onClick={() => setMobileOpen(false)}>Favoritos</MobileNavItem>
+                  <MobileNavItem href="/notifications" icon={Bell} onClick={() => setMobileOpen(false)}>Notificações</MobileNavItem>
                   <div className="border-t border-gray-200 my-2"></div>
                   <Button 
                     variant="ghost" 
@@ -181,8 +183,8 @@ export function Header() {
                 </>
               ) : (
                 <>
-                  <MobileNavItem href="/entrar" icon={User}>Entrar</MobileNavItem>
-                  <MobileNavItem href="/cadastrar" icon={UserPlus}>Cadastrar</MobileNavItem>
+                  <MobileNavItem href="/entrar" icon={User} onClick={() => setMobileOpen(false)}>Entrar</MobileNavItem>
+                  <MobileNavItem href="/cadastrar" icon={UserPlus} onClick={() => setMobileOpen(false)}>Cadastrar</MobileNavItem>
                 </>
               )}
             </nav>
@@ -235,37 +237,8 @@ export function Header() {
             <div className="h-8 w-24 bg-gray-200 animate-pulse rounded-md"></div>
           ) : isAuthenticated ? (
             <>
-              {/* Notifications */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="relative hover:bg-brand-cyan/10 transition-colors duration-200">
-                    <Bell className="h-5 w-5" />
-                    <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-brand-teal text-white text-[10px] animate-bounce">
-                      2
-                    </Badge>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <DropdownMenuLabel>Notificações</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <div className="max-h-80 overflow-y-auto">
-                    <div className="p-2 hover:bg-gray-50 cursor-pointer rounded transition-colors duration-200">
-                      <p className="text-sm font-medium">Agendamento confirmado</p>
-                      <p className="text-xs text-muted-foreground">Seu serviço de limpeza foi confirmado</p>
-                      <p className="text-xs text-muted-foreground">Há 5 minutos</p>
-                    </div>
-                    <div className="p-2 hover:bg-gray-50 cursor-pointer rounded transition-colors duration-200">
-                      <p className="text-sm font-medium">Nova mensagem</p>
-                      <p className="text-xs text-muted-foreground">Maria enviou uma mensagem sobre seu orçamento</p>
-                      <p className="text-xs text-muted-foreground">Há 1 hora</p>
-                    </div>
-                  </div>
-                  <DropdownMenuSeparator />
-                  <Link href="/notifications" className="block p-2 text-center text-sm text-secondary hover:underline">
-                    Ver todas
-                  </Link>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {/* Notifications (reais) */}
+              <NotificationDropdown />
               {/* User Menu */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -298,13 +271,13 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/mensagens">
-                      <MessageSquare className="mr-2 h-4 w-4" />
-                      <span>Mensagens</span>
+                    <Link href="/notifications">
+                      <Bell className="mr-2 h-4 w-4" />
+                      <span>Notificações</span>
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href="/configuracoes">
+                    <Link href={session?.user?.userType === 'SERVICE_PROVIDER' ? '/dashboard/profissional?tab=settings' : '/dashboard/cliente?tab=settings'}>
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Configurações</span>
                     </Link>

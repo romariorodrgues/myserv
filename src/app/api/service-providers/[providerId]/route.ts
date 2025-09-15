@@ -82,7 +82,7 @@ export async function GET(
     }
 
     // Get review statistics
-    const [reviewStats, totalServices] = await Promise.all([
+    const [reviewStats, totalServices, platformAvgRaw, platformTotalCount] = await Promise.all([
       prisma.review.aggregate({
         where: {
           receiverId: serviceProvider.user.id
@@ -99,7 +99,9 @@ export async function GET(
           providerId: serviceProvider.user.id,
           status: 'COMPLETED'
         }
-      })
+      }),
+      prisma.review.aggregate({ _avg: { rating: true } }),
+      prisma.review.count()
     ])
 
     // Get rating distribution
@@ -126,10 +128,18 @@ export async function GET(
     })
 
     // Format response
+    // Bayesian average to stabilize small sample sizes
+    const C = platformAvgRaw._avg.rating ? Number(platformAvgRaw._avg.rating.toFixed(2)) : 0
+    const n = reviewStats._count.id
+    const R = reviewStats._avg.rating ? Number(reviewStats._avg.rating) : 0
+    const m = 8 // prior weight (tunable)
+    const bayesian = n > 0 ? (m * C + n * R) / (m + n) : C
+
     const response = {
       ...serviceProvider,
       statistics: {
         averageRating: reviewStats._avg.rating ? Number(reviewStats._avg.rating.toFixed(2)) : 0,
+        bayesianRating: Number(bayesian.toFixed(2)),
         totalReviews: reviewStats._count.id,
         totalCompletedServices: totalServices,
         ratingDistribution: distributionMap

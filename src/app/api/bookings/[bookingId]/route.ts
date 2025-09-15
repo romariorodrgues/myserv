@@ -30,11 +30,7 @@ export async function PATCH(
     const booking = await prisma.serviceRequest.findUnique({
       where: { id: bookingId },
       include: {
-        provider: {
-          include: {
-            user: true
-          }
-        },
+        provider: true,
         client: true,
         service: true
       }
@@ -59,11 +55,7 @@ export async function PATCH(
       },
       include: {
         service: true,
-        provider: {
-          include: {
-            user: true
-          }
-        },
+        provider: true,
         client: {
           select: {
             id: true,
@@ -80,7 +72,7 @@ export async function PATCH(
       userPhone: updatedBooking.client.phone,
       userName: updatedBooking.client.name,
       serviceName: updatedBooking.service.name,
-      providerName: updatedBooking.provider.user.name,
+      providerName: updatedBooking.provider.name,
       bookingId: updatedBooking.id,
       scheduledDate: updatedBooking.scheduledDate?.toLocaleDateString('pt-BR'),
       amount: updatedBooking.estimatedPrice || 0
@@ -132,9 +124,10 @@ export async function PATCH(
           userId: updatedBooking.clientId,
           type: notificationType,
           title: message,
-          message: `${updatedBooking.service.name} - ${updatedBooking.provider.user.name}`,
+          message: `${updatedBooking.service.name} - ${updatedBooking.provider.name}`,
           isRead: false,
-          sentVia: 'whatsapp,email'
+          sentVia: 'whatsapp,email',
+          data: { bookingId: updatedBooking.id }
         }
       })
     }
@@ -164,6 +157,49 @@ export async function PATCH(
         success: false,
         error: 'Erro interno do servidor'
       },
+      { status: 500 }
+    )
+  }
+}
+
+// GET - Return booking details for review modal and details view
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ bookingId: string }> }
+) {
+  try {
+    const { bookingId } = await params
+
+    const booking = await prisma.serviceRequest.findUnique({
+      where: { id: bookingId },
+      include: {
+        service: true,
+        client: {
+          select: { id: true, name: true, email: true, phone: true }
+        },
+        provider: {
+          select: {
+            id: true,
+            name: true,
+            profileImage: true,
+          }
+        },
+        review: true,
+      }
+    })
+
+    if (!booking) {
+      return NextResponse.json(
+        { success: false, error: 'Reserva não encontrada' },
+        { status: 404 }
+      )
+    }
+
+    return NextResponse.json({ success: true, booking })
+  } catch (error) {
+    console.error('Booking fetch error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Erro interno do servidor' },
       { status: 500 }
     )
   }

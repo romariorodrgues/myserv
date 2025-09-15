@@ -482,26 +482,17 @@ export function ClientFavorites({ clientId }: ClientFavoritesProps) {
                   {/* Actions Section */}
                   <div className="flex flex-col space-y-2 lg:w-40">
                     <Button asChild>
-                      <Link href={`/prestador/${favorite.serviceProvider.id}`}>
+                      <Link href={`/prestador/${favorite.serviceProvider.id}/avaliacoes`}>
                         Ver Perfil
                       </Link>
                     </Button>
                     
-                    {favorite.serviceProvider.availableScheduling ? (
-                      <Button variant="outline" asChild>
-                        <Link href={`/prestador/${favorite.serviceProvider.id}/agendar`}>
-                          <Calendar className="w-4 h-4 mr-1" />
-                          Agendar
-                        </Link>
-                      </Button>
-                    ) : (
-                      <Button variant="outline" asChild>
-                        <Link href={`/prestador/${favorite.serviceProvider.id}/contato`}>
-                          <Phone className="w-4 h-4 mr-1" />
-                          Contatar
-                        </Link>
-                      </Button>
-                    )}
+                    <Button variant="outline" asChild>
+                      <Link href={`/servicos`}>
+                        <Calendar className="w-4 h-4 mr-1" />
+                        Agendar
+                      </Link>
+                    </Button>
                     
                     <Button
                       variant="ghost"

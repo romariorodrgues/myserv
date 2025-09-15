@@ -30,21 +30,33 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status')
     const upcoming = searchParams.get('upcoming') === 'true'
+    const statusesParam = searchParams.get('statuses') // CSV e.g. PENDING,ACCEPTED
+    const open = searchParams.get('open') === 'true'
 
     // Get user's service requests (appointments)
+    // Build dynamic where clause with flexible status filters
+    const whereClause: any = {
+      OR: [
+        { clientId: session.user.id },
+        { providerId: session.user.id }
+      ]
+    }
+
+    if (open) {
+      whereClause.status = { in: ['PENDING', 'ACCEPTED'] }
+    } else if (statusesParam) {
+      const items = statusesParam.split(',').map(s => s.trim()).filter(Boolean)
+      if (items.length) whereClause.status = { in: items as any }
+    } else if (status) {
+      whereClause.status = status as any
+    }
+
+    if (upcoming) {
+      whereClause.scheduledDate = { gte: new Date() }
+    }
+
     const appointments = await prisma.serviceRequest.findMany({
-      where: {
-        OR: [
-          { clientId: session.user.id },
-          { providerId: session.user.id }
-        ],
-        ...(status && { status: status as any }),
-        ...(upcoming && {
-          scheduledDate: {
-            gte: new Date()
-          }
-        })
-      },
+      where: whereClause,
       include: {
         client: {
           select: {
@@ -87,7 +99,7 @@ export async function GET(request: NextRequest) {
         type: appointment.requestType,
         scheduledDate: appointment.scheduledDate,
         description: appointment.description,
-        budget: appointment.budget,
+        budget: appointment.finalPrice ?? appointment.estimatedPrice ?? null,
         userRole: isClient ? 'CLIENT' : 'PROVIDER',
         otherUser: otherUser ? {
           id: otherUser.id,

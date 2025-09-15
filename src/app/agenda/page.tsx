@@ -37,7 +37,8 @@ export default function AgendaPage() {
   const { data: session } = useSession()
   const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<'all' | 'upcoming' | 'pending' | 'completed'>('upcoming')
+  const [filter, setFilter] = useState<'all' | 'upcoming' | 'pending' | 'accepted' | 'completed' | 'open'>('upcoming')
+  const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
 
   // Fetch appointments on component mount
   useEffect(() => {
@@ -48,6 +49,13 @@ export default function AgendaPage() {
     }
   }, [session, filter])
 
+  // Default providers to "pending" to surface quotes without horário
+  useEffect(() => {
+    if (session?.user?.userType === 'SERVICE_PROVIDER' && filter === 'upcoming') {
+      setFilter('open') // Sem data específica: pendentes + aceitos
+    }
+  }, [session?.user?.userType, filter])
+
   const fetchAppointments = async () => {
     try {
       const params = new URLSearchParams()
@@ -55,8 +63,12 @@ export default function AgendaPage() {
         params.append('upcoming', 'true')
       } else if (filter === 'pending') {
         params.append('status', 'PENDING')
+      } else if (filter === 'accepted') {
+        params.append('status', 'ACCEPTED')
       } else if (filter === 'completed') {
         params.append('status', 'COMPLETED')
+      } else if (filter === 'open') {
+        params.append('open', 'true') // PENDING + ACCEPTED
       }
 
       const response = await fetch(`/api/appointments?${params}`)
@@ -72,6 +84,27 @@ export default function AgendaPage() {
       toast.error('Erro ao carregar agendamentos')
     } finally {
       setLoading(false)
+    }
+  }
+
+  const openScheduleFor = (id: string) => {
+    setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
+  }
+  const updateSchedField = (id: string, field: 'date'|'time', value: string) => {
+    setSchedMap((m) => ({ ...m, [id]: { ...(m[id] || { date: '', time: '' }), [field]: value } }))
+  }
+  const scheduleFromQuote = async (id: string) => {
+    const payload = schedMap[id]
+    if (!payload?.date || !payload?.time) { toast.error('Selecione data e horário'); return }
+    try {
+      const res = await fetch(`/api/bookings/${id}/schedule`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ scheduledDate: payload.date, scheduledTime: payload.time }) })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao agendar')
+      toast.success('Orçamento agendado e aceito!')
+      setSchedMap((m) => { const { [id]: _, ...rest } = m; return rest })
+      fetchAppointments()
+    } catch (e: any) {
+      toast.error(e?.message || 'Erro ao agendar')
     }
   }
 
@@ -186,10 +219,13 @@ export default function AgendaPage() {
 
         {/* Filter Tabs */}
         <div className="flex gap-2 mb-6 overflow-x-auto">
+          {/* Opções de filtro, incluindo "Sem data específica" (open) */}
           {[
-            { key: 'upcoming', label: 'Próximos' },
+            { key: 'open', label: 'Sem data específica' },
             { key: 'pending', label: 'Pendentes' },
+            { key: 'accepted', label: 'Aceitos' },
             { key: 'completed', label: 'Concluídos' },
+            { key: 'upcoming', label: 'Próximos' },
             { key: 'all', label: 'Todos' }
           ].map((tab) => (
             <Button
@@ -239,9 +275,14 @@ export default function AgendaPage() {
                 <CardContent className="p-6">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="font-semibold text-brand-navy text-lg mb-1">
-                        {appointment.serviceName}
-                      </h3>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-brand-navy text-lg">
+                          {appointment.serviceName}
+                        </h3>
+                        {appointment.type === 'QUOTE' && (
+                          <span className="text-xs px-2 py-1 rounded bg-purple-100 text-purple-800">Orçamento</span>
+                        )}
+                      </div>
                       <p className="text-gray-600 mb-1">{appointment.category}</p>
                       {appointment.otherUser && (
                         <div className="flex items-center gap-1 text-gray-600 mb-2">
@@ -292,15 +333,31 @@ export default function AgendaPage() {
                         <MessageCircle className="h-4 w-4 mr-2" />
                         WhatsApp
                       </Button>
-                      {appointment.status === 'PENDING' && appointment.userRole === 'PROVIDER' && (
+                      {appointment.status === 'PENDING' && appointment.userRole === 'PROVIDER' && appointment.type === 'SCHEDULING' && (
                         <>
-                          <Button size="sm">
-                            Aceitar
-                          </Button>
-                          <Button variant="destructive" size="sm">
-                            Rejeitar
-                          </Button>
+                          <Button size="sm">Aceitar</Button>
+                          <Button variant="destructive" size="sm">Rejeitar</Button>
                         </>
+                      )}
+                      {appointment.status === 'PENDING' && appointment.userRole === 'PROVIDER' && appointment.type === 'QUOTE' && (
+                        <div className="flex flex-wrap items-end gap-2">
+                          {!schedMap[appointment.id] ? (
+                            <Button size="sm" onClick={() => openScheduleFor(appointment.id)}>Agendar</Button>
+                          ) : (
+                            <>
+                              <div>
+                                <label className="text-xs text-gray-600">Data</label>
+                                <input type="date" value={schedMap[appointment.id]?.date || ''} onChange={(e) => updateSchedField(appointment.id, 'date', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-600">Hora</label>
+                                <input type="time" value={schedMap[appointment.id]?.time || ''} onChange={(e) => updateSchedField(appointment.id, 'time', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
+                              </div>
+                              <Button size="sm" onClick={() => scheduleFromQuote(appointment.id)}>Confirmar</Button>
+                              <Button size="sm" variant="outline" onClick={() => setSchedMap((m) => { const { [appointment.id]: _, ...rest } = m; return rest })}>Cancelar</Button>
+                            </>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}

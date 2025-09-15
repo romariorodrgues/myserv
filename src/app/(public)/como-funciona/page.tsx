@@ -155,8 +155,7 @@ export default function ComoFuncionaPage() {
             Pronto para começar?
           </h2>
           <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
-            Junte-se a milhares de pessoas que já usam a MyServ para encontrar 
-            e oferecer serviços de qualidade.
+            Cadastre-se gratuitamente para buscar ou oferecer serviços.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" variant="secondary" asChild>
@@ -186,7 +185,7 @@ const clientSteps = [
   {
     icon: CreditCard,
     title: 'Faça o agendamento',
-    description: 'Escolha data e hora disponível e efetue o pagamento de forma segura'
+    description: 'solicite um orçamento ou agende um serviço com data e horário conforme disponibilidade do profissional. Pague somente após o serviço/orçamento concluído.'
   },
   {
     icon: Star,
@@ -222,7 +221,7 @@ const features = [
   {
     icon: Shield,
     title: 'Segurança garantida',
-    description: 'Todos os profissionais passam por verificação e os pagamentos são processados com segurança'
+    description: 'Todos os profissionais e clientes passam por verificação, possuímos termos rigorosos podendo qualquer cadastrado ser bloqueado do sistema em caso de não cumprimento das regras'
   },
   {
     icon: MapPin,
@@ -242,34 +241,34 @@ const features = [
   {
     icon: MessageCircle,
     title: 'Comunicação direta',
-    description: 'Converse diretamente com o profissional via WhatsApp após a contratação'
+    description: 'Converse diretamente com o profissional via chat ou whatsapp após a contratação'
   },
   {
     icon: CreditCard,
     title: 'Pagamento seguro',
-    description: 'Múltiplas formas de pagamento com proteção total das suas informações'
+    description: 'Aceite pagar direto ao profissional somente após a conclusão do serviço/orçamento contratado'
   }
 ]
 
 const faqs = [
   {
     question: 'Como funciona o pagamento?',
-    answer: 'O pagamento é processado de forma segura através de gateways confiáveis. Para agendamentos, você paga uma taxa simbólica que é repassada ao profissional após a confirmação do serviço.'
+    answer: 'O pagamento é combinado e realizado diretamente entre cliente e profissional. A MyServ não intermedia pagamentos dos serviços.'
   },
   {
     question: 'E se eu não gostar do serviço?',
-    answer: 'Temos um sistema de avaliações e mediação de conflitos. Em casos extremos, oferecemos garantias e reembolsos conforme nossa política de satisfação.'
+    answer: 'Você pode avaliar o profissional e relatar problemas. A plataforma oferece ferramentas de avaliação e denúncia, mas não realiza reembolsos pois não processa pagamentos entre as partes.'
   },
   {
     question: 'Os profissionais são verificados?',
-    answer: 'Sim! Todos os profissionais passam por um processo de verificação que inclui validação de documentos e análise de perfil antes de serem aprovados.'
+    answer: 'Sim! Todos os profissionais passam por um processo básico de verificação antes de serem aprovados.'
   },
   {
     question: 'Posso cancelar um agendamento?',
-    answer: 'Sim, você pode cancelar conforme nossa política de cancelamento. Cancelamentos com antecedência adequada não geram custos adicionais.'
+    answer: 'Sim. Não há cobrança de taxas pela plataforma para clientes. Combine diretamente com o profissional caso já tenha um horário ajustado.'
   },
   {
     question: 'Como funciona para profissionais?',
-    answer: 'Profissionais podem escolher entre planos mensais ou pagamento por solicitação aceita. Oferecemos também opções de destaque para aumentar a visibilidade.'
+    answer: 'Profissionais assinam um plano mensal para ter acesso aos contatos dos clientes que enviaram solicitações e, assim, negociar diretamente.'
   }
 ]

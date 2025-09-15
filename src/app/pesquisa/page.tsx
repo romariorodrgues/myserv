@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Search, MapPin, Filter, Star, Heart, Phone, MessageCircle, Loader2, Crosshair } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -13,6 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { useSession } from 'next-auth/react'
 import { toast } from 'sonner'
 import { useGeolocation } from '@/hooks/use-geolocation'
+import ServiceSuggestInput from '@/components/services/service-suggest-input'
+import { AdvancedSearchFilters } from '@/components/search/advanced-filters'
 
 interface ServiceProvider {
   id: string
@@ -28,103 +30,100 @@ interface ServiceProvider {
   available: boolean
 }
 
-interface Category {
-  id: string
-  name: string
-  description?: string
-  icon?: string
-  serviceCount: number
-  isActive: boolean
+type SortByUI =
+  | 'RELEVANCE'
+  | 'PRICE_LOW'
+  | 'PRICE_HIGH'
+  | 'NEWEST'
+  | 'RATING'
+  | 'DISTANCE';
+
+type Filters = {
+  q?: string
+  leafCategoryId?: string
+  city?: string
+  state?: string
+  minPrice?: number
+  maxPrice?: number
+  sortBy?: SortByUI
 }
 
-export default function PesquisaPage() {
+function PesquisaPage() {
   const { data: session } = useSession()
   const { getCurrentLocation, address, loading: locationLoading } = useGeolocation()
+
   const [searchTerm, setSearchTerm] = useState('')
   const [location, setLocation] = useState('')
-  const [selectedCategory, setSelectedCategory] = useState<string>('')
-  const [categories, setCategories] = useState<Category[]>([])
   const [providers, setProviders] = useState<ServiceProvider[]>([])
   const [loading, setLoading] = useState(false)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [favoriteLoading, setFavoriteLoading] = useState<string | null>(null)
+  const [filters, setFilters] = useState<Filters>({})
+  const [hasSearched, setHasSearched] = useState(false)
 
-  // Load categories on component mount
+  // Atualiza campo de localização quando hook resolver endereço
   useEffect(() => {
-    fetchCategories()
-  }, [])
-
-  // Auto-search when category changes
-  useEffect(() => {
-    if (selectedCategory) {
-      handleSearch()
-    }
-  }, [selectedCategory])
-
-  // Update location when geolocation address changes
-  useEffect(() => {
-    if (address?.formatted) {
-      setLocation(address.formatted)
-    }
+    if (address?.formatted) setLocation(address.formatted)
   }, [address])
 
   const handleLocationClick = async () => {
     await getCurrentLocation()
   }
 
-  const fetchCategories = async () => {
-    try {
-      const response = await fetch('/api/categories?active=true')
-      if (response.ok) {
-        const data = await response.json()
-        setCategories(data.categories || [])
-      }
-    } catch (error) {
-      console.error('Error fetching categories:', error)
-    }
-  }
-
-  // Search function
   const handleSearch = async () => {
-    if (!searchTerm.trim() && !selectedCategory) return
-
+    const q = searchTerm.trim()
+    const local = location.trim()
+    if (!q && !filters.leafCategoryId && !local) return
+    setHasSearched(true)
     setLoading(true)
+
     try {
+      // mapeia valores extras da UI para os que a API aceita
+      const apiSortBy:
+        | 'RELEVANCE'
+        | 'PRICE_LOW'
+        | 'PRICE_HIGH'
+        | 'NEWEST'
+        | undefined =
+        filters.sortBy === 'PRICE_LOW'  ? 'PRICE_LOW'  :
+        filters.sortBy === 'PRICE_HIGH' ? 'PRICE_HIGH' :
+        filters.sortBy === 'NEWEST'     ? 'NEWEST'     :
+        filters.sortBy ? 'RELEVANCE' : undefined
+
       const params = new URLSearchParams({
-        ...(searchTerm.trim() && { q: searchTerm.trim() }),
-        ...(location.trim() && { local: location.trim() }),
-        ...(selectedCategory && { categoryId: selectedCategory })
+        ...(q && { q }),
+        ...(local && { local }),
+        ...(filters.leafCategoryId && { leafCategoryId: filters.leafCategoryId }),
+        ...(filters.minPrice != null && { minPrice: String(filters.minPrice) }),
+        ...(filters.maxPrice != null && { maxPrice: String(filters.maxPrice) }),
+        ...(apiSortBy && { sortBy: apiSortBy }),
       })
 
-      const response = await fetch(`/api/services/search?${params}`)
-      if (response.ok) {
-        const data = await response.json()
-        setProviders(data.results || [])
-      } else {
+      const res = await fetch(`/api/services/search?${params}`)
+      if (!res.ok) {
         toast.error('Erro ao buscar serviços')
+        return
       }
-    } catch (error) {
-      console.error('Error searching services:', error)
+      const data = await res.json()
+      setProviders(data.results || [])
+    } catch (err) {
+      console.error('Error searching services:', err)
       toast.error('Erro ao buscar serviços')
     } finally {
       setLoading(false)
     }
   }
 
-  // Handle enter key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      handleSearch()
-    }
+    if (e.key === 'Enter') handleSearch()
   }
 
-  // Toggle favorite
+  // Favoritos (inalterado)
   const toggleFavorite = async (providerId: string) => {
     if (!session?.user) {
       toast.error('Faça login para favoritar')
       return
     }
-
     if (favoriteLoading) return
 
     setFavoriteLoading(providerId)
@@ -133,35 +132,20 @@ export default function PesquisaPage() {
     try {
       const response = await fetch('/api/favorites', {
         method: isFavorited ? 'DELETE' : 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        ...(isFavorited 
-          ? {} 
-          : { body: JSON.stringify({ providerId }) }
-        ),
-        ...(isFavorited && {
-          method: 'DELETE',
-          headers: {},
-          body: undefined
-        })
+        headers: { 'Content-Type': 'application/json' },
+        ...(isFavorited ? {} : { body: JSON.stringify({ providerId }) }),
+        ...(isFavorited && { method: 'DELETE', headers: {}, body: undefined }),
       })
 
-      // For DELETE, use query parameter
-      const deleteResponse = isFavorited 
+      const deleteResponse = isFavorited
         ? await fetch(`/api/favorites?providerId=${providerId}`, { method: 'DELETE' })
         : response
 
       if ((isFavorited ? deleteResponse : response).ok) {
-        const newFavorites = new Set(favorites)
-        if (isFavorited) {
-          newFavorites.delete(providerId)
-          toast.success('Removido dos favoritos')
-        } else {
-          newFavorites.add(providerId)
-          toast.success('Adicionado aos favoritos')
-        }
-        setFavorites(newFavorites)
+        const next = new Set(favorites)
+        if (isFavorited) { next.delete(providerId); toast.success('Removido dos favoritos') }
+        else { next.add(providerId); toast.success('Adicionado aos favoritos') }
+        setFavorites(next)
       } else {
         toast.error('Erro ao atualizar favoritos')
       }
@@ -178,12 +162,8 @@ export default function PesquisaPage() {
       <div className="container mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-brand-navy mb-2">
-            Pesquisar Serviços
-          </h1>
-          <p className="text-gray-600">
-            Encontre os melhores profissionais da sua região
-          </p>
+          <h1 className="text-3xl font-bold text-brand-navy mb-2">Pesquisar Serviços</h1>
+          <p className="text-gray-600">Encontre os melhores profissionais da sua região</p>
         </div>
 
         {/* Search Bar */}
@@ -191,18 +171,25 @@ export default function PesquisaPage() {
           <CardContent className="p-4">
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
+                <ServiceSuggestInput
                   placeholder="O que você está procurando?"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-cyan focus:border-transparent"
+                  defaultValue={searchTerm}
+                  onSelect={(item) => {
+                    if (item.type === 'leaf') {
+                      setFilters((prev) => ({ ...prev, leafCategoryId: item.id }))
+                      setSearchTerm(item.name)
+                      handleSearch()
+                    } else {
+                      setFilters((prev) => ({ ...prev, leafCategoryId: undefined }))
+                      setSearchTerm(item.name)
+                      handleSearch()
+                    }
+                  }}
                 />
               </div>
+
               <div className="flex-1 relative">
-                <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <input
                   type="text"
                   placeholder="Sua localização"
@@ -216,67 +203,47 @@ export default function PesquisaPage() {
                   size="sm"
                   onClick={handleLocationClick}
                   disabled={locationLoading}
-                  className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
                 >
-                  {locationLoading ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Crosshair className="h-4 w-4" />
-                  )}
+                  {locationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
                 </Button>
               </div>
-              <Button 
+
+              <Button
                 onClick={handleSearch}
-                disabled={loading || !searchTerm.trim()}
+                disabled={loading || (!searchTerm.trim() && !filters.leafCategoryId && !location.trim())}
                 className="px-6"
               >
-                {loading ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Search className="h-4 w-4 mr-2" />
-                )}
+                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
                 Buscar
               </Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Category Filters */}
-        {categories.length > 0 && (
-          <Card className="mb-6">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-4 mb-3">
-                <span className="text-sm font-medium text-gray-700">Categorias:</span>
-                <Button
-                  variant={selectedCategory === '' ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setSelectedCategory('')}
-                >
-                  Todas
-                </Button>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setSelectedCategory(category.id)}
-                    className="h-auto py-2 px-3"
-                  >
-                    {category.icon && (
-                      <span className="mr-2">{category.icon}</span>
-                    )}
-                    {category.name}
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {category.serviceCount}
-                    </Badge>
-                  </Button>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* Filtros avançados (inclui picker em cascata) */}
+        <Card className="mb-6">
+          <CardContent className="p-4">
+            <AdvancedSearchFilters
+              priceRange={{ min: 0, max: 10000 }}
+              onFiltersChange={(f) => {
+                if (typeof f.q === 'string') setSearchTerm(f.q)
+                if (typeof f.city === 'string') setLocation(f.city)
+                setFilters({
+                  q: f.q,
+                  leafCategoryId: f.leafCategoryId,
+                  city: f.city,
+                  state: f.state,
+                  minPrice: f.minPrice,
+                  maxPrice: f.maxPrice,
+                  sortBy: f.sortBy as SortByUI | undefined,
+                })
+                // se quiser buscar automaticamente ao escolher a leaf:
+                // if (f.leafCategoryId) handleSearch()
+              }}
+            />
+          </CardContent>
+        </Card>
 
         {/* Results */}
         {loading ? (
@@ -302,11 +269,7 @@ export default function PesquisaPage() {
                     {/* Avatar */}
                     <div className="w-16 h-16 bg-brand-cyan/10 rounded-full flex items-center justify-center overflow-hidden">
                       {provider.profileImage ? (
-                        <img 
-                          src={provider.profileImage} 
-                          alt={provider.name}
-                          className="w-full h-full object-cover"
-                        />
+                        <img src={provider.profileImage} alt={provider.name} className="w-full h-full object-cover" />
                       ) : (
                         <span className="text-2xl font-semibold text-brand-cyan">
                           {provider.name.charAt(0).toUpperCase()}
@@ -318,13 +281,9 @@ export default function PesquisaPage() {
                     <div className="flex-1">
                       <div className="flex items-start justify-between mb-2">
                         <div>
-                          <h3 className="font-semibold text-brand-navy text-lg">
-                            {provider.name}
-                          </h3>
+                          <h3 className="font-semibold text-brand-navy text-lg">{provider.name}</h3>
                           <p className="text-gray-600">{provider.category}</p>
-                          <p className="text-sm text-gray-500">
-                            {provider.services.join(', ')}
-                          </p>
+                          <p className="text-sm text-gray-500">{provider.services.join(', ')}</p>
                         </div>
                         {session?.user && (
                           <Button
@@ -357,22 +316,17 @@ export default function PesquisaPage() {
                         <div className="flex items-center gap-1 text-sm text-gray-500">
                           <MapPin className="h-4 w-4" />
                           <span>{provider.location}</span>
-                          {provider.distance && (
-                            <span className="ml-1">({provider.distance.toFixed(1)} km)</span>
-                          )}
+                          {provider.distance && <span className="ml-1">({provider.distance.toFixed(1)} km)</span>}
                         </div>
-                        <Badge variant={provider.available ? "default" : "secondary"}>
-                          {provider.available ? "Disponível" : "Ocupado"}
+                        <Badge variant={provider.available ? 'default' : 'secondary'}>
+                          {provider.available ? 'Disponível' : 'Ocupado'}
                         </Badge>
                       </div>
 
                       {/* Price and Actions */}
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-brand-navy">
-                          {provider.basePrice > 0 
-                            ? `A partir de R$ ${provider.basePrice.toFixed(2)}`
-                            : 'Sob consulta'
-                          }
+                          {provider.basePrice > 0 ? `A partir de R$ ${provider.basePrice.toFixed(2)}` : 'Sob consulta'}
                         </span>
                         <div className="flex gap-2">
                           <Button variant="outline" size="sm">
@@ -383,9 +337,7 @@ export default function PesquisaPage() {
                             <MessageCircle className="h-4 w-4 mr-2" />
                             WhatsApp
                           </Button>
-                          <Button size="sm">
-                            Solicitar
-                          </Button>
+                          <Button size="sm">Solicitar</Button>
                         </div>
                       </div>
                     </div>
@@ -394,17 +346,13 @@ export default function PesquisaPage() {
               </Card>
             ))}
           </div>
-        ) : searchTerm ? (
+        ) : hasSearched ? (
           /* No Results */
           <Card>
             <CardContent className="p-12 text-center">
               <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">
-                Nenhum resultado encontrado
-              </h3>
-              <p className="text-gray-500 mb-6">
-                Tente buscar com outros termos ou ajustar sua localização
-              </p>
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
+              <p className="text-gray-500 mb-6">Tente buscar com outros termos ou ajustar sua localização</p>
               <Button variant="outline" onClick={() => setSearchTerm('')}>
                 Limpar Busca
               </Button>
@@ -415,12 +363,8 @@ export default function PesquisaPage() {
           <Card>
             <CardContent className="p-12 text-center">
               <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">
-                Digite o que você está procurando
-              </h3>
-              <p className="text-gray-500">
-                Use a barra de pesquisa acima para encontrar profissionais
-              </p>
+              <h3 className="text-xl font-semibold text-gray-600 mb-2">Digite o que você está procurando</h3>
+              <p className="text-gray-500">Use a barra de pesquisa acima para encontrar profissionais</p>
             </CardContent>
           </Card>
         )}
@@ -428,3 +372,13 @@ export default function PesquisaPage() {
     </div>
   )
 }
+
+const SearchPage: React.FC = () => {
+  return (
+    <Suspense fallback={<div>Carregando...</div>}>
+      <PesquisaPage />
+    </Suspense>
+  );
+}
+
+export default SearchPage;

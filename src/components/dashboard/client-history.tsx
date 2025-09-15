@@ -472,9 +472,11 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
                   
                   <div className="flex flex-col space-y-2 lg:ml-4">
                     {request.status === 'COMPLETED' && !request.rating && (
-                      <Button size="sm" variant="outline">
-                        Avaliar Serviço
-                      </Button>
+                      <a href={`/dashboard/cliente?tab=history&reviewBookingId=${request.id}`}>
+                        <Button size="sm" variant="outline">
+                          Avaliar Serviço
+                        </Button>
+                      </a>
                     )}
                     
                     {request.status === 'PENDING' && (

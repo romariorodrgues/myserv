@@ -9,6 +9,7 @@ import { LucideIcon } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useSearchParams } from 'next/navigation'
 import { useEffect, useState, useCallback, Suspense } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { Calendar, Search, Star, Clock, MapPin, CheckCircle, XCircle, AlertCircle, User, Heart, Settings, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -18,7 +19,7 @@ import { ClientHistory } from '@/components/dashboard/client-history'
 import { ClientFavorites } from '@/components/dashboard/client-favorites'
 import { ClientProfileSettings } from '@/components/dashboard/client-profile-settings'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
-import { SupportChatWidget } from '@/components/chat/SupportChatWidget'
+import { ClientReviewModal } from '@/components/dashboard/client-review-modal'
 import { redirect } from 'next/navigation'
 
 
@@ -52,6 +53,8 @@ function ClientDashboardContent() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabOption>('overview')
+  const [pendingReviews, setPendingReviews] = useState(0)
+  const [reviewBookingId, setReviewBookingId] = useState<string | null>(null)
 
     type TabOption = 'overview' | 'history' | 'favorites' | 'settings'
 
@@ -65,67 +68,34 @@ if (!session) {
     redirect('/entrar') // redireciona para a página de login correta
   }
   const fetchBookings = useCallback(async () => {
+    if (!session?.user?.id) return []
+    const response = await fetch(`/api/bookings/with-payments?clientId=${session.user.id}`)
+    if (response.ok) {
+      const data = await response.json()
+      return data.bookings as Booking[]
+    }
+    return []
+  }, [session?.user?.id])
+
+  const bookingsQuery = useQuery({
+    queryKey: ['client-bookings', session?.user?.id],
+    queryFn: fetchBookings,
+    enabled: !!session?.user?.id,
+    staleTime: 60_000,
+    gcTime: 5 * 60_000,
+    initialData: [] as Booking[],
+  })
+
+  const fetchPendingReviews = useCallback(async () => {
     try {
-      // Fetch bookings with payment information for WhatsApp communication
-      if (!session?.user?.id) {
-        setBookings([])
-        setLoading(false)
-        return
+      if (!session?.user?.id) return
+      const res = await fetch(`/api/reviews/pending?clientId=${session.user.id}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.success) setPendingReviews(data.data.count)
       }
-      const response = await fetch(`/api/bookings/with-payments?clientId=${session.user.id}`)
-      if (response.ok) {
-        const data = await response.json()
-        setBookings(data.bookings)
-      } else {
-        // Mock data for development with payment status
-        const mockBookings: Booking[] = [
-          {
-            id: '1',
-            status: 'ACCEPTED',
-            description: 'Limpeza residencial completa para apartamento de 3 quartos',
-            preferredDate: '2025-06-15T10:00:00Z',
-            createdAt: '2025-06-10T09:00:00Z',
-            address: 'Rua das Flores, 123',
-            city: 'São Paulo',
-            state: 'SP',
-            service: { name: 'Limpeza Residencial' },
-            serviceProvider: {
-              user: { 
-                name: 'Maria Silva', 
-                profileImage: null,
-                phone: '(11) 99999-1234'
-              }
-            },
-            payment: { status: 'COMPLETED' }
-          },
-          {
-            id: '2',
-            status: 'ACCEPTED',
-            description: 'Instalação de ar condicionado split',
-            preferredDate: '2025-06-18T14:00:00Z',
-            createdAt: '2025-06-12T11:30:00Z',
-            address: 'Av. Paulista, 1000',
-            city: 'São Paulo',
-            state: 'SP',
-            service: { name: 'Instalação de Ar Condicionado' },
-            serviceProvider: {
-              user: { 
-                name: 'João Santos', 
-                profileImage: null,
-                phone: '(11) 98888-5678'
-              }
-            },
-            payment: { status: 'PENDING' }
-          }
-        ]
-        setBookings(mockBookings)
-      }
-    } catch (error) {
-      console.error('Error fetching bookings:', error)
-      // Set mock data on error
-      setBookings([])
-    } finally {
-      setLoading(false)
+    } catch (e) {
+      console.error('Error fetching pending reviews:', e)
     }
   }, [session?.user?.id])
 
@@ -136,8 +106,21 @@ if (!session) {
       setActiveTab(tab as TabOption)
     }
     
-    fetchBookings()
-  }, [searchParams, fetchBookings])
+    ;(async () => {
+      setLoading(true)
+      try {
+        const data = await fetchBookings()
+        setBookings(data)
+      } finally {
+        setLoading(false)
+      }
+      fetchPendingReviews()
+    })()
+
+    // If notification pushed a reviewBookingId, open the modal
+    const rId = searchParams.get('reviewBookingId')
+    if (rId) setReviewBookingId(rId)
+  }, [searchParams, fetchBookings, fetchPendingReviews])
 
   const getStatusIcon = (status: Booking['status']) => {
     switch (status) {
@@ -179,7 +162,7 @@ if (!session) {
     })
   }
 
-  if (loading) {
+  if (loading && (!bookingsQuery.data || bookingsQuery.data.length === 0)) {
     return (
       <div className="space-y-6">
         <div className="animate-pulse">
@@ -301,7 +284,7 @@ if (!session) {
                   <Star className="h-5 w-5 text-yellow-500" />
                   <div>
                     <p className="text-sm font-medium text-muted-foreground">Avaliações Pendentes</p>
-                    <p className="text-2xl font-bold">2</p>
+                    <p className="text-2xl font-bold">{pendingReviews}</p>
                   </div>
                 </div>
               </CardContent>
@@ -434,6 +417,16 @@ if (!session) {
 
       {activeTab === 'settings' && (
         <ClientProfileSettings />
+      )}
+
+      {reviewBookingId && (
+        <ClientReviewModal
+          bookingId={reviewBookingId}
+          onClose={() => setReviewBookingId(null)}
+          onSubmitted={() => {
+            fetchPendingReviews()
+          }}
+        />
       )}
     </div>
   )

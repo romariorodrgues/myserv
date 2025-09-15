@@ -14,7 +14,6 @@ import { MobileNavigation } from "@/components/layout/mobile-navigation";
 import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "sonner";
 import { ClientLayoutWrapper } from "@/components/layout/client-layout-wrapper";
-import { SupportChatWidgetWrapper } from "@/components/chat/SupportChatWidgetWrapper";
 import ReactQueryProvider from "@/lib/react-query";
 
 const inter = Inter({
@@ -31,7 +30,7 @@ const manrope = Manrope({
 
 export const metadata: Metadata = {
   title: "MyServ - Conectando você aos melhores profissionais",
-  description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, pagamento seguro e profissionais qualificados.",
+  description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, contato direto e profissionais qualificados.",
   keywords: ["serviços", "profissionais", "agendamento", "prestadores", "home services"],
   authors: [{ name: "Romário Rodrigues" }],
   creator: "Romário Rodrigues",
@@ -47,7 +46,7 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "MyServ - Conectando você aos melhores profissionais",
-    description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, pagamento seguro e profissionais qualificados.",
+    description: "Encontre os melhores prestadores de serviços da sua região. Agendamento online, contato direto e profissionais qualificados.",
     url: "https://myserv.com.br",
     siteName: "MyServ",
     type: "website",
@@ -85,8 +84,11 @@ export default function RootLayout({
       </head>
       <body>
         <ReactQueryProvider>
-
          <ClientLayoutWrapper>
+         <div
+            suppressHydrationWarning
+            className="font-sans antialiased bg-gradient-to-br from-brand-bg via-white to-brand-teal/10 min-h-screen text-primary transition-colors duration-300"
+         >
         <div className="relative min-h-screen flex flex-col">
           {/* Efeito visual de background animado */}
           <div className="pointer-events-none fixed inset-0 z-0 opacity-60 blur-2xl select-none" aria-hidden="true">
@@ -103,8 +105,7 @@ export default function RootLayout({
             <FooterModern />
             <MobileNavigation />
             
-            {/* Widget de Chat de Suporte Global */}
-            <SupportChatWidgetWrapper />
+            {/* Support chat desativado nesta release */}
             
             <Toaster 
               position="top-right"
@@ -117,6 +118,7 @@ export default function RootLayout({
               }}
             />
           </AuthProvider>
+        </div>
         </div>
          </ClientLayoutWrapper>
         </ReactQueryProvider>
