@@ -223,14 +223,14 @@ export default function FavoritosPage() {
                           }
                         </span>
                         <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
+                          {/* <Button variant="outline" size="sm">
                             <Phone className="h-4 w-4 mr-2" />
                             Ligar
                           </Button>
                           <Button variant="outline" size="sm">
                             <MessageCircle className="h-4 w-4 mr-2" />
                             WhatsApp
-                          </Button>
+                          </Button> */}
                           <Button size="sm">
                             Solicitar
                           </Button>

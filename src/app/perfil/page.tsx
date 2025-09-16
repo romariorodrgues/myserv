@@ -68,7 +68,7 @@ export default function PerfilPage() {
       return [
         { icon: Edit, title: 'Editar Perfil', description: 'Dados e foto do prestador', href: '/dashboard/profissional?tab=settings' },
         { icon: History, title: 'Histórico de Serviços', description: 'Serviços realizados e status', href: '/dashboard/profissional?tab=history' },
-        { icon: Settings, title: 'Agenda e Preços', description: 'Defina horários e valores', href: '/dashboard/profissional?tab=schedule' },
+        { icon: Settings, title: 'Agenda e Serviços', description: 'Defina horários e gerencie serviços', href: '/dashboard/profissional?tab=schedule' },
         { icon: Heart, title: 'Favoritos', description: 'Clientes e profissionais salvos', href: '/favoritos' },
         { icon: HelpCircle, title: 'Ajuda e Suporte', description: 'Central de ajuda e contato', href: '/ajuda' },
       ]
@@ -100,6 +100,16 @@ export default function PerfilPage() {
         <Button
           size="sm"
           className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full p-0 border border-gray-300 bg-white shadow-sm"
+          onClick={() => {
+            if (session?.user?.userType === 'SERVICE_PROVIDER') {
+              window.location.href = '/dashboard/profissional?tab=settings'
+            } else if (session?.user?.userType === 'ADMIN') {
+              window.location.href = '/dashboard/cliente?tab=settings'
+            } else {
+              window.location.href = '/dashboard/cliente?tab=settings'
+            }
+          }}
+          title="Alterar foto"
         >
           <Camera className="w-4 h-4 text-brand-navy" />
         </Button>

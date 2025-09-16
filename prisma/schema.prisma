@@ -37,6 +37,9 @@ model User {
   adminAssignments SupportAssignment[]
   supportChats     SupportChat[]
   sentMessages     SupportMessage[]
+  couponRedemptions CouponRedemption[]
+   moderationsAsTarget UserModeration[] @relation("UserModerationsAsTarget")
+  moderationsAsAdmin  UserModeration[] @relation("UserModerationsAsAdmin")
 
   @@map("users")
 }
@@ -236,6 +239,7 @@ model Payment {
   subscription     Subscription?   @relation(fields: [subscriptionId], references: [id])
   serviceRequest   ServiceRequest? @relation(fields: [serviceRequestId], references: [id])
   user             User            @relation(fields: [userId], references: [id])
+  couponRedemption CouponRedemption?
 
   @@map("payments")
 }
@@ -252,6 +256,7 @@ model Plan {
   updatedAt        DateTime          @updatedAt
   serviceProviders ServiceProvider[]
   subscriptions    Subscription[]
+  couponRedemptions CouponRedemption[]
 
   @@map("plans")
 }
@@ -383,4 +388,82 @@ model SupportAssignment {
   chat       SupportChat @relation(fields: [chatId], references: [id], onDelete: Cascade)
 
   @@map("support_assignments")
+}
+
+model UserModeration {
+  id        String   @id @default(uuid())
+  userId    String
+  adminId   String?                       // deixe opcional p/ permitir SetNull
+  action    String                        // "DEACTIVATE" | "ACTIVATE" | "APPROVE" | "REJECT"
+  reason    String?
+  createdAt DateTime @default(now())
+
+  // dê nomes diferentes às 2 relações para User:
+  user  User  @relation("UserModerationsAsTarget", fields: [userId], references: [id], onDelete: Cascade)
+  admin User? @relation("UserModerationsAsAdmin",  fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([adminId, createdAt])
+  @@map("user_moderation")
+}
+
+model Coupon {
+  id              String   @id @default(uuid())
+  code            String   @unique
+  discountType    String   // PERCENT | FIXED
+  value           Float
+  appliesTo       String   // FREE | PREMIUM | ENTERPRISE | ANY
+  validFrom       DateTime?
+  validTo         DateTime?
+  maxRedemptions  Int?
+  perUserLimit    Int?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  redemptions     CouponRedemption[]
+
+  @@map("coupons")
+}
+
+model PendingProviderRegistration {
+  id                     String   @id @default(uuid())
+  name                   String
+  email                  String
+  phone                  String
+  cpfCnpj                String
+  passwordHash           String
+  userType               String
+  personType             String
+  plan                   String
+  gender                 String?
+  maritalStatus          String?
+  dateOfBirth            DateTime?
+  hasDriverLicense       Boolean  @default(false)
+  driverLicenseNumber    String?
+  driverLicenseCategory  String?
+  driverLicenseExpiresAt DateTime?
+  extraData              Json?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@map("pending_provider_registrations")
+  @@index([email])
+  @@index([cpfCnpj])
+}
+
+model CouponRedemption {
+  id        String   @id @default(uuid())
+  couponId  String
+  userId    String
+  planId    String?
+  amountOff Float?
+  paymentId String?  @unique
+  createdAt DateTime @default(now())
+
+  coupon Coupon @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id])
+  plan   Plan?  @relation(fields: [planId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@map("coupon_redemptions")
 }

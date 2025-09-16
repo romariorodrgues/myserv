@@ -111,6 +111,7 @@ export default function AgendaPage() {
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       PENDING: { variant: 'secondary' as const, label: 'Pendente', icon: AlertCircle },
+      HOLD: { variant: 'secondary' as const, label: 'Pendente', icon: AlertCircle },
       ACCEPTED: { variant: 'default' as const, label: 'Confirmado', icon: CheckCircle },
       COMPLETED: { variant: 'default' as const, label: 'Concluído', icon: CheckCircle },
       REJECTED: { variant: 'destructive' as const, label: 'Rejeitado', icon: XCircle },

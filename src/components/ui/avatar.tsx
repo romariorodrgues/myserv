@@ -7,6 +7,7 @@
 
 import * as React from "react"
 import Image from "next/image"
+import { cdnImageUrl } from "@/lib/cdn"
 import { cn } from "@/utils"
 
 const Avatar = React.forwardRef<
@@ -28,30 +29,33 @@ const AvatarImage = React.forwardRef<
   HTMLDivElement,
   React.ImgHTMLAttributes<HTMLImageElement> & {
     src: string
-    width?: number
-    height?: number
+    size?: number
   }
->(({ className, alt = "", src, width = 40, height = 40, ...props }, ref) => (
-  <div
-    ref={ref}
-    className={cn("aspect-square h-full w-full relative", className)}
-  >
-    {src ? (
-      <Image
-        src={src}
-        alt={alt}
-        width={width}
-        height={height}
-        className="object-cover rounded-full"
-        {...props}
-      />
-    ) : (
-      <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600">
-        ?
-      </div>
-    )}
-  </div>
-))
+>(({ className, alt = "", src, size = 40, ...props }, ref) => {
+  const finalSrc = cdnImageUrl(src)
+  return (
+    <div
+      ref={ref}
+      className={cn("relative h-full w-full", className)}
+      style={{ width: '100%', height: '100%' }}
+    >
+      {finalSrc ? (
+        <Image
+          src={finalSrc}
+          alt={alt}
+          fill
+          sizes={`${size}px`}
+          className="object-cover rounded-full"
+          {...(props as any)}
+        />
+      ) : (
+        <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600">
+          ?
+        </div>
+      )}
+    </div>
+  )
+})
 AvatarImage.displayName = "AvatarImage"
 
 const AvatarFallback = React.forwardRef<

@@ -168,7 +168,7 @@ export function Header() {
               <div className="border-t border-gray-200 my-2"></div>
               {isAuthenticated ? (
                 <>
-                  <MobileNavItem href={getDashboardUrl()} icon={User} onClick={() => setMobileOpen(false)}>Minha Conta</MobileNavItem>
+                  <MobileNavItem href={'/perfil'} icon={User} onClick={() => setMobileOpen(false)}>Meu Perfil</MobileNavItem>
                   <MobileNavItem href="/favoritos" icon={Heart} onClick={() => setMobileOpen(false)}>Favoritos</MobileNavItem>
                   <MobileNavItem href="/notifications" icon={Bell} onClick={() => setMobileOpen(false)}>Notificações</MobileNavItem>
                   <div className="border-t border-gray-200 my-2"></div>
@@ -244,7 +244,7 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2 hidden md:flex hover:bg-brand-cyan/10 transition-colors duration-200">
                     <Avatar className="h-8 w-8 shadow-md">
-                      <AvatarImage src={session.user.image || undefined} alt={session.user.name || 'User'} />
+                      <AvatarImage src={session.user.image ?? ''} alt={session.user.name || 'User'} />
                       <AvatarFallback className="bg-primary text-xs">
                         {getUserInitials()}
                       </AvatarFallback>
@@ -259,7 +259,7 @@ export function Header() {
                   <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem asChild>
-                    <Link href={getDashboardUrl()}>
+                    <Link href={'/perfil'}>
                       <User className="mr-2 h-4 w-4" />
                       <span>Meu Perfil</span>
                     </Link>

@@ -33,13 +33,14 @@ import { ProviderPriceManagement } from '@/components/dashboard/provider-price-m
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
 import { useQuery } from '@tanstack/react-query'
 import PlansSettings from '@/components/dashboard/plans-settings'
+import { ClientProfileSettings } from '@/components/dashboard/client-profile-settings'
 import axios from 'axios'
 import PaymentHistory from '@/components/dashboard/payments-history'
 import React from 'react'
 
-interface Booking {
+interface ProviderBooking {
   id: string
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED'
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'HOLD'
   requestType?: 'SCHEDULING' | 'QUOTE'
   description: string
   preferredDate: string | null
@@ -69,7 +70,7 @@ function ProviderDashboardContent() {
   const [avgRating, setAvgRating] = useState<number>(0)
   const [totalReviews, setTotalReviews] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
-  const { data: bookings, isLoading, isFetching, refetch: refetchBookings } = useQuery<Booking[]>({
+  const { data: bookings, isLoading, isFetching, refetch: refetchBookings } = useQuery<ProviderBooking[]>({
     queryKey: ['bookings'],
     initialData: [],
     queryFn: async () => {
@@ -108,6 +109,12 @@ function ProviderDashboardContent() {
     if (currentSession.user.userType !== 'SERVICE_PROVIDER') {
       router.push('/dashboard/cliente');
       return;
+    }
+
+    // Gate: perfil em análise
+    if (!currentSession.user.isApproved) {
+      setActiveTab('overview')
+      return
     }
     
     const tab = searchParams.get('tab');
@@ -201,7 +208,13 @@ function ProviderDashboardContent() {
     return
   }
 
-  if (isLoading || isFetching || !session) {
+  if (!session) {
+    return null
+  }
+
+  const underReview = session.user.userType === 'SERVICE_PROVIDER' && !session.user.isApproved
+
+  if (isLoading || isFetching) {
     return (
       <div className="space-y-6 p-4">
         <div className="animate-pulse">
@@ -222,7 +235,7 @@ function ProviderDashboardContent() {
   }
 
   const currentSession = session
-  const pendingBookings = bookings.filter(b => b.status === 'PENDING').length
+  const pendingBookings = bookings.filter(b => b.status === 'PENDING' || b.status === 'HOLD').length
   const acceptedBookings = bookings.filter(b => b.status === 'ACCEPTED').length
   const completedBookings = bookings.filter(b => b.status === 'COMPLETED').length
 
@@ -231,9 +244,62 @@ function ProviderDashboardContent() {
     { id: 'schedule', label: 'Agenda', icon: Calendar },
     { id: 'history', label: 'Histórico', icon: History },
     { id: 'metrics', label: 'Métricas', icon: BarChart3 },
-    { id: 'pricing', label: 'Preços', icon: DollarSign },
+    { id: 'pricing', label: 'Serviços', icon: DollarSign },
     { id: 'settings', label: 'Configurações', icon: Settings }
   ]
+
+  if (underReview && activeTab !== 'settings') {
+    return (
+      <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight">Dashboard do Prestador</h1>
+            <p className="text-muted-foreground">
+              Olá, {currentSession?.user?.name || 'Prestador'}! Seu cadastro está em análise.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-b">
+          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+            {tabs.map((tab) => {
+              const Icon = tab.icon
+              const isActiveTab = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    isActiveTab
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="whitespace-nowrap">{tab.label}</span>
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+
+        <div className="max-w-3xl mx-auto py-10">
+          <Card>
+            <CardHeader>
+              <CardTitle>Perfil em análise</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 mb-4">Seu cadastro como prestador está em revisão. Em até 72h você deve receber uma resposta.</p>
+              <p className="text-gray-600 mb-6">Acesse Configurações para completar seu perfil (foto, dados) e acelerar a aprovação.</p>
+              <div className="flex gap-2">
+                <Button onClick={() => setActiveTab('settings')}>Ir para Configurações</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
@@ -272,7 +338,22 @@ function ProviderDashboardContent() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'overview' && (
+      {underReview && activeTab !== 'settings' ? (
+        <div className="max-w-3xl mx-auto py-10">
+          <Card>
+            <CardHeader>
+              <CardTitle>Perfil em análise</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-gray-700 mb-4">Seu cadastro como prestador está em revisão. Em até 72h você deve receber uma resposta.</p>
+              <p className="text-gray-600 mb-6">Acesse Configurações para completar seu perfil (foto, dados) e acelerar a aprovação.</p>
+              <div className="flex gap-2">
+                <Button onClick={() => router.push('/dashboard/profissional?tab=settings')}>Ir para Configurações</Button>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      ) : activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -347,7 +428,7 @@ function ProviderDashboardContent() {
 
                 <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('pricing')}>
                   <DollarSign className="h-6 w-6 mb-2" />
-                  Configurar Preços
+                  Gerenciar Serviços
                 </Button>
 
                 <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('history')}>
@@ -428,7 +509,7 @@ function ProviderDashboardContent() {
                 <div className="space-y-4">
                   {pendingBookings > 0 ? (
                     bookings
-                      .filter(booking => booking.status === 'PENDING')
+                      .filter(booking => booking.status === 'PENDING' || booking.status === 'HOLD')
                       .slice(0, 3)
                       .map((booking) => (
                         <div key={booking.id} className="p-3 border rounded-lg">
@@ -608,32 +689,7 @@ function ProviderDashboardContent() {
 
       {activeTab === 'settings' && (
         <div className='flex gap-4 flex-col'>
-          <Card>
-            <CardHeader>
-              <CardTitle>Configurações do Prestador</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                <p className="text-muted-foreground">
-                  Configurações avançadas do prestador em desenvolvimento...
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Button variant="outline" asChild>
-                    <Link href="/dashboard/profissional?tab=settings">
-                      <User className="h-4 w-4 mr-2" />
-                      Editar Perfil
-                    </Link>
-                  </Button>
-                  <Button variant="outline" asChild>
-                    <Link href="/dashboard/profissional?tab=pricing">
-                      <Settings className="h-4 w-4 mr-2" />
-                      Gerenciar Serviços
-                    </Link>
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          <ClientProfileSettings />
           <PlansSettings />
           <PaymentHistory />
         </div>
@@ -663,7 +719,7 @@ function ProviderMonthlyEarnings() {
   return <p className="text-2xl font-bold">{isLoading ? '—' : formatted}</p>
 }
 
-function MonthlyAverageRevenueCard({ bookings }: { bookings: Booking[] }) {
+function MonthlyAverageRevenueCard({ bookings }: { bookings: ProviderBooking[] }) {
   const { data } = useQuery<{ success: boolean; data?: { net: number } }>({
     queryKey: ['provider-earnings'],
     queryFn: async () => {

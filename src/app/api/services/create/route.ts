@@ -24,6 +24,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const data = serviceSchema.parse(body)
 
+    // Regras de elegibilidade por categoria
+    const category = await prisma.serviceCategory.findUnique({ where: { id: data.categoryId } })
+    if (!category) {
+      return NextResponse.json({ success: false, error: 'Categoria inválida' }, { status: 400 })
+    }
+
+    if (category.requiresDriverLicense) {
+      const provider = await prisma.serviceProvider.findFirst({ where: { userId: session.user.id } })
+      if (!provider || !provider.hasDriverLicense) {
+        return NextResponse.json({ success: false, error: 'Esta categoria exige CNH válida' }, { status: 403 })
+      }
+      if (provider.driverLicenseExpiresAt && provider.driverLicenseExpiresAt < new Date()) {
+        return NextResponse.json({ success: false, error: 'CNH vencida. Atualize seus dados.' }, { status: 403 })
+      }
+    }
+
     // Cria novo serviço global (mesmo que já exista com mesmo nome)
     const service = await prisma.service.create({
       data: {

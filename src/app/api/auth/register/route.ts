@@ -4,6 +4,8 @@ import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { UserTypeValues, type UserType } from "@/types";
 import { isValidCPF, isValidCNPJ } from "@/utils";
+import { Preference } from "mercadopago";
+import mercadoPagoConfig from "@/lib/mercadopago";
 
 const UserTypeArray = Object.values(UserTypeValues) as [
   UserType,
@@ -22,6 +24,8 @@ const registerSchema = z.object({
     errorMap: () => ({ message: "Deve aceitar os termos" }),
   }),
   // Campos opcionais adicionais (principalmente para prestador)
+  personType: z.enum(["PF","PJ"]).optional(),
+  selectedPlan: z.enum(["FREE","PREMIUM","ENTERPRISE"]).optional(),
   gender: z.string().optional(),
   maritalStatus: z.string().optional(),
   dateOfBirth: z.string().optional(), // ISO date
@@ -76,7 +80,156 @@ export async function POST(request: NextRequest) {
     // Hash da senha
     const hashedPassword = await bcrypt.hash(validatedData.password, 12);
 
-    // Criação do usuário
+    // Prestador precisa escolher o plano no passo final
+    if (
+      validatedData.userType === UserTypeValues.SERVICE_PROVIDER &&
+      !fullData.selectedPlan
+    ) {
+      return NextResponse.json(
+        { error: "Escolha um plano para continuar" },
+        { status: 400 }
+      );
+    }
+
+    // Regras PF/PJ x Plano (sem quebrar fluxos atuais)
+    if (fullData.userType === UserTypeValues.SERVICE_PROVIDER) {
+      const personType = fullData.personType || (fullData.cpfCnpj.replace(/\D/g, "").length > 11 ? 'PJ' : 'PF')
+      const plan = fullData.selectedPlan
+      if (personType === 'PJ' && plan && plan !== 'ENTERPRISE') {
+        return NextResponse.json({ error: 'Pessoa jurídica deve escolher o plano Enterprise' }, { status: 400 })
+      }
+      if (personType === 'PF' && plan === 'ENTERPRISE') {
+        return NextResponse.json({ error: 'Pessoa física não pode escolher o plano Enterprise' }, { status: 400 })
+      }
+    }
+
+    // Fluxo específico para prestador com plano pago: criar registro pendente + preferência Mercado Pago
+    if (validatedData.userType === UserTypeValues.SERVICE_PROVIDER && fullData.selectedPlan && fullData.selectedPlan !== 'FREE') {
+      const personType =
+        fullData.personType ||
+        (fullData.cpfCnpj.replace(/\D/g, "").length > 11 ? "PJ" : "PF");
+
+      const pending = await prisma.pendingProviderRegistration.create({
+        data: {
+          name: validatedData.name,
+          email: validatedData.email,
+          phone: validatedData.phone,
+          cpfCnpj: validatedData.cpfCnpj,
+          passwordHash: hashedPassword,
+          userType: validatedData.userType,
+          personType,
+          plan: fullData.selectedPlan,
+          gender: validatedData.gender || null,
+          maritalStatus: validatedData.maritalStatus || null,
+          dateOfBirth: validatedData.dateOfBirth
+            ? new Date(validatedData.dateOfBirth)
+            : null,
+          hasDriverLicense: !!validatedData.hasDriverLicense,
+          driverLicenseNumber: validatedData.hasDriverLicense
+            ? validatedData.driverLicenseNumber || null
+            : null,
+          driverLicenseCategory: validatedData.hasDriverLicense
+            ? validatedData.driverLicenseCategory || null
+            : null,
+          driverLicenseExpiresAt:
+            validatedData.hasDriverLicense && validatedData.driverLicenseExpiresAt
+              ? new Date(validatedData.driverLicenseExpiresAt)
+              : null,
+          extraData: {
+            selectedPlan: fullData.selectedPlan,
+          },
+        },
+      });
+
+      const preference = new Preference(mercadoPagoConfig);
+
+      let itemId: string = fullData.selectedPlan ?? '';
+      let title = "Assinatura MyServ";
+      let unitPrice = 0;
+
+      if (fullData.selectedPlan === "ENTERPRISE") {
+        const enterprisePlan = await prisma.plan.findFirst({
+          where: { name: "Enterprise", isActive: true },
+        });
+        const s = await prisma.systemSettings.findUnique({
+          where: { key: "PLAN_ENTERPRISE_PRICE" },
+        });
+        unitPrice =
+          Number(s?.value || enterprisePlan?.price || 0) ||
+          (enterprisePlan?.price ?? 0);
+        itemId = enterprisePlan?.id || "enterprise";
+        title = "MyServ Plano Enterprise";
+      } else {
+        const premiumPlan = await prisma.plan.upsert({
+          where: { name: "Premium" },
+          update: {},
+          create: {
+            name: "Premium",
+            description: "Plano mensal profissional",
+            price: 39.9,
+            billingCycle: "MONTHLY",
+            features: JSON.stringify([
+              "Propostas ilimitadas",
+              "Agenda personalizada",
+              "Gestão de clientes",
+            ]),
+          },
+        });
+        const s = await prisma.systemSettings.findUnique({
+          where: { key: "PLAN_MONTHLY_PRICE" },
+        });
+        unitPrice = Number(s?.value || premiumPlan.price || 39.9) || 39.9;
+        itemId = premiumPlan.id;
+        title = "MyServ Plano Mensal Profissional";
+      }
+
+      const { id, init_point } = await preference.create({
+        body: {
+          items: [
+            {
+              id: itemId,
+              title,
+              quantity: 1,
+              currency_id: "BRL",
+              unit_price: unitPrice,
+            },
+          ],
+          payer: {
+            name: validatedData.name,
+            email: validatedData.email,
+          },
+          notification_url: `${process.env.BASE_URL}/api/payments/webhook/subscription`,
+          back_urls: {
+            success: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}`,
+            failure: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}&status=failure`,
+            pending: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}&status=pending`,
+          },
+          auto_return: "approved",
+          metadata: {
+            pendingRegistrationId: pending.id,
+            plan: {
+              planId: itemId,
+              planName: title,
+              planType: fullData.selectedPlan === "ENTERPRISE" ? "ENTERPRISE" : "PREMIUM",
+            },
+          },
+          external_reference: `pending-registration:${pending.id}`,
+        },
+      });
+
+      return NextResponse.json(
+        {
+          success: true,
+          requiresPayment: true,
+          preferenceId: id,
+          initPoint: init_point,
+          pendingId: pending.id,
+        },
+        { status: 200 }
+      );
+    }
+
+    // Criação do usuário imediato (cliente ou prestador plano grátis)
     let user;
 
     try {
@@ -91,15 +244,16 @@ export async function POST(request: NextRequest) {
           isApproved: validatedData.userType === UserTypeValues.CLIENT,
           gender: validatedData.gender || null,
           maritalStatus: validatedData.maritalStatus || null,
-          dateOfBirth: validatedData.dateOfBirth ? new Date(validatedData.dateOfBirth) : null,
+          dateOfBirth: validatedData.dateOfBirth
+            ? new Date(validatedData.dateOfBirth)
+            : null,
         },
       });
     } catch (err) {
       console.error("Erro ao criar usuário no banco:", err);
-      throw err; // ou NextResponse.json({ error: 'Erro ao salvar usuário' }, { status: 500 })
+      throw err;
     }
 
-    // Criação de perfil
     if (validatedData.userType === UserTypeValues.CLIENT) {
       await prisma.clientProfile.create({ data: { userId: user.id } });
     } else {
@@ -110,18 +264,20 @@ export async function POST(request: NextRequest) {
           hasQuoting: true,
           chargesTravel: false,
           hasDriverLicense: !!validatedData.hasDriverLicense,
-          driverLicenseNumber: validatedData.hasDriverLicense ? (validatedData.driverLicenseNumber || null) : null,
-          driverLicenseCategory: validatedData.hasDriverLicense ? (validatedData.driverLicenseCategory || null) : null,
-          driverLicenseExpiresAt: validatedData.hasDriverLicense && validatedData.driverLicenseExpiresAt
-            ? new Date(validatedData.driverLicenseExpiresAt)
+          driverLicenseNumber: validatedData.hasDriverLicense
+            ? validatedData.driverLicenseNumber || null
             : null,
-          // assinatura será criada após aprovação ou na tela de planos
+          driverLicenseCategory: validatedData.hasDriverLicense
+            ? validatedData.driverLicenseCategory || null
+            : null,
+          driverLicenseExpiresAt:
+            validatedData.hasDriverLicense && validatedData.driverLicenseExpiresAt
+              ? new Date(validatedData.driverLicenseExpiresAt)
+              : null,
         },
       });
     }
 
-    // Remover a senha da resposta
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password: _password, ...userWithoutSensitiveData } = user;
 
     return NextResponse.json(

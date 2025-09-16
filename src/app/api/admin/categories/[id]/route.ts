@@ -11,6 +11,7 @@ const updateSchema = z.object({
   description: z.string().optional(),
   icon: z.string().optional(),
   isActive: z.boolean().optional(),
+  requiresDriverLicense: z.boolean().optional(),
 })
 
 export async function PATCH(
@@ -43,6 +44,32 @@ export async function PATCH(
   }
 }
 
+export async function GET(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const { id } = params
+    const node = await prisma.serviceCategory.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        icon: true,
+        isActive: true,
+        isLeaf: true,
+        requiresDriverLicense: true,
+      }
+    })
+    if (!node) return NextResponse.json({ success: false, error: 'Categoria não encontrada' }, { status: 404 })
+    return NextResponse.json({ success: true, category: node })
+  } catch (e) {
+    console.error('[ADMIN_CATEGORIES_GET]', e)
+    return NextResponse.json({ success: false, error: 'Erro interno' }, { status: 500 })
+  }
+}
+
 export async function DELETE(
   _req: NextRequest,
   { params }: { params: { id: string } }
@@ -71,4 +98,3 @@ export async function DELETE(
     return NextResponse.json({ success: false, error: 'Erro interno' }, { status: 500 })
   }
 }
-

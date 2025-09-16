@@ -11,6 +11,10 @@ import { useState, useRef } from 'react'
 import Image from 'next/image'
 import { Camera, Upload, X, User, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cdnImageUrl } from '@/lib/cdn'
+import { AvatarCropperModal } from './avatar-cropper-modal'
+import { getCroppedImg } from '@/lib/image/crop'
+import { getAutoCenter } from '@/lib/face/autoCenter'
 
 interface ProfileImageUploadProps {
   currentImage?: string | null
@@ -26,10 +30,13 @@ export function ProfileImageUpload({
   className = '' 
 }: ProfileImageUploadProps) {
   const [uploading, setUploading] = useState(false)
-  const [preview, setPreview] = useState<string | null>(currentImage || null)
+  const [preview, setPreview] = useState<string | null>(currentImage ? cdnImageUrl(currentImage) : null)
   const [dragOver, setDragOver] = useState(false)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [initialCenter, setInitialCenter] = useState<{ x: number; y: number } | undefined>(undefined)
+  const [initialZoom, setInitialZoom] = useState<number | undefined>(undefined)
 
   const handleFileSelect = async (file: File) => {
     if (!file) return
@@ -49,37 +56,13 @@ export function ProfileImageUpload({
 
     setError('')
     setUploading(true)
-
     try {
-      // Create preview
-      const previewUrl = URL.createObjectURL(file)
-      setPreview(previewUrl)
-
-      // Upload file
-      const formData = new FormData()
-      formData.append('image', file)
-
-      const response = await fetch('/api/upload/profile-image', {
-        method: 'POST',
-        body: formData
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setPreview(data.data.imagePath)
-        onImageUpdate?.(data.data.imagePath)
-        
-        // Clean up preview URL
-        URL.revokeObjectURL(previewUrl)
-      } else {
-        setError(data.error || 'Erro ao fazer upload')
-        setPreview(currentImage || null)
-      }
-    } catch (error) {
-      console.error('Upload error:', error)
-      setError('Erro ao fazer upload da imagem')
-      setPreview(currentImage || null)
+      const localUrl = URL.createObjectURL(file)
+      setCropSrc(localUrl)
+      try {
+        const auto = await getAutoCenter(file)
+        if (auto) { setInitialCenter(auto.center); setInitialZoom(auto.zoom) }
+      } catch {}
     } finally {
       setUploading(false)
     }
@@ -117,18 +100,14 @@ export function ProfileImageUpload({
     setError('')
 
     try {
-      const response = await fetch('/api/upload/profile-image', {
-        method: 'DELETE'
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setPreview(null)
-        onImageUpdate?.(null)
-      } else {
-        setError(data.error || 'Erro ao remover imagem')
+      // Zera a chave no perfil (mantém compat DELETE local como fallback)
+      const res = await fetch('/api/users/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileImageKey: null }) })
+      if (!res.ok) {
+        const response = await fetch('/api/upload/profile-image', { method: 'DELETE' })
+        await response.json()
       }
+      setPreview(null)
+      onImageUpdate?.(null)
     } catch (error) {
       console.error('Remove image error:', error)
       setError('Erro ao remover imagem')
@@ -230,11 +209,45 @@ export function ProfileImageUpload({
         </div>
 
         {/* Error Message */}
-        {error && (
-          <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700 text-sm">{error}</p>
-          </div>
-        )}
+      {error && (
+        <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+          <p className="text-red-700 text-sm">{error}</p>
+        </div>
+      )}
+      {cropSrc && (
+        <AvatarCropperModal
+          src={cropSrc}
+          initialCenter={initialCenter}
+          initialZoom={initialZoom}
+          onCancel={() => { URL.revokeObjectURL(cropSrc); setCropSrc(null) }}
+          onConfirm={async (pixels) => {
+            try {
+              setUploading(true)
+              const blob = await getCroppedImg(cropSrc, pixels)
+              const pres = await fetch('/api/uploads/avatar/presign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mime: 'image/jpeg', filename: 'avatar.jpg' }) })
+              if (pres.ok) {
+                const { data } = await pres.json()
+                const form = new FormData()
+                Object.entries(data.fields || {}).forEach(([k, v]) => form.append(k, String(v)))
+                form.append('file', blob, 'avatar.jpg')
+                const uploadRes = await fetch(data.url, { method: 'POST', body: form })
+                if (!uploadRes.ok) throw new Error('Falha ao enviar para Spaces')
+                await fetch('/api/users/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileImageKey: data.key }) })
+                const host = (data.cdnHost || '').replace(/^https?:\/\//, '')
+                const absolute = host ? `https://${host}/${data.key}` : data.key
+                setPreview(absolute)
+                onImageUpdate?.(absolute)
+              }
+            } catch (e: any) {
+              setError(e?.message || 'Erro ao enviar imagem')
+            } finally {
+              if (cropSrc) URL.revokeObjectURL(cropSrc)
+              setCropSrc(null)
+              setUploading(false)
+            }
+          }}
+        />
+      )}
       </div>
     </div>
   )
@@ -248,7 +261,7 @@ export function ProfileImageUploadCompact({
   className = '' 
 }: ProfileImageUploadProps) {
   const [uploading, setUploading] = useState(false)
-  const [preview, setPreview] = useState<string | null>(currentImage || null)
+  const [preview, setPreview] = useState<string | null>(currentImage ? cdnImageUrl(currentImage) : null)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 

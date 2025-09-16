@@ -373,7 +373,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Gerenciamento de Preços</CardTitle>
+          <CardTitle>Meus Serviços</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="animate-pulse space-y-4">
@@ -397,7 +397,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
             <CardTitle className="flex items-center space-x-2">
               <DollarSign className="w-5 h-5" />
-              <span>Gerenciamento de Preços</span>
+              <span>Meus Serviços</span>
               <Badge variant="secondary">{services.length}</Badge>
             </CardTitle>
             
@@ -420,10 +420,10 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
 
 {/* Add Service Modal */}
       {showAddService && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle>Adicionar Novo Serviço</CardTitle>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Adicionar Novo Serviço</CardTitle>
               <Button variant="ghost" onClick={() => setShowAddService(false)}>
                 <X className="w-4 h-4" />
               </Button>

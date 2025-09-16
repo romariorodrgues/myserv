@@ -39,7 +39,10 @@ export async function GET() {
             city: true,
             state: true,
             street: true,
-            district: true
+            district: true,
+            number: true,
+            zipCode: true,
+            complement: true
           }
         },
         serviceProvider: {

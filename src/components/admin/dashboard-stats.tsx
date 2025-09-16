@@ -259,6 +259,16 @@ export function AdminDashboardStats() {
           <Settings className="w-6 h-6" />
           <span>Configurações</span>
         </Button>
+
+        <Button 
+          variant="outline" 
+          size="lg" 
+          className="h-24 flex flex-col items-center justify-center space-y-2"
+          onClick={() => window.location.href = '/admin/coupons'}
+        >
+          <span className="text-xl">🎟️</span>
+          <span>Cupons</span>
+        </Button>
       </div>
 
       {/* Content Grid */}

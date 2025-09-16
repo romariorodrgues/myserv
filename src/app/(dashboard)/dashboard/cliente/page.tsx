@@ -43,7 +43,7 @@ interface Booking {
     }
   }
   payment?: {
-    status: 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED'
+    status: 'PENDING' | 'APPROVED' | 'FAILED' | 'REFUNDED'
   }
 }
 

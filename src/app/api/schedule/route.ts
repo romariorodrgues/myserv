@@ -82,42 +82,51 @@ export async function GET(request: NextRequest) {
       const appointments = await prisma.serviceRequest.findMany({
         where: whereClause,
         include: {
-          client: {
-            select: {
-              name: true,
-              phone: true,
-              email: true
-            }
-          },
-          service: {
-            select: {
-              name: true
-            }
-          }
+          client: { select: { name: true, phone: true, email: true } },
+          service: { select: { name: true } },
+          payments: { select: { status: true, userId: true }, orderBy: { createdAt: 'desc' } },
         },
-        orderBy: {
-          scheduledDate: 'asc'
+        orderBy: { scheduledDate: 'asc' }
+      })
+
+      // assinatura ativa do prestador
+      const activeSub = await prisma.subscription.findFirst({
+        where: {
+          serviceProvider: { userId: sp.userId },
+          status: 'ACTIVE',
+          OR: [{ endDate: null }, { endDate: { gte: new Date() } }]
         }
       })
 
-      const transformedAppointments = appointments.map(appointment => ({
-        id: appointment.id,
-        date: appointment.scheduledDate?.toISOString().split('T')[0],
-        startTime: appointment.scheduledTime || '09:00',
-        endTime: '10:00', // Default value since estimatedEndTime doesn't exist
-        status: appointment.status,
-        type: appointment.requestType,
-        client: {
-          name: appointment.client.name,
-          phone: appointment.client.phone,
-          email: appointment.client.email
-        },
-        service: {
-          name: appointment.service.name,
-          duration: 60 // Default duration
-        },
-        notes: appointment.description
-      }))
+      const transformedAppointments = appointments.map(appointment => {
+        const unlockedByPayment = appointment.payments?.some(
+          (p) => (p.status === 'APPROVED' || p.status === 'COMPLETED' || p.status === 'PAID') && p.userId === sp.userId
+        )
+        const unlocked = Boolean(activeSub) || Boolean(unlockedByPayment)
+        return {
+          id: appointment.id,
+          date: appointment.scheduledDate?.toISOString().split('T')[0],
+          startTime: appointment.scheduledTime || '09:00',
+          endTime: '10:00',
+          status: appointment.status,
+          type: appointment.requestType,
+          client: unlocked ? {
+            name: appointment.client.name,
+            phone: appointment.client.phone,
+            email: appointment.client.email
+          } : {
+            name: 'Dados bloqueados',
+            phone: undefined,
+            email: undefined
+          },
+          service: {
+            name: appointment.service.name,
+            duration: 60
+          },
+          notes: appointment.description,
+          unlocked,
+        }
+      })
 
       return NextResponse.json({
         success: true,
@@ -165,11 +174,15 @@ export async function GET(request: NextRequest) {
       const nextDay = new Date(targetDate)
       nextDay.setDate(nextDay.getDate() + 1)
 
+      const now = new Date()
       const dayBookings = await prisma.serviceRequest.findMany({
         where: {
           providerId: sp.userId, // ServiceRequest.providerId referencia User.id
           scheduledDate: { gte: targetDate, lt: nextDay },
-          status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] },
+          OR: [
+            { status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] } },
+            { AND: [ { status: 'HOLD' }, { expiresAt: { gt: now } } ] }
+          ]
         },
         select: { scheduledTime: true }
       })
@@ -540,20 +553,6 @@ export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const scheduleId = searchParams.get('scheduleId')
-    if (action === 'save_settings') {
-      // Resolve provider userId
-      const spById = await prisma.serviceProvider.findUnique({ where: { id: body.providerId }, select: { userId: true } })
-      const spByUser = spById ?? await prisma.serviceProvider.findUnique({ where: { userId: body.providerId }, select: { userId: true } })
-      if (!spByUser) return NextResponse.json({ success: false, error: 'Prestador não encontrado' }, { status: 404 })
-      const key = `provider_schedule_settings:${spByUser.userId}`
-      const value = JSON.stringify(body.settings || {})
-      await prisma.systemSettings.upsert({
-        where: { key },
-        create: { key, value, description: 'Provider schedule preferences' },
-        update: { value }
-      })
-      return NextResponse.json({ success: true })
-    }
     const appointmentId = searchParams.get('appointmentId')
 
     if (scheduleId) {

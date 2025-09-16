@@ -8,8 +8,22 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Users, DollarSign, Calendar, TrendingUp, Star, Shield, Clock } from 'lucide-react'
+import { prisma } from '@/lib/prisma'
 
-export default function SejaProfissionalPage() {
+async function getPlanSettings() {
+  try {
+    const rows = await prisma.systemSettings.findMany({ where: { key: { in: ['PLAN_UNLOCK_PRICE','PLAN_MONTHLY_PRICE','PLAN_ENTERPRISE_PRICE'] } } })
+    const map = Object.fromEntries(rows.map(r => [r.key, r.value])) as Record<string, string>
+    return {
+      unlock: map.PLAN_UNLOCK_PRICE || '4.90',
+      monthly: map.PLAN_MONTHLY_PRICE || '39.90',
+      enterprise: map.PLAN_ENTERPRISE_PRICE || '',
+    }
+  } catch { return { unlock: '4.90', monthly: '39.90', enterprise: '' } }
+}
+
+export default async function SejaProfissionalPage() {
+  const prices = await getPlanSettings()
   return (
     <div className="space-y-16">
       {/* Hero Section */}
@@ -124,37 +138,38 @@ export default function SejaProfissionalPage() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Planos transparentes
             </h2>
-            <p className="text-xl text-gray-600">
-              Plano mensal para desbloquear contatos e fechar mais serviços
-            </p>
+            <p className="text-xl text-gray-600">Escolha entre desbloqueio por solicitação, plano mensal ou empresarial</p>
           </div>
-
-          <div className="max-w-3xl mx-auto">
-            <div className="rounded-lg shadow-lg p-8 border-2 border-green-500 bg-green-50">
-              <div className="text-center mb-6">
-                <h3 className="text-2xl font-bold text-gray-900 mb-2">Plano Mensal</h3>
-                <div className="text-3xl font-bold text-green-600 mb-2">R$ 39,90/mês</div>
-                <p className="text-gray-600">Acesso aos contatos dos clientes que solicitaram seus serviços</p>
-              </div>
-              <ul className="space-y-3 mb-8">
-                {[
-                  'Perfil profissional completo',
-                  'Receba solicitações ilimitadas',
-                  'Acesso aos contatos para negociar',
-                  'Sistema de avaliações',
-                  'Suporte por e-mail',
-                ].map((feature, i) => (
-                  <li key={i} className="flex items-start">
-                    <svg className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-gray-700">{feature}</span>
-                  </li>
-                ))}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+            <div className="rounded-lg shadow p-6 bg-white border">
+              <h3 className="text-xl font-bold mb-1">Grátis • Por solicitação</h3>
+              <p className="text-gray-600 mb-4">Desbloqueie cada solicitação por R$ {prices.unlock}</p>
+              <ul className="space-y-2 mb-6">
+                <li>Receba solicitações</li>
+                <li>Desbloqueio unitário</li>
+                <li>Sem mensalidade</li>
               </ul>
-              <Button className="w-full">
-                Assinar agora
-              </Button>
+              <Button className="w-full" variant="outline">Começar grátis</Button>
+            </div>
+            <div className="rounded-lg shadow p-6 border-2 border-green-500 bg-green-50">
+              <h3 className="text-xl font-bold mb-1">Mensal • Profissional</h3>
+              <p className="text-gray-700 mb-4">R$ {prices.monthly}/mês</p>
+              <ul className="space-y-2 mb-6">
+                <li>Contatos desbloqueados automaticamente</li>
+                <li>Perfil completo e avaliações</li>
+                <li>Suporte por e-mail</li>
+              </ul>
+              <Button className="w-full">Assinar</Button>
+            </div>
+            <div className="rounded-lg shadow p-6 bg-white border">
+              <h3 className="text-xl font-bold mb-1">Empresarial</h3>
+              <p className="text-gray-600 mb-4">{prices.enterprise ? `R$ ${prices.enterprise}/mês` : 'Sob consulta'}</p>
+              <ul className="space-y-2 mb-6">
+                <li>Equipe multiusuário</li>
+                <li>Relatórios avançados</li>
+                <li>Suporte prioritário</li>
+              </ul>
+              <Button asChild variant="outline" className="w-full"><a href="mailto:contato@myserv.com.br?subject=Plano%20Empresarial">Falar com vendas</a></Button>
             </div>
           </div>
         </div>

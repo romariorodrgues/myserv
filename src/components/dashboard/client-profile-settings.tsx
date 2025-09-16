@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { ProfileImageUploadCompact } from '@/components/upload/profile-image-upload'
 import { toast } from 'sonner'
 import Image from 'next/image'
+import { cdnImageUrl } from '@/lib/cdn'
 import { useEffect } from 'react'
 import { updateMyProfile } from '@/lib/api/update-my-profile'
 import type { ClientProfileData } from '@/types'
@@ -246,33 +247,16 @@ if (loading || !profileData) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Profile Image */}
-            <div className="flex items-center space-x-6">
-              <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                  {profileData && profileData.profileImage ? (
-                    <Image
-                      src={profileData.profileImage}
-                      alt="Profile"
-                      width={96}
-                      height={96}
-                      className="rounded-full"
-                    />
-                  ) : (
-                    <User className="w-12 h-12 text-gray-500" />
-                  )}
-                </div>
-                <ProfileImageUploadCompact
-                  currentImage={profileData?.profileImage}
-                  userName={profileData?.name ?? ''}
-                  onImageUpdate={handleImageUpload}
-                />
-              </div>
+            {/* Profile Image (compact uploader only to evitar duplicação) */}
+            <div className="flex items-center gap-6">
+              <ProfileImageUploadCompact
+                currentImage={profileData?.profileImage}
+                userName={profileData?.name ?? ''}
+                onImageUpdate={handleImageUpload}
+              />
               <div>
                 <h3 className="font-medium">Foto do Perfil</h3>
-                <p className="text-sm text-gray-500">
-                  Adicione uma foto para que os profissionais possam te reconhecer
-                </p>
+                <p className="text-sm text-gray-500">Adicione uma foto para que os profissionais possam te reconhecer</p>
               </div>
             </div>
 

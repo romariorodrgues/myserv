@@ -7,11 +7,11 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Eye, EyeOff, Mail, Lock, User, Phone, FileText } from 'lucide-react'
+import { Eye, EyeOff, Mail, Lock, User, Phone, FileText, IdCard } from 'lucide-react'
 import { UserTypeValues } from '@/types'
 import { useRouter } from 'next/navigation'
 
@@ -24,6 +24,15 @@ type RegisterFormData = {
   password: string
   confirmPassword: string
   acceptTerms: boolean
+  // extra (prestador)
+  personType?: 'PF' | 'PJ'
+  gender?: string
+  maritalStatus?: string
+  dateOfBirth?: string
+  hasDriverLicense?: boolean
+  driverLicenseNumber?: string
+  driverLicenseCategory?: string
+  driverLicenseExpiresAt?: string
 }
 
 export default function RegisterPage() {
@@ -38,10 +47,59 @@ export default function RegisterPage() {
     userType: 'CLIENT',
     password: '',
     confirmPassword: '',
-    acceptTerms: false
+    acceptTerms: false,
+    personType: 'PF',
+    gender: '',
+    maritalStatus: '',
+    dateOfBirth: '',
+    hasDriverLicense: false,
+    driverLicenseNumber: '',
+    driverLicenseCategory: '',
+    driverLicenseExpiresAt: '',
   })
 
   const router = useRouter()
+
+  const [step, setStep] = useState<1 | 2>(1)
+  const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM' | 'ENTERPRISE' | null>(null)
+  const [planPrices, setPlanPrices] = useState({ unlock: '4.90', monthly: '39.90', enterprise: '' })
+  const planFeatures: Record<'FREE' | 'PREMIUM' | 'ENTERPRISE', string[]> = {
+    FREE: [
+      'Propostas ilimitadas',
+      'Relatórios completos',
+      'Agenda personalizada',
+      'Controle de precificação de serviço',
+    ],
+    PREMIUM: [
+      'Tudo do plano grátis',
+      'Contatos desbloqueados automaticamente',
+      'Destaque na busca',
+      'Relatórios básicos',
+    ],
+    ENTERPRISE: [
+      'Equipe multiusuário',
+      'Relatórios avançados',
+      'Suporte prioritário',
+    ],
+  }
+
+  useEffect(() => {
+    ;(async () => {
+      try {
+        const res = await fetch('/api/system-settings')
+        if (!res.ok) return
+        const data = await res.json()
+        const s = data.settings || {}
+        setPlanPrices({
+          unlock: s.PLAN_UNLOCK_PRICE || '4.90',
+          monthly: s.PLAN_MONTHLY_PRICE || '39.90',
+          enterprise: s.PLAN_ENTERPRISE_PRICE || '',
+        })
+      } catch (error) {
+        console.warn('Falha ao carregar valores dos planos', error)
+      }
+    })()
+  }, [])
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
@@ -61,12 +119,33 @@ if (passwordInput.value !== confirmInput.value) {
 
 
   try {
+    // Se for prestador, aplicamos o wizard de planos
+    if (formData.userType === 'SERVICE_PROVIDER') {
+      if (step === 1) {
+        // Regras CPF/CNPJ conforme tipo de pessoa
+        if (formData.personType === 'PF' && formData.cpfCnpj.replace(/\D/g,'').length < 11) {
+          alert('CPF obrigatório para pessoa física')
+          setIsLoading(false)
+          return
+        }
+        if (formData.personType === 'PJ' && formData.cpfCnpj.replace(/\D/g,'').length < 14) {
+          alert('CNPJ obrigatório para pessoa jurídica')
+          setIsLoading(false)
+          return
+        }
+        setStep(2)
+        setSelectedPlan(formData.personType === 'PJ' ? 'ENTERPRISE' : 'FREE')
+        setIsLoading(false)
+        return
+      }
+    }
+
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(formData),
+      body: JSON.stringify({ ...formData, selectedPlan }),
     })
 
     const data = await response.json()
@@ -77,8 +156,7 @@ if (passwordInput.value !== confirmInput.value) {
     } else {
       console.log('Registro concluído:', data)
       alert(data.message)
-      // Redirecionar ou limpar formulário
-       router.push('/entrar')
+      router.push('/entrar')
     }
   } catch (err) {
     console.error('Erro de rede:', err)
@@ -96,6 +174,59 @@ if (passwordInput.value !== confirmInput.value) {
       [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
     }))
   }
+
+  const completeProviderRegistration = async () => {
+    if (!selectedPlan) {
+      alert('Escolha um plano para continuar')
+      return
+    }
+    if (formData.personType === 'PJ' && selectedPlan !== 'ENTERPRISE') {
+      alert('Pessoa jurídica deve escolher o plano Enterprise')
+      return
+    }
+    if (formData.personType === 'PF' && selectedPlan === 'ENTERPRISE') {
+      alert('Pessoa física não pode escolher o plano Enterprise')
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ ...formData, selectedPlan }),
+      })
+      const data = await response.json()
+
+      if (!response.ok) {
+        console.error('Erro ao registrar:', data)
+        alert(data.error || 'Erro ao registrar')
+        return
+      }
+
+      if (data.requiresPayment) {
+        alert('Redirecionando para o pagamento seguro do Mercado Pago...')
+        window.location.href = data.initPoint
+        return
+      }
+
+      alert(data.message)
+      router.push('/entrar')
+    } catch (err) {
+      console.error('Erro de rede:', err)
+      alert('Erro de rede ao registrar')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const isProviderPlanStep = formData.userType === UserTypeValues.SERVICE_PROVIDER && step === 2
+  const planOptions = formData.personType === 'PF'
+    ? (['FREE', 'PREMIUM'] as const)
+    : (['ENTERPRISE'] as const)
+  const planGridClass = formData.personType === 'PJ' ? 'md:grid-cols-1' : 'md:grid-cols-2'
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
@@ -120,6 +251,63 @@ if (passwordInput.value !== confirmInput.value) {
 
         <div className="bg-white py-8 px-6 shadow-xl rounded-lg">
           <form className="space-y-6" onSubmit={handleSubmit}>
+            {isProviderPlanStep ? (
+              <div className="space-y-6">
+                <div className="text-center space-y-2">
+                  <h3 className="text-2xl font-bold text-gray-900">Escolha o plano ideal para começar no MyServ</h3>
+                  <p className="text-gray-600">Você só concluirá seu cadastro após confirmar o plano. Pagamentos são processados com segurança pelo Mercado Pago.</p>
+                </div>
+                <div className={`grid grid-cols-1 ${planGridClass} gap-4`}>
+                  {planOptions.map((plan) => {
+                    const isActive = selectedPlan === plan
+                    const baseClasses = plan === 'ENTERPRISE'
+                      ? 'from-brand-cyan to-brand-navy text-white'
+                      : plan === 'PREMIUM'
+                        ? 'from-emerald-50 to-green-100 text-brand-navy'
+                        : 'from-brand-bg to-brand-teal text-brand-navy'
+
+                    return (
+                      <button
+                        key={plan}
+                        type="button"
+                        onClick={() => setSelectedPlan(plan)}
+                        className={`flex flex-col text-left rounded-2xl p-6 bg-gradient-to-br shadow-md transition-transform ${isActive ? 'ring-2 ring-[#00a9d4] scale-[1.02]' : 'hover:scale-[1.01]'} ${baseClasses}`}
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xl font-semibold">
+                            {plan === 'FREE' ? 'Grátis • Por Solicitação' : plan === 'PREMIUM' ? 'Mensal • Profissional' : 'Empresarial'}
+                          </h4>
+                          {isActive && <span className="rounded-full bg-white/30 px-3 py-1 text-sm font-semibold">Selecionado</span>}
+                        </div>
+                        <p className="mt-2 text-sm opacity-80">
+                          {plan === 'FREE'
+                            ? `Desbloqueie por R$ ${planPrices.unlock} por solicitação`
+                            : plan === 'PREMIUM'
+                              ? `R$ ${planPrices.monthly}/mês`
+                              : planPrices.enterprise
+                                ? `R$ ${planPrices.enterprise}/mês`
+                                : 'Sob consulta' }
+                        </p>
+                        <ul className="mt-4 space-y-2 text-sm font-medium">
+                          {planFeatures[plan].map((feature) => (
+                            <li key={feature}>{feature}</li>
+                          ))}
+                        </ul>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-3">
+                  <Button type="button" variant="outline" onClick={() => setStep(1)} disabled={isLoading}>
+                    Voltar
+                  </Button>
+                  <Button type="button" onClick={completeProviderRegistration} disabled={isLoading}>
+                    {isLoading ? 'Processando...' : selectedPlan === 'FREE' ? 'Concluir cadastro gratuito' : 'Ir para pagamento' }
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <>
             {/* User Type Selection */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-3">
@@ -229,7 +417,7 @@ if (passwordInput.value !== confirmInput.value) {
 
               <div>
                 <label htmlFor="cpfCnpj" className="block text-sm font-medium text-gray-700">
-                  CPF/CNPJ *
+                  {formData.userType === UserTypeValues.SERVICE_PROVIDER && formData.personType === 'PJ' ? 'CNPJ *' : 'CPF *'}
                 </label>
                 <div className="mt-1 relative">
                   <FileText className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
@@ -239,13 +427,87 @@ if (passwordInput.value !== confirmInput.value) {
                     type="text"
                     required
                     className="pl-10"
-                    placeholder="000.000.000-00"
+                    placeholder={formData.userType === UserTypeValues.SERVICE_PROVIDER && formData.personType === 'PJ' ? '00.000.000/0000-00' : '000.000.000-00'}
                     value={formData.cpfCnpj}
                     onChange={handleInputChange}
                   />
                 </div>
               </div>
             </div>
+
+            {/* Informações adicionais para Prestador */}
+            {formData.userType === UserTypeValues.SERVICE_PROVIDER && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Tipo de pessoa</label>
+                    <select name="personType" value={formData.personType} onChange={handleInputChange} className="mt-1 w-full border rounded-md px-3 py-2">
+                      <option value="PF">Pessoa Física</option>
+                      <option value="PJ">Pessoa Jurídica</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Gênero</label>
+                    <select name="gender" value={formData.gender} onChange={handleInputChange} className="mt-1 w-full border rounded-md px-3 py-2">
+                      <option value="">Selecione</option>
+                      <option value="MALE">Masculino</option>
+                      <option value="FEMALE">Feminino</option>
+                      <option value="OTHER">Outro</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Estado civil</label>
+                    <select name="maritalStatus" value={formData.maritalStatus} onChange={handleInputChange} className="mt-1 w-full border rounded-md px-3 py-2">
+                      <option value="">Selecione</option>
+                      <option value="SINGLE">Solteiro(a)</option>
+                      <option value="MARRIED">Casado(a)</option>
+                      <option value="DIVORCED">Divorciado(a)</option>
+                      <option value="WIDOWED">Viúvo(a)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Data de nascimento</label>
+                    <input type="date" name="dateOfBirth" value={formData.dateOfBirth} onChange={handleInputChange} className="mt-1 w-full border rounded-md px-3 py-2" />
+                  </div>
+                </div>
+
+                <div className="border rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <IdCard className="w-5 h-5 text-blue-600" />
+                    <div className="font-medium">CNH</div>
+                  </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <input type="checkbox" id="hasDriverLicense" name="hasDriverLicense" checked={!!formData.hasDriverLicense} onChange={handleInputChange} />
+                    <label htmlFor="hasDriverLicense" className="text-sm">Possuo carteira de motorista (CNH)</label>
+                  </div>
+                  {formData.hasDriverLicense && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Número da CNH</label>
+                        <Input name="driverLicenseNumber" value={formData.driverLicenseNumber} onChange={handleInputChange} placeholder="00000000000" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Categoria</label>
+                        <select name="driverLicenseCategory" value={formData.driverLicenseCategory} onChange={handleInputChange} className="mt-1 w-full border rounded-md px-3 py-2">
+                          <option value="">Selecione</option>
+                          <option value="A">A</option>
+                          <option value="B">B</option>
+                          <option value="C">C</option>
+                          <option value="D">D</option>
+                          <option value="E">E</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Vencimento</label>
+                        <input type="date" name="driverLicenseExpiresAt" value={formData.driverLicenseExpiresAt} onChange={handleInputChange} className="mt-1 w-full border rounded-md px-3 py-2" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Password */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -334,15 +596,13 @@ if (passwordInput.value !== confirmInput.value) {
               </label>
             </div>
 
-            <div>
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading || !formData.acceptTerms}
-              >
-                {isLoading ? 'Criando conta...' : 'Criar conta'}
-              </Button>
-            </div>
+              <div>
+                <Button type="submit" className="w-full" disabled={isLoading || !formData.acceptTerms}>
+                  {isLoading ? 'Processando...' : (formData.userType === UserTypeValues.SERVICE_PROVIDER ? 'Próximo' : 'Criar conta')}
+                </Button>
+              </div>
+              </>
+            )}
           </form>
         </div>
       </div>

@@ -70,7 +70,25 @@ export async function GET(request: NextRequest) {
     });
 
     // Transform bookings to include payment information
-    const transformedBookings = bookings.map((booking) => ({
+    // check active subscription if providerId present
+    let activeSub: any = null
+    if (providerId) {
+      activeSub = await prisma.subscription.findFirst({
+        where: {
+          serviceProvider: { userId: providerId },
+          status: 'ACTIVE',
+          OR: [{ endDate: null }, { endDate: { gte: new Date() } }]
+        }
+      })
+    }
+
+    const transformedBookings = bookings.map((booking) => {
+      const unlockedByPayment = booking.payments?.some?.(
+        (p) => p.status === 'APPROVED' || p.status === 'COMPLETED' || p.status === 'PAID'
+      )
+      const unlocked = !!activeSub || !!unlockedByPayment
+      const client = unlocked ? booking.client : { name: 'Dados bloqueados', phone: undefined }
+      return ({
       id: booking.id,
       status: booking.status,
       requestType: booking.requestType,
@@ -80,7 +98,7 @@ export async function GET(request: NextRequest) {
       estimatedPrice: booking.estimatedPrice,
       finalPrice: booking.finalPrice,
       service: booking.service,
-      client: booking.client,
+      client,
       serviceProvider: {
         user: booking.provider,
       },
@@ -90,7 +108,8 @@ export async function GET(request: NextRequest) {
             status: booking.payments[0].status,
           }
         : null,
-    }));
+      unlocked,
+    })});
 
     return NextResponse.json({
       success: true,

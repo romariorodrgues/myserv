@@ -52,6 +52,7 @@ export const authOptions: NextAuthOptions = {
           userType: user.userType as UserType,
           profileImage: user.profileImage,
           isApproved: user.isApproved,
+          isActive: user.isActive,
           address: user.address
         }
       }
@@ -69,6 +70,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.userType = user.userType
         token.isApproved = user.isApproved
+        token.isActive = (user as any).isActive
         token.profileImage = user.profileImage
         token.address = user.address
       }
@@ -79,6 +81,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub!
         session.user.userType = token.userType as UserType
         session.user.isApproved = token.isApproved as boolean
+        ;(session.user as any).isActive = token.isActive as boolean
         session.user.profileImage = token.profileImage as string | null
         session.user.address = token.address as any
       }
@@ -90,6 +93,37 @@ export const authOptions: NextAuthOptions = {
       // Allows callback URLs on the same origin
       else if (new URL(url).origin === baseUrl) return url
       return baseUrl
+    }
+  },
+  events: {
+    async signIn({ user }) {
+      // Recria notificação "complete seu perfil (foto)" para prestadores sem avatar em todo login
+      try {
+        const u = await prisma.user.findUnique({ where: { id: user.id as string }, select: { id: true, userType: true, profileImage: true } })
+        if (!u) return
+        if (u.userType !== 'SERVICE_PROVIDER') return
+        if (u.profileImage) return
+
+        const existing = await prisma.notification.findFirst({
+          where: { userId: u.id, type: 'SYSTEM', data: { path: ['kind'], equals: 'COMPLETE_PROFILE_PHOTO' } as any }
+        })
+        if (existing) {
+          await prisma.notification.update({ where: { id: existing.id }, data: { isRead: false } })
+        } else {
+          await prisma.notification.create({
+            data: {
+              userId: u.id,
+              type: 'SYSTEM',
+              title: 'Complete seu perfil',
+              message: 'Adicione sua foto de perfil para aumentar suas chances de aprovação.',
+              isRead: false,
+              data: { kind: 'COMPLETE_PROFILE_PHOTO', url: '/dashboard/profissional?tab=settings' }
+            }
+          })
+        }
+      } catch (e) {
+        // silencioso
+      }
     }
   },
   pages: {

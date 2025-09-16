@@ -51,6 +51,9 @@ export async function PATCH(
       where: { id: bookingId },
       data: {
         status: validatedData.status,
+        // Clear HOLD expiry on decision
+        ...(validatedData.status === 'ACCEPTED' ? { expiresAt: null } : {}),
+        ...(validatedData.status === 'REJECTED' ? { expiresAt: null } : {}),
         ...(validatedData.notes && { description: validatedData.notes }),
       },
       include: {

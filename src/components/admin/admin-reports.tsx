@@ -74,58 +74,24 @@ export function AdminReports() {
     try {
       setLoading(true)
       
-      // Mock data - replace with actual API calls
+      // Valores iniciais zerados até a API real estar disponível
       const mockMetrics: ReportMetrics = {
-        totalBookings: 1247,
-        totalRevenue: 89340.50,
-        totalUsers: 3456,
-        totalProviders: 234,
-        averageRating: 4.7,
-        completionRate: 89.2,
-        cancellationRate: 5.1,
-        monthlyGrowth: 23.5
+        totalBookings: 0,
+        totalRevenue: 0,
+        totalUsers: 0,
+        totalProviders: 0,
+        averageRating: 0,
+        completionRate: 0,
+        cancellationRate: 0,
+        monthlyGrowth: 0,
       }
 
       const mockChartData: ChartData = {
-        bookingsByMonth: [
-          { month: 'Jan', bookings: 85, revenue: 6850 },
-          { month: 'Fev', bookings: 112, revenue: 8960 },
-          { month: 'Mar', bookings: 134, revenue: 10720 },
-          { month: 'Abr', bookings: 156, revenue: 12480 },
-          { month: 'Mai', bookings: 178, revenue: 14240 },
-          { month: 'Jun', bookings: 198, revenue: 15840 }
-        ],
-        bookingsByService: [
-          { service: 'Limpeza Residencial', bookings: 456, value: 45 },
-          { service: 'Limpeza Comercial', bookings: 234, value: 23 },
-          { service: 'Limpeza Pós-Obra', bookings: 189, value: 18 },
-          { service: 'Jardinagem', bookings: 156, value: 15 },
-          { service: 'Manutenção', bookings: 123, value: 12 },
-          { service: 'Outros', bookings: 89, value: 9 }
-        ],
-        userGrowth: [
-          { month: 'Jan', clients: 245, providers: 15 },
-          { month: 'Fev', clients: 312, providers: 23 },
-          { month: 'Mar', clients: 398, providers: 31 },
-          { month: 'Abr', clients: 456, providers: 38 },
-          { month: 'Mai', clients: 534, providers: 45 },
-          { month: 'Jun', clients: 612, providers: 52 }
-        ],
-        topCities: [
-          { city: 'São Paulo', bookings: 456, percentage: 36.8 },
-          { city: 'Rio de Janeiro', bookings: 234, percentage: 18.9 },
-          { city: 'Belo Horizonte', bookings: 156, percentage: 12.6 },
-          { city: 'Brasília', bookings: 123, percentage: 9.9 },
-          { city: 'Salvador', bookings: 98, percentage: 7.9 },
-          { city: 'Outras', bookings: 180, percentage: 14.5 }
-        ],
-        ratingDistribution: [
-          { rating: '5 estrelas', count: 567 },
-          { rating: '4 estrelas', count: 342 },
-          { rating: '3 estrelas', count: 123 },
-          { rating: '2 estrelas', count: 45 },
-          { rating: '1 estrela', count: 23 }
-        ]
+        bookingsByMonth: [],
+        bookingsByService: [],
+        userGrowth: [],
+        topCities: [],
+        ratingDistribution: [],
       }
 
       // Simulate API delay
@@ -208,7 +174,7 @@ export function AdminReports() {
                 <p className="text-2xl font-bold">{metrics?.totalBookings.toLocaleString()}</p>
                 <p className="text-sm text-green-600 flex items-center mt-1">
                   <TrendingUp className="w-3 h-3 mr-1" />
-                  +{metrics?.monthlyGrowth}% este mês
+                  {metrics?.monthlyGrowth ? `+${metrics.monthlyGrowth}% este mês` : 'Sem variação'}
                 </p>
               </div>
               <Calendar className="w-8 h-8 text-blue-500" />

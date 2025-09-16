@@ -145,7 +145,10 @@ export async function POST(request: NextRequest) {
           providerId: serviceProvider.userId,
           scheduledDate: { gte: sameDayStart, lt: nextDay },
           scheduledTime: validatedData.preferredTime,
-          status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] }
+          OR: [
+            { status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] } },
+            { AND: [ { status: 'HOLD' }, { expiresAt: { gt: now } } ] }
+          ]
         }
       })
       if (conflicting) {
@@ -170,6 +173,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Create the booking
+    // HOLD TTL (minutes) configurable via env; default 15
+    const HOLD_TTL_MINUTES = Number(process.env.HOLD_TTL_MINUTES || 15)
+    const holdExpiresAt = new Date(Date.now() + HOLD_TTL_MINUTES * 60_000)
+
     const booking = await prisma.serviceRequest.create({
       data: {
         clientId: clientUser.id,
@@ -179,7 +186,10 @@ export async function POST(request: NextRequest) {
         scheduledDate: validatedData.preferredDate ? new Date(validatedData.preferredDate + 'T' + (validatedData.preferredTime || '10:00')) : null,
         scheduledTime: validatedData.preferredTime || null,
         requestType,
-        status: requestType === 'SCHEDULING' && autoAccept ? 'ACCEPTED' : 'PENDING'
+        status: requestType === 'SCHEDULING'
+          ? (autoAccept ? 'ACCEPTED' : 'HOLD')
+          : 'PENDING',
+        expiresAt: requestType === 'SCHEDULING' && !autoAccept ? holdExpiresAt : null
       },
       include: {
         service: {

@@ -22,6 +22,7 @@ import {
   Briefcase
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { cdnImageUrl } from '@/lib/cdn'
 import { Card } from '@/components/ui/card'
 
 interface ServiceProvider {
@@ -30,8 +31,14 @@ interface ServiceProvider {
   email: string
   phone: string
   isApproved: boolean
+  isActive: boolean
+  profileImage?: string | null
   createdAt: string
   description?: string
+  cpfCnpj?: string
+  dateOfBirth?: string
+  gender?: string
+  maritalStatus?: string
   address?: {
     city: string
     state: string
@@ -64,6 +71,8 @@ export default function AdminProvidersPage() {
   const [providers, setProviders] = useState<ServiceProvider[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null)
+  const [toggleTarget, setToggleTarget] = useState<ServiceProvider | null>(null)
+  const [toggleReason, setToggleReason] = useState('')
 
   useEffect(() => {
     if (status === 'loading') return
@@ -225,7 +234,14 @@ export default function AdminProvidersPage() {
                 <Card key={provider.id} className="p-4 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <h3 className="font-semibold text-gray-900">{provider.name}</h3>
+                      <div className="flex items-center gap-3">
+                        {provider.profileImage ? (
+                          <img src={cdnImageUrl(provider.profileImage)} alt={provider.name} className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gray-200" />
+                        )}
+                        <h3 className="font-semibold text-gray-900">{provider.name}</h3>
+                      </div>
                       <div className="text-sm text-gray-500 space-y-1 mt-2">
                         <div className="flex items-center">
                           <Mail className="w-4 h-4 mr-1" />
@@ -239,6 +255,12 @@ export default function AdminProvidersPage() {
                           <div className="flex items-center">
                             <MapPin className="w-4 h-4 mr-1" />
                             {provider.address.city}, {provider.address.state}
+                          </div>
+                        )}
+                        {provider.cpfCnpj && (
+                          <div className="flex items-center">
+                            <span className="w-4 h-4 mr-1">🆔</span>
+                            {provider.cpfCnpj}
                           </div>
                         )}
                       </div>
@@ -287,6 +309,13 @@ export default function AdminProvidersPage() {
                         <XCircle className="w-4 h-4 mr-1" />
                         Rejeitar
                       </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setToggleTarget(provider); setToggleReason('') }}
+                      >
+                        {provider.isActive ? 'Desativar' : 'Ativar'}
+                      </Button>
                     </div>
                   </div>
                 </Card>
@@ -314,12 +343,30 @@ export default function AdminProvidersPage() {
                   </div>
                   
                   <div className="space-y-4">
+                    {selectedProvider.profileImage && (
+                      <div className="flex justify-center">
+                        <img src={cdnImageUrl(selectedProvider.profileImage)} alt={selectedProvider.name} className="w-24 h-24 rounded-full object-cover" />
+                      </div>
+                    )}
                     <div>
                       <h4 className="font-medium text-gray-900">Informações Pessoais</h4>
                       <div className="mt-2 space-y-2">
                         <p><strong>Nome:</strong> {selectedProvider.name}</p>
                         <p><strong>Email:</strong> {selectedProvider.email}</p>
                         <p><strong>Telefone:</strong> {selectedProvider.phone}</p>
+                        {selectedProvider.cpfCnpj && (
+                          <p><strong>CPF/CNPJ:</strong> {selectedProvider.cpfCnpj}</p>
+                        )}
+                        {selectedProvider.dateOfBirth && (
+                          <p><strong>Data de nascimento:</strong> {new Date(selectedProvider.dateOfBirth).toLocaleDateString('pt-BR')}</p>
+                        )}
+                        {selectedProvider.gender && (
+                          <p><strong>Gênero:</strong> {selectedProvider.gender}</p>
+                        )}
+                        {selectedProvider.maritalStatus && (
+                          <p><strong>Estado civil:</strong> {selectedProvider.maritalStatus}</p>
+                        )}
+                        <p><strong>Status:</strong> {selectedProvider.isActive ? 'Ativo' : 'Desativado'} {selectedProvider.isApproved ? '(Aprovado)' : '(Pendente)'}</p>
                         {selectedProvider.description && (
                           <p><strong>Descrição:</strong> {selectedProvider.description}</p>
                         )}
@@ -393,6 +440,45 @@ export default function AdminProvidersPage() {
                     >
                       <XCircle className="w-4 h-4 mr-2" />
                       Rejeitar
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Toggle Active Modal */}
+          {toggleTarget && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+              <Card className="max-w-md w-full">
+                <div className="p-6 space-y-4">
+                  <h3 className="text-lg font-semibold">
+                    {toggleTarget.isActive ? 'Desativar usuário' : 'Ativar usuário'}
+                  </h3>
+                  {toggleTarget.isActive && (
+                    <div>
+                      <label className="block text-sm text-gray-700 mb-1">Motivo da desativação (obrigatório)</label>
+                      <textarea className="w-full border rounded p-2" rows={3} value={toggleReason} onChange={(e) => setToggleReason(e.target.value)} />
+                    </div>
+                  )}
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => setToggleTarget(null)}>Cancelar</Button>
+                    <Button onClick={async () => {
+                      try {
+                        const res = await fetch(`/api/admin/users/${toggleTarget.id}/toggle-active`, {
+                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ active: !toggleTarget.isActive, reason: toggleReason })
+                        })
+                        const d = await res.json()
+                        if (!res.ok || !d.success) throw new Error(d?.error || 'Falha ao atualizar')
+                        setToggleTarget(null)
+                        setToggleReason('')
+                        fetchProviders()
+                      } catch (e: any) {
+                        alert(e?.message || 'Erro ao atualizar usuário')
+                      }
+                    }}>
+                      Confirmar
                     </Button>
                   </div>
                 </div>

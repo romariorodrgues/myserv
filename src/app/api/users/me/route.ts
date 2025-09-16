@@ -29,6 +29,7 @@ export async function GET() {
               plan: true,
             },
           },
+          activePlan: true,
         },
       },
     },
@@ -40,6 +41,10 @@ export async function GET() {
       { status: 404 }
     );
   }
+
+  const activeSubscription = user.serviceProvider?.subscriptions?.[0];
+  const planName =
+    activeSubscription?.plan?.name ?? user.serviceProvider?.activePlan?.name ?? "Start";
 
   const responseData: ClientProfileData = {
     id: user.id,
@@ -64,7 +69,7 @@ export async function GET() {
     preferences: user.clientProfile
       ?.preferences as ClientProfileData["preferences"],
     privacy: user.clientProfile?.privacy as ClientProfileData["privacy"],
-    plan: user.serviceProvider?.subscriptions[0].plan.name ?? "Start",
+    plan: planName,
   };
 
   return NextResponse.json({ user: responseData });
@@ -76,7 +81,7 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body: Partial<ClientProfileData> = await req.json();
+  const body: Partial<ClientProfileData & { profileImageKey?: string }> = await req.json();
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -87,7 +92,7 @@ export async function PUT(req: Request) {
           name: body.name,
           phone: body.phone,
           email: body.email,
-          profileImage: body.profileImage ?? undefined,
+          profileImage: (body as any).profileImageKey ?? body.profileImage ?? undefined,
           description: body.description ?? undefined,
           cpfCnpj: body.cpfCnpj,
           address: body.address
@@ -166,10 +171,18 @@ export async function PUT(req: Request) {
                 plan: true,
               },
             },
+            activePlan: true,
           },
         },
       },
     });
+
+    const updatedActiveSubscription =
+      updatedUser?.serviceProvider?.subscriptions?.[0];
+    const updatedPlanName =
+      updatedActiveSubscription?.plan?.name ??
+      updatedUser?.serviceProvider?.activePlan?.name ??
+      "Start";
 
     const responseData: ClientProfileData = {
       id: updatedUser!.id,
@@ -195,7 +208,7 @@ export async function PUT(req: Request) {
         ?.preferences as ClientProfileData["preferences"],
       privacy: updatedUser!.clientProfile
         ?.privacy as ClientProfileData["privacy"],
-      plan: updatedUser!.serviceProvider?.subscriptions[0].plan.name ?? "Start",
+      plan: updatedPlanName,
     };
 
     return NextResponse.json({ user: responseData });

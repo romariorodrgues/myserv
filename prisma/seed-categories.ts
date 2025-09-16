@@ -49,6 +49,7 @@ const TREE: Node[] = [
 async function upsertTree(nodes: Node[], parentId: string | null = null, level = 0): Promise<void> {
   for (const [i, n] of nodes.entries()) {
     const isLeaf = !n.children || n.children.length === 0
+    const requiresDL = ['Transporte', 'Frete/Carreto', 'Mudanças', 'Motoboy/Entregas rápidas'].includes(n.name)
 
     const cat = await prisma.serviceCategory.upsert({
       where: { name: n.name }, // name é único no seu schema atual
@@ -60,6 +61,7 @@ async function upsertTree(nodes: Node[], parentId: string | null = null, level =
         isLeaf,
         displayOrder: i,
         isActive: true,
+        requiresDriverLicense: requiresDL,
       },
       create: {
         name: n.name,
@@ -70,6 +72,7 @@ async function upsertTree(nodes: Node[], parentId: string | null = null, level =
         isLeaf,
         displayOrder: i,
         isActive: true,
+        requiresDriverLicense: requiresDL,
       },
     })
 

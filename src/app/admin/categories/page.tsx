@@ -14,6 +14,8 @@ import { Label } from '@/components/ui/label'
 import CascadingCategoryPicker from '@/components/categories/cascading-category-picker'
 import { Badge } from '@/components/ui/badge'
 import { Loader2, Plus, Pencil, Check, X } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Separator } from '@/components/ui/separator'
 
 type Cat = { id: string; name: string; isLeaf: boolean; isActive: boolean; serviceCount: number }
 
@@ -22,7 +24,7 @@ export default function AdminCategoriesPage() {
   const [selectedLeafId, setSelectedLeafId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', icon: '' })
+  const [form, setForm] = useState({ name: '', description: '', icon: '', requiresDriverLicense: false })
   const parentId = useMemo(() => currentPath.at(-1)?.id ?? null, [currentPath])
 
   const [editing, setEditing] = useState<Cat | null>(null)
@@ -40,7 +42,7 @@ export default function AdminCategoriesPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data?.error || 'Erro ao criar categoria')
-      setForm({ name: '', description: '', icon: '' })
+      setForm({ name: '', description: '', icon: '', requiresDriverLicense: false })
       setCreating(false)
       // força recarregar picker mudando o path (no-op)
       setCurrentPath((p) => [...p])
@@ -89,6 +91,44 @@ export default function AdminCategoriesPage() {
       alert('Erro ao renomear')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const [selectedDetails, setSelectedDetails] = useState<{ id: string; requiresDriverLicense: boolean } | null>(null)
+
+  useEffect(() => {
+    const current = currentPath.at(-1)
+    if (!current) { setSelectedDetails(null); return }
+    ;(async () => {
+      try {
+        const res = await fetch(`/api/admin/categories/${current.id}`)
+        const data = await res.json()
+        if (res.ok && data.success) {
+          setSelectedDetails({ id: data.category.id, requiresDriverLicense: !!data.category.requiresDriverLicense })
+        }
+      } catch {}
+    })()
+  }, [currentPath])
+
+  const toggleRequiresDL = async () => {
+    const node = currentPath.at(-1)
+    if (!node || !selectedDetails) return
+    const newVal = !selectedDetails.requiresDriverLicense
+    setToggling(node.id)
+    try {
+      const res = await fetch(`/api/admin/categories/${node.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requiresDriverLicense: newVal })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Erro')
+      setSelectedDetails((d) => d ? { ...d, requiresDriverLicense: newVal } : d)
+    } catch (e) {
+      console.error(e)
+      alert('Erro ao atualizar')
+    } finally {
+      setToggling(null)
     }
   }
 
@@ -151,6 +191,13 @@ export default function AdminCategoriesPage() {
               <Label>Descrição</Label>
               <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
+            <div className="flex items-center justify-between rounded-md border p-3">
+              <div>
+                <Label>Exige CNH</Label>
+                <p className="text-xs text-gray-500">Marque para categorias como Transporte/Frete/Motoboy etc.</p>
+              </div>
+              <Switch checked={form.requiresDriverLicense} onCheckedChange={(v) => setForm((f) => ({ ...f, requiresDriverLicense: v }))} />
+            </div>
             <div className="flex gap-2">
               <Button onClick={handleCreate} disabled={saving || !form.name.trim()}>
                 {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Plus className="h-4 w-4 mr-2" />}
@@ -194,6 +241,15 @@ export default function AdminCategoriesPage() {
                     <Button size="sm" variant="ghost" onClick={() => setEditing(null)}><X className="h-4 w-4" /></Button>
                   </div>
                 )}
+
+                <Separator className="my-2" />
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">Exige CNH</div>
+                    <div className="text-xs text-gray-500">Controla elegibilidade do prestador para esta categoria</div>
+                  </div>
+                  <Switch disabled={!selectedDetails} checked={!!selectedDetails?.requiresDriverLicense} onCheckedChange={toggleRequiresDL} />
+                </div>
               </>
             )}
           </CardContent>

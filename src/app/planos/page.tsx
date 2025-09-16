@@ -4,8 +4,24 @@
 
 import { Check } from 'lucide-react'
 import Link from 'next/link'
+import { prisma } from '@/lib/prisma'
 
-export default function PlanosPage() {
+async function getPlanSettings() {
+  try {
+    const rows = await prisma.systemSettings.findMany({ where: { key: { in: ['PLAN_UNLOCK_PRICE','PLAN_MONTHLY_PRICE','PLAN_ENTERPRISE_PRICE'] } } })
+    const map = Object.fromEntries(rows.map(r => [r.key, r.value])) as Record<string, string>
+    return {
+      unlock: map.PLAN_UNLOCK_PRICE || '4.90',
+      monthly: map.PLAN_MONTHLY_PRICE || '39.90',
+      enterprise: map.PLAN_ENTERPRISE_PRICE || '',
+    }
+  } catch {
+    return { unlock: '4.90', monthly: '39.90', enterprise: '' }
+  }
+}
+
+export default async function PlanosPage() {
+  const prices = await getPlanSettings()
   const features = [
     'Perfil profissional completo',
     'Receba solicitações ilimitadas',
@@ -26,10 +42,10 @@ export default function PlanosPage() {
           <div className="rounded-lg shadow p-6 bg-white border">
             <h2 className="text-xl font-bold mb-2">Grátis • Por Solicitação</h2>
             <div className="text-2xl font-bold text-gray-900 mb-2">R$ 0/mês</div>
-            <p className="text-gray-600 mb-4">Pague R$ 4,90 para desbloquear cada solicitação que desejar atender.</p>
+            <p className="text-gray-600 mb-4">Pague R$ {prices.unlock} para desbloquear cada solicitação que desejar atender.</p>
             <ul className="space-y-2 mb-6">
               <li className="flex items-center gap-2 text-gray-800"><Check className="w-5 h-5 text-green-600" />Receba solicitações</li>
-              <li className="flex items-center gap-2 text-gray-800"><Check className="w-5 h-5 text-green-600" />Desbloqueio por R$ 4,90</li>
+              <li className="flex items-center gap-2 text-gray-800"><Check className="w-5 h-5 text-green-600" />Desbloqueio por R$ {prices.unlock}</li>
               <li className="flex items-center gap-2 text-gray-800"><Check className="w-5 h-5 text-green-600" />Sem mensalidade</li>
             </ul>
             <Link href="/seja-profissional" className="block text-center border rounded-md py-2 hover:bg-gray-50">Criar conta grátis</Link>
@@ -38,7 +54,7 @@ export default function PlanosPage() {
           {/* Plano Mensal PF */}
           <div className="rounded-lg shadow p-6 border-2 border-green-500 bg-green-50">
             <h2 className="text-xl font-bold mb-2">Mensal • Profissional</h2>
-            <div className="text-2xl font-bold text-green-600 mb-2">R$ 39,90/mês</div>
+            <div className="text-2xl font-bold text-green-600 mb-2">R$ {prices.monthly}/mês</div>
             <p className="text-gray-700 mb-4">Acesso automático aos contatos de todas as solicitações.</p>
             <ul className="space-y-2 mb-6">
               {features.map((f, i) => (
@@ -53,7 +69,7 @@ export default function PlanosPage() {
           {/* Plano Empresarial */}
           <div className="rounded-lg shadow p-6 bg-white border">
             <h2 className="text-xl font-bold mb-2">Empresarial</h2>
-            <div className="text-2xl font-bold text-gray-900 mb-2">Sob consulta</div>
+            <div className="text-2xl font-bold text-gray-900 mb-2">{prices.enterprise ? `R$ ${prices.enterprise}/mês` : 'Sob consulta'}</div>
             <p className="text-gray-600 mb-4">Para empresas com alto volume e múltiplos usuários.</p>
             <ul className="space-y-2 mb-6">
               <li className="flex items-center gap-2 text-gray-800"><Check className="w-5 h-5 text-green-600" />Equipe multiusuário</li>

@@ -4,10 +4,18 @@
  */
 
 import { withAuth } from "next-auth/middleware"
+import { NextResponse } from 'next/server'
 
 export default withAuth(
   function middleware(req) {
-    // Add any additional middleware logic here
+    // Redireciona /entrar e /cadastrar quando já autenticado
+    const token = (req as any).nextauth?.token
+    const { pathname } = req.nextUrl
+    if (token && (pathname === '/entrar' || pathname === '/cadastrar')) {
+      const url = req.nextUrl.clone()
+      url.pathname = '/perfil'
+      return NextResponse.redirect(url)
+    }
   },
   {
     callbacks: {
@@ -42,6 +50,8 @@ export default withAuth(
 
 export const config = {
   matcher: [
+    '/entrar',
+    '/cadastrar',
     '/dashboard/:path*',
     '/admin/:path*',
     '/api/protected/:path*'

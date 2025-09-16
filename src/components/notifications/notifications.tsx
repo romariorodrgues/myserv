@@ -182,6 +182,18 @@ export function NotificationsComponent({
                 // Navegação: serviço/agendamento
                 if (notification.type === 'SERVICE_REQUEST') {
                   router.push('/agenda?open=true')
+                  return
+                }
+                // Navegação: sistema - completar perfil
+                const url = (notification as any)?.data?.url
+                const kind = (notification as any)?.data?.kind
+                if (url) {
+                  router.push(url)
+                  return
+                }
+                if (notification.type === 'SYSTEM' && kind === 'COMPLETE_PROFILE_PHOTO') {
+                  router.push('/dashboard/profissional?tab=settings')
+                  return
                 }
               }}
             >

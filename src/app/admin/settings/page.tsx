@@ -25,6 +25,10 @@ export default function AdminSettingsPage() {
     contactAddress: '',
     socialFacebook: '',
     socialInstagram: '',
+    // Planos
+    planUnlockPrice: '4.90',
+    planMonthlyPrice: '39.90',
+    planEnterprisePrice: '',
   })
 
   useEffect(() => {
@@ -41,6 +45,9 @@ export default function AdminSettingsPage() {
           contactAddress: s.CONTACT_ADDRESS || prev.contactAddress,
           socialFacebook: s.SOCIAL_FACEBOOK_URL || prev.socialFacebook,
           socialInstagram: s.SOCIAL_INSTAGRAM_URL || prev.socialInstagram,
+          planUnlockPrice: s.PLAN_UNLOCK_PRICE || prev.planUnlockPrice,
+          planMonthlyPrice: s.PLAN_MONTHLY_PRICE || prev.planMonthlyPrice,
+          planEnterprisePrice: s.PLAN_ENTERPRISE_PRICE || prev.planEnterprisePrice,
         }))
       } catch { /* noop */ }
     }
@@ -60,6 +67,9 @@ export default function AdminSettingsPage() {
             CONTACT_ADDRESS: settings.contactAddress,
             SOCIAL_FACEBOOK_URL: settings.socialFacebook,
             SOCIAL_INSTAGRAM_URL: settings.socialInstagram,
+            PLAN_UNLOCK_PRICE: settings.planUnlockPrice,
+            PLAN_MONTHLY_PRICE: settings.planMonthlyPrice,
+            PLAN_ENTERPRISE_PRICE: settings.planEnterprisePrice,
           }
         })
       })
@@ -108,6 +118,12 @@ export default function AdminSettingsPage() {
                   className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100"
                 >
                   💳 Pagamentos
+                </Link>
+                <Link 
+                  href="/admin/coupons"
+                  className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100"
+                >
+                  🎟️ Cupons
                 </Link>
                 <Link 
                   href="/admin/users"
@@ -301,6 +317,30 @@ export default function AdminSettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Instagram URL</label>
                   <Input value={settings.socialInstagram} onChange={(e) => setSettings(p => ({...p, socialInstagram: e.target.value}))} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Planos */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Planos</CardTitle>
+              <CardDescription>Valores exibidos em toda a plataforma</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Desbloqueio por solicitação (R$)</label>
+                  <Input value={settings.planUnlockPrice} onChange={(e) => setSettings(p => ({...p, planUnlockPrice: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Plano Mensal Profissional (R$)</label>
+                  <Input value={settings.planMonthlyPrice} onChange={(e) => setSettings(p => ({...p, planMonthlyPrice: e.target.value}))} />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Plano Empresarial (R$) — opcional</label>
+                  <Input value={settings.planEnterprisePrice} onChange={(e) => setSettings(p => ({...p, planEnterprisePrice: e.target.value}))} />
                 </div>
               </div>
             </CardContent>

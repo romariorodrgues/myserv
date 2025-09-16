@@ -83,12 +83,14 @@ export async function POST(req: NextRequest) {
     const input = upsertSchema.parse(await req.json())
 
     // prestador logado
-    const sp = await prisma.serviceProvider.findUnique({
+    let sp = await prisma.serviceProvider.findUnique({
       where: { userId: session.user.id },
       select: { id: true }
     })
     if (!sp) {
-      return NextResponse.json({ success: false, error: 'Perfil de prestador não encontrado' }, { status: 404 })
+      // cria perfil de prestador automaticamente para usuários do tipo prestador
+      const created = await prisma.serviceProvider.create({ data: { userId: session.user.id, hasQuoting: true, hasScheduling: false, chargesTravel: false } })
+      sp = { id: created.id }
     }
 
     // valida categoria folha

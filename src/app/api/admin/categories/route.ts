@@ -12,6 +12,7 @@ const createSchema = z.object({
   icon: z.string().optional(),
   parentId: z.string().uuid().nullish(),
   isActive: z.boolean().optional().default(true),
+  requiresDriverLicense: z.boolean().optional().default(false),
 })
 
 export async function POST(req: NextRequest) {
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
         isLeaf: true, // por padrão, novo nó é folha
         displayOrder,
         isActive: input.isActive,
+        requiresDriverLicense: input.requiresDriverLicense,
       },
     })
 
@@ -70,4 +72,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: false, error: 'Erro interno' }, { status: 500 })
   }
 }
-

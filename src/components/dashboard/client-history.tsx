@@ -49,6 +49,7 @@ interface ClientHistoryProps {
 
 const statusConfig = {
   PENDING: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
+  HOLD: { label: 'Pendente', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   ACCEPTED: { label: 'Aceito', color: 'bg-blue-100 text-blue-800', icon: Calendar },
   REJECTED: { label: 'Rejeitado', color: 'bg-red-100 text-red-800', icon: Clock },
   COMPLETED: { label: 'Concluído', color: 'bg-green-100 text-green-800', icon: Clock },

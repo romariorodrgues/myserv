@@ -139,7 +139,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
             date: '2025-06-15',
             startTime: '09:00',
             endTime: '10:00',
-            status: 'CONFIRMED',
+            status: 'ACCEPTED',
             client: { name: 'João Silva', phone: '(11) 99999-1234' },
             service: { name: 'Limpeza Residencial', duration: 60 },
             notes: 'Apartamento 3 quartos, foco na cozinha'
@@ -158,7 +158,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
             date: '2025-06-16',
             startTime: '10:00',
             endTime: '11:00',
-            status: 'CONFIRMED',
+            status: 'ACCEPTED',
             client: { name: 'Carlos Pereira' },
             service: { name: 'Limpeza Comercial', duration: 60 }
           }
@@ -353,7 +353,11 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
 
   const getAppointmentsForDate = (date: string) => {
     const list = showAllDates ? appointments : appointments.filter(apt => apt.date === date)
-    return list.filter((apt) => apptStatusFilter === 'ALL' ? true : apt.status === apptStatusFilter)
+    return list.filter((apt) => {
+      if (apptStatusFilter === 'ALL') return true
+      if (apptStatusFilter === 'PENDING') return apt.status === 'PENDING' || apt.status === 'HOLD'
+      return apt.status === apptStatusFilter
+    })
   }
 
   // Ações: aceitar/recusar/concluir
@@ -370,18 +374,20 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
     }
   }
 
-  const getStatusBadge = (status: Appointment['status']) => {
-    const config = {
+  const getStatusBadge = (status: Appointment['status'] | string) => {
+    const map: Record<string, { label: string; className: string }> = {
       ACCEPTED: { label: 'Aceito', className: 'bg-green-100 text-green-800' },
+      CONFIRMED: { label: 'Aceito', className: 'bg-green-100 text-green-800' },
       PENDING: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
+      HOLD: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
       CANCELLED: { label: 'Cancelado', className: 'bg-red-100 text-red-800' },
       COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' },
-      REJECTED: { label: 'Recusado', className: 'bg-gray-100 text-gray-800' }
+      REJECTED: { label: 'Recusado', className: 'bg-gray-100 text-gray-800' },
     }
-    
+    const cfg = map[status] ?? { label: String(status || '—'), className: 'bg-gray-100 text-gray-800' }
     return (
-      <Badge className={config[status].className}>
-        {config[status].label}
+      <Badge className={cfg.className}>
+        {cfg.label}
       </Badge>
     )
   }
@@ -611,7 +617,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                   <div key={appointment.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-1 sm:space-y-0 mb-2">
                           <h3 className="font-medium text-lg">{appointment.service.name}</h3>
                           {appointment.type === 'QUOTE' && (
                             <Badge className="bg-purple-100 text-purple-800">Orçamento</Badge>
@@ -631,8 +637,14 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                             </span>
                           </div>
                           
-                          {appointment.client.phone && (
+                          {appointment.client.phone ? (
                             <p>Telefone: {appointment.client.phone}</p>
+                          ) : (
+                            <>
+                              {appointment.client.name === 'Dados bloqueados' && (
+                                <p className="text-gray-500">Desbloqueie para ver telefone e detalhes</p>
+                              )}
+                            </>
                           )}
                           
                           {appointment.notes && (
@@ -642,7 +654,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                       </div>
                       
                       <div className="flex space-x-2">
-                        {appointment.status === 'PENDING' && appointment.type !== 'QUOTE' && (
+                        {(appointment.status === 'PENDING' || appointment.status === 'HOLD') && appointment.type !== 'QUOTE' && (
                           <>
                             <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'ACCEPTED')}>
                               <CheckCircle className="w-4 h-4 mr-1" />
@@ -653,6 +665,27 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                               Recusar
                             </Button>
                           </>
+                        )}
+                        {!appointment.client.phone && (
+                          <Button
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                const r = await fetch('/api/payments/unlock-request', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ requestId: appointment.id }),
+                                })
+                                const d = await r.json()
+                                if (!r.ok || !d.success) throw new Error(d?.error || 'Falha ao iniciar pagamento')
+                                window.location.href = d.initPoint
+                              } catch (e: any) {
+                                toast.error(e?.message || 'Erro ao iniciar pagamento')
+                              }
+                            }}
+                          >
+                            Desbloquear
+                          </Button>
                         )}
                         {appointment.status === 'PENDING' && appointment.type === 'QUOTE' && (
                           <div className="flex flex-wrap items-end gap-2">

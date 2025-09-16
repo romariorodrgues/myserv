@@ -1,6 +1,7 @@
 import mercadoPagoConfig from "@/lib/mercadopago";
 import { prisma } from "@/lib/prisma";
-import { PaymentMethod, PaymentStatus } from "@/types";
+import { PaymentMethod, PaymentStatus, UserTypeValues } from "@/types";
+import { Plan } from "@prisma/client";
 import { Payment } from "mercadopago";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -65,6 +66,83 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ message: "Payment Not Found" }, { status: 404 });
       }
 
+      const metadataPayer = (paymentData.metadata?.payer || {}) as {
+        userId?: string
+        user_id?: string
+        providerId?: string
+        provider_id?: string
+      }
+
+      const pendingRegistrationId = paymentData.metadata?.pendingRegistrationId as string | undefined
+
+      if (pendingRegistrationId && paymentData.status !== 'approved') {
+        return NextResponse.json({ message: 'Registration payment pending' }, { status: 200 })
+      }
+
+      let resolvedUserId = (metadataPayer.userId || metadataPayer.user_id) as string | undefined
+      let resolvedProviderId = (metadataPayer.providerId || metadataPayer.provider_id) as string | undefined
+
+      if (pendingRegistrationId && paymentData.status === 'approved' && !resolvedUserId) {
+        const pending = await prisma.pendingProviderRegistration.findUnique({ where: { id: pendingRegistrationId } })
+
+        if (pending) {
+          const existingUser = await prisma.user.findFirst({
+            where: {
+              OR: [
+                { email: pending.email },
+                { cpfCnpj: pending.cpfCnpj },
+              ],
+            },
+            include: { serviceProvider: true },
+          })
+
+          if (existingUser) {
+            resolvedUserId = existingUser.id
+            resolvedProviderId = existingUser.serviceProvider?.id
+            await prisma.pendingProviderRegistration.delete({ where: { id: pending.id } })
+          } else {
+            const createdUser = await prisma.user.create({
+              data: {
+                name: pending.name,
+                email: pending.email,
+                phone: pending.phone,
+                cpfCnpj: pending.cpfCnpj,
+                userType: pending.userType,
+                password: pending.passwordHash,
+                isApproved: false,
+                gender: pending.gender,
+                maritalStatus: pending.maritalStatus,
+                dateOfBirth: pending.dateOfBirth,
+              },
+            })
+
+            if (pending.userType === UserTypeValues.SERVICE_PROVIDER) {
+              const createdProvider = await prisma.serviceProvider.create({
+                data: {
+                  userId: createdUser.id,
+                  hasScheduling: false,
+                  hasQuoting: true,
+                  chargesTravel: false,
+                  hasDriverLicense: pending.hasDriverLicense,
+                  driverLicenseNumber: pending.driverLicenseNumber,
+                  driverLicenseCategory: pending.driverLicenseCategory,
+                  driverLicenseExpiresAt: pending.driverLicenseExpiresAt,
+                },
+              })
+              resolvedProviderId = createdProvider.id
+            }
+
+            resolvedUserId = createdUser.id
+
+            await prisma.pendingProviderRegistration.delete({ where: { id: pending.id } })
+          }
+        }
+      }
+
+      if (!resolvedUserId) {
+        return NextResponse.json({ message: 'Unable to resolve user for payment' }, { status: 400 })
+      }
+
       const updatedPayment = await prisma.payment.upsert({
         where: { gatewayPaymentId: String(paymentData.id) },
         update: {
@@ -75,7 +153,7 @@ export async function POST(request: NextRequest) {
           description: paymentData.description,
         },
         create: {
-          userId: paymentData.metadata.payer.user_id,
+          userId: resolvedUserId,
           amount: paymentData.transaction_amount as number,
           currency: paymentData.currency_id,
           paymentMethod: mapPaymentMethod(paymentData.payment_type_id),
@@ -84,68 +162,128 @@ export async function POST(request: NextRequest) {
           status: mapPaymentStatus(paymentData.status as string),
           description: paymentData.description,
         },
-      });
+      })
 
       if (updatedPayment.status === "APPROVED") {
-        const enterprisePlan = await prisma.plan.findFirst({
-          where: { name: "Enterprise", isActive: true },
-        });
+        const metadataPlan = paymentData.metadata?.plan as
+          | { planId?: string; planName?: string; planType?: string }
+          | undefined
+        const externalReference = typeof paymentData.external_reference === 'string'
+          ? paymentData.external_reference
+          : undefined
 
-        if (!enterprisePlan) {
-          return NextResponse.json({ message: "Plan not found or is not active" }, { status: 404 });
+        const planIdCandidates = [
+          metadataPlan?.planId,
+          externalReference && externalReference.length === 36 ? externalReference : undefined,
+        ].filter((value): value is string => Boolean(value))
+
+        const planNameCandidates = [
+          metadataPlan?.planName,
+          metadataPlan?.planType === 'ENTERPRISE'
+            ? 'Enterprise'
+            : metadataPlan?.planType === 'PREMIUM'
+              ? 'Premium'
+              : undefined,
+          externalReference === 'monthly' ? 'Premium' : undefined,
+          externalReference && externalReference.length !== 36 ? externalReference : undefined,
+        ].filter((value): value is string => Boolean(value))
+
+        let targetPlan: Plan | null = null
+        for (const candidate of planIdCandidates) {
+          const plan = await prisma.plan.findUnique({ where: { id: candidate } })
+          if (plan?.isActive) {
+            targetPlan = plan
+            break
+          }
         }
 
-        const serviceProviderId = paymentData.metadata.payer.provider_id as string;
+        if (!targetPlan) {
+          for (const name of planNameCandidates) {
+            const plan = await prisma.plan.findFirst({ where: { name, isActive: true } })
+            if (plan) {
+              targetPlan = plan
+              break
+            }
+          }
+        }
 
-        let subscription = await prisma.subscription.findFirst({
-          where: {
-            serviceProviderId,
-            status: "ACTIVE",
-          },
-        });
+        if (!targetPlan) {
+          targetPlan = await prisma.plan.findFirst({ where: { name: 'Enterprise', isActive: true } })
+        }
 
-        if (!subscription) {
-          const { startDate, endDate } = getOneMonthInterval();
-          subscription = await prisma.subscription.create({
-            data: {
-              serviceProviderId,
-              planId: enterprisePlan.id,
-              startDate,
-              endDate,
-              isAutoRenew: false,
-              status: "ACTIVE",
-              payments: { connect: { id: updatedPayment.id } },
-            },
-          });
-        } else if (subscription.planId === enterprisePlan.id) {
-          const { endDate } = getOneMonthInterval(
-            subscription.endDate ?? new Date()
-          );
-          subscription = await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: {
-              endDate,
-              payments: { connect: { id: updatedPayment.id } },
-            },
-          });
-        } else {
+        if (!targetPlan) {
+          return NextResponse.json({ message: 'Plan not found or is not active' }, { status: 404 })
+        }
+
+        let serviceProviderId = resolvedProviderId || (metadataPayer.providerId || metadataPayer.provider_id) as string | undefined
+        if (!serviceProviderId) {
+          return NextResponse.json({ message: 'Service provider not found in metadata' }, { status: 400 })
+        }
+
+        const now = new Date()
+        const existingSubscription = await prisma.subscription.findFirst({
+          where: { serviceProviderId, status: 'ACTIVE' },
+          orderBy: { endDate: 'desc' },
+        })
+
+        if (existingSubscription && existingSubscription.planId !== targetPlan.id) {
           await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: { status: "CANCELLED" },
-          });
+            where: { id: existingSubscription.id },
+            data: { status: 'CANCELLED', endDate: now },
+          })
+        }
 
-          const { startDate, endDate } = getOneMonthInterval();
-          subscription = await prisma.subscription.create({
+        const baseDate =
+          existingSubscription && existingSubscription.planId === targetPlan.id && existingSubscription.endDate && existingSubscription.endDate > now
+            ? existingSubscription.endDate
+            : now
+        const { startDate, endDate } = getOneMonthInterval(baseDate)
+
+        if (existingSubscription && existingSubscription.planId === targetPlan.id) {
+          await prisma.subscription.update({
+            where: { id: existingSubscription.id },
+            data: {
+              endDate,
+              payments: { connect: { id: updatedPayment.id } },
+            },
+          })
+        } else {
+          await prisma.subscription.create({
             data: {
               serviceProviderId,
-              planId: enterprisePlan.id,
+              planId: targetPlan.id,
               startDate,
               endDate,
               isAutoRenew: false,
-              status: "ACTIVE",
+              status: 'ACTIVE',
               payments: { connect: { id: updatedPayment.id } },
             },
-          });
+          })
+        }
+
+        await prisma.serviceProvider.update({
+          where: { id: serviceProviderId },
+          data: { planId: targetPlan.id },
+        })
+
+        try {
+          const coupon = paymentData.metadata?.coupon
+          const userId = resolvedUserId
+          if (coupon?.couponId && userId) {
+            await prisma.couponRedemption.upsert({
+              where: { paymentId: updatedPayment.id },
+              update: {},
+              create: {
+                couponId: String(coupon.couponId),
+                userId,
+                planId: targetPlan.id,
+                amountOff: typeof coupon.amountOff === 'number' ? coupon.amountOff : null,
+                paymentId: updatedPayment.id,
+              },
+            })
+          }
+        } catch (e) {
+          console.error('[WEBHOOK][COUPON] redemption error', e)
         }
       }
 

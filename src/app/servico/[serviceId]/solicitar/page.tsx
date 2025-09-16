@@ -608,10 +608,28 @@ export default function ServiceRequestPage() {
                   )}
                   
                   <div className="flex justify-end gap-2">
-                    {selectedProvider && service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling ? (
+                    {selectedProvider ? (
                       <Button
                         type="button"
-                        onClick={() => router.push(`/servico/${serviceId}/agendar?providerId=${selectedProviderProfileId}`)}
+                        disabled={!isFormValid() || submitting}
+                        onClick={() => {
+                          try {
+                            const payload = {
+                              serviceId,
+                              providerId: selectedProviderProfileId,
+                              description: bookingData.description,
+                              clientName: bookingData.clientName,
+                              clientPhone: bookingData.clientPhone,
+                              clientEmail: bookingData.clientEmail,
+                              address: bookingData.address,
+                              city: bookingData.city,
+                              state: bookingData.state,
+                              zipCode: bookingData.zipCode,
+                            }
+                            sessionStorage.setItem('pendingBooking', JSON.stringify(payload))
+                          } catch {}
+                          router.push(`/servico/${serviceId}/agendar?providerId=${selectedProviderProfileId}`)
+                        }}
                         className="px-8 py-2"
                       >
                         Escolher Data na Agenda

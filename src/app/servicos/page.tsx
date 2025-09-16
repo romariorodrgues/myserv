@@ -198,7 +198,7 @@ function ServicesPageContent() {
                               R$ {provider.basePrice?.toFixed(2)}
                             </span>
                             <Button size="sm" asChild>
-                              <Link href={`/servico/${service.id}/solicitar`}>
+                              <Link href={`/servico/${service.id}/solicitar?providerId=${provider.id}`}>
                                 Contratar
                               </Link>
                             </Button>

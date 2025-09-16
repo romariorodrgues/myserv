@@ -6,8 +6,7 @@ import { authOptions } from '@/lib/auth'
 async function requireAdmin(): Promise<boolean> {
   try {
     const session = await getServerSession(authOptions)
-    // @ts-expect-error next-auth augmented type
-    return session?.user?.userType === 'ADMIN'
+    return (session as any)?.user?.userType === 'ADMIN'
   } catch {
     return false
   }
@@ -31,6 +30,10 @@ export async function POST(req: NextRequest) {
     'CONTACT_ADDRESS',
     'SOCIAL_FACEBOOK_URL',
     'SOCIAL_INSTAGRAM_URL',
+    // Plan settings
+    'PLAN_UNLOCK_PRICE',
+    'PLAN_MONTHLY_PRICE',
+    'PLAN_ENTERPRISE_PRICE',
   ])
 
   const entries = Object.entries(updates).filter(([k, v]) => allowedKeys.has(k) && typeof v === 'string')
@@ -46,4 +49,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ success: true })
 }
-

@@ -46,13 +46,17 @@ export async function PATCH(
     nextDay.setDate(nextDay.getDate() + 1)
 
     // Ensure slot is free for provider
+    const now = new Date()
     const conflicting = await prisma.serviceRequest.findFirst({
       where: {
         providerId: booking.providerId,
         scheduledDate: { gte: sameDayStart, lt: nextDay },
         scheduledTime,
-        status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] },
-        NOT: { id: booking.id }
+        NOT: { id: booking.id },
+        OR: [
+          { status: { in: ['PENDING', 'ACCEPTED', 'COMPLETED'] } },
+          { AND: [ { status: 'HOLD' }, { expiresAt: { gt: now } } ] }
+        ]
       }
     })
     if (conflicting) {
@@ -108,4 +112,3 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
-
