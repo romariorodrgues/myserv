@@ -1,10 +1,11 @@
 'use client'
 
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 
-export default function ProviderRegistrationThankYou() {
+function ThankYouContent() {
   const searchParams = useSearchParams()
   const status = searchParams.get('status')
 
@@ -37,5 +38,13 @@ export default function ProviderRegistrationThankYou() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ProviderRegistrationThankYou() {
+  return (
+    <Suspense fallback={null}>
+      <ThankYouContent />
+    </Suspense>
   )
 }

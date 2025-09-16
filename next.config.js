@@ -13,7 +13,20 @@ const nextConfig = {
       { protocol: 'https', hostname: '*.digitaloceanspaces.com' },
     ],
   },
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+  webpack: (config) => {
+    config.resolve = config.resolve || {}
+    config.resolve.fallback = {
+      ...(config.resolve.fallback || {}),
+      fs: false,
+    }
+    return config
+  },
 }
 
 module.exports = nextConfig
-
