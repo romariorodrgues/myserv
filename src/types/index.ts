@@ -117,6 +117,8 @@ export interface ClientProfileData {
     zipCode?: string
     complement?: string
     district?: string
+    latitude?: number
+    longitude?: number
   }
   preferences?: {
     emailNotifications?: boolean
@@ -131,6 +133,13 @@ export interface ClientProfileData {
     showPhone?: boolean
     showEmail?: boolean
     showLocation?: boolean
+  }
+  serviceProviderSettings?: {
+    chargesTravel: boolean
+    travelCost?: number
+    travelRatePerKm?: number
+    travelMinimumFee?: number
+    waivesTravelOnHire: boolean
   }
   plan: string,
 }
@@ -170,6 +179,8 @@ export interface ServiceProvider {
   hasQuoting: boolean
   chargesTravel: boolean
   travelCost?: number
+  travelRatePerKm?: number
+  travelMinimumFee?: number
   waivesTravelOnHire: boolean
   isHighlighted: boolean
   highlightUntil?: Date
@@ -192,6 +203,12 @@ export interface ServiceRequest {
   estimatedPrice?: number
   finalPrice?: number
   travelCost?: number
+  basePriceSnapshot?: number
+  travelDistanceKm?: number
+  travelDurationMinutes?: number
+  travelRatePerKmSnapshot?: number
+  travelMinimumFeeSnapshot?: number
+  travelFixedFeeSnapshot?: number
   schedulingFee?: number
   isVisitVirtual: boolean
   expiresAt?: Date
@@ -228,6 +245,7 @@ export interface ServiceCategory {
   description?: string
   icon?: string
   isActive: boolean
+  allowScheduling?: boolean
   services: Service[]
 }
 
@@ -238,6 +256,7 @@ export interface ServiceProviderService {
   basePrice?: number
   description?: string
   isActive: boolean
+  offersScheduling?: boolean
   service: Service
 }
 
@@ -333,6 +352,8 @@ export interface ServiceProviderFormData {
   hasQuoting: boolean
   chargesTravel: boolean
   travelCost?: number
+  travelRatePerKm?: number
+  travelMinimumFee?: number
   waivesTravelOnHire: boolean
   description: string
   services: string[]

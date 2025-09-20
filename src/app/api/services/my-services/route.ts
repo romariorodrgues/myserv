@@ -4,6 +4,21 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 
+async function syncProviderSchedulingFlag(serviceProviderId: string) {
+  const hasScheduling = await prisma.serviceProviderService.count({
+    where: {
+      serviceProviderId,
+      offersScheduling: true,
+      isActive: true,
+    },
+  }) > 0
+
+  await prisma.serviceProvider.update({
+    where: { id: serviceProviderId },
+    data: { hasScheduling },
+  })
+}
+
 // ---------------- GET (mantém seu shape) ----------------
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -21,17 +36,18 @@ export async function GET() {
       include: {
         services: {
           include: {
-            service: {
-              include: {
-                category: {
-                  select: {
-                    id: true,
-                    name: true,
-                    icon: true
-                  }
-                }
+        service: {
+          include: {
+            category: {
+              select: {
+                id: true,
+                name: true,
+                icon: true,
+                allowScheduling: true,
               }
             }
+          }
+        }
           },
           orderBy: { createdAt: 'desc' }
         }
@@ -52,8 +68,10 @@ export async function GET() {
         basePrice: s.basePrice,
         unit: s.unit,
         isActive: s.isActive,
+        offersScheduling: s.offersScheduling,
         category: s.service.category,
         categoryId: s.service.categoryId,
+        allowScheduling: s.service.category?.allowScheduling ?? true,
         createdAt: s.createdAt
       }))
     })
@@ -70,7 +88,8 @@ const upsertSchema = z.object({
   basePrice: z.number().nonnegative().optional(),
   unit: z.string().min(1),               // ex.: "hora", "serviço", "m²"
   description: z.string().max(2000).optional(),
-  isActive: z.boolean().optional()
+  isActive: z.boolean().optional(),
+  offersScheduling: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -143,7 +162,8 @@ export async function POST(req: NextRequest) {
         basePrice: input.basePrice ?? null,
         unit: input.unit,
         description: input.description ?? null,
-        isActive: input.isActive ?? true
+        isActive: input.isActive ?? true,
+        offersScheduling: cat.allowScheduling && !!input.offersScheduling,
       },
       create: {
         serviceProviderId: sp.id,
@@ -151,12 +171,15 @@ export async function POST(req: NextRequest) {
         basePrice: input.basePrice ?? null,
         unit: input.unit,
         description: input.description ?? null,
-        isActive: input.isActive ?? true
+        isActive: input.isActive ?? true,
+        offersScheduling: cat.allowScheduling && !!input.offersScheduling,
       },
       include: {
-        service: { include: { category: { select: { id: true, name: true, icon: true } } } }
+        service: { include: { category: { select: { id: true, name: true, icon: true, allowScheduling: true } } } }
       }
     })
+
+    await syncProviderSchedulingFlag(sp.id)
 
     // retorna no mesmo shape do GET
     return NextResponse.json({
@@ -171,6 +194,7 @@ export async function POST(req: NextRequest) {
         isActive: link.isActive,
         category: link.service.category,
         categoryId: service.categoryId,
+        allowScheduling: link.service.category.allowScheduling,
         createdAt: link.createdAt
       }
     }, { status: 201 })
@@ -206,19 +230,19 @@ export async function DELETE(req: NextRequest) {
     }
 
     if (id) {
-  const link = await prisma.serviceProviderService.findUnique({
-    where: { id },
-    select: { serviceProviderId: true }
-  })
-  if (!link) {
-    return NextResponse.json({ success: false, error: 'Vínculo não encontrado' }, { status: 404 })
-  }
-  if (link.serviceProviderId !== sp.id) {
-    return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
-  }
+      const link = await prisma.serviceProviderService.findUnique({
+        where: { id },
+        select: { serviceProviderId: true }
+      })
+      if (!link) {
+        return NextResponse.json({ success: false, error: 'Vínculo não encontrado' }, { status: 404 })
+      }
+      if (link.serviceProviderId !== sp.id) {
+        return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
+      }
 
-  await prisma.serviceProviderService.delete({ where: { id } })
-} else if (serviceId) {
+      await prisma.serviceProviderService.delete({ where: { id } })
+    } else if (serviceId) {
       await prisma.serviceProviderService.delete({
         where: {
           serviceProviderId_serviceId: { serviceProviderId: sp.id, serviceId }
@@ -237,6 +261,8 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Informe id, serviceId ou leafCategoryId' }, { status: 400 })
     }
 
+    await syncProviderSchedulingFlag(sp.id)
+
     return NextResponse.json({ success: true })
   } catch (error) {
     console.error('Erro ao remover serviço do prestador:', error)
@@ -251,11 +277,18 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId } = await req.json()
+    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling } = await req.json()
+
+    const requestedScheduling = typeof offersScheduling === 'boolean' ? offersScheduling : undefined
 
     const sps = await prisma.serviceProviderService.findUnique({
       where: { id: serviceProviderServiceId },
-      select: { serviceProviderId: true, serviceId: true }
+      select: {
+        serviceProviderId: true,
+        serviceId: true,
+        offersScheduling: true,
+        service: { select: { category: { select: { allowScheduling: true } } } }
+      }
     })
     if (!sps) return NextResponse.json({ success: false, error: 'Vínculo não encontrado' }, { status: 404 })
 
@@ -267,12 +300,16 @@ export async function PATCH(req: NextRequest) {
 
     // Se veio uma nova folha, mover para o serviço canônico da nova categoria
     if (typeof leafCategoryId === 'string') {
-      const cat = await prisma.serviceCategory.findUnique({ where: { id: leafCategoryId }, select: { id: true, isLeaf: true, isActive: true, name: true } })
+      const cat = await prisma.serviceCategory.findUnique({ where: { id: leafCategoryId }, select: { id: true, isLeaf: true, isActive: true, name: true, allowScheduling: true } })
       if (!cat || !cat.isActive) {
         return NextResponse.json({ success: false, error: 'Categoria inválida/inativa' }, { status: 400 })
       }
       if (!cat.isLeaf) {
         return NextResponse.json({ success: false, error: 'Selecione uma subcategoria folha' }, { status: 400 })
+      }
+
+      const schedulingData = {
+        offersScheduling: cat.allowScheduling ? (requestedScheduling ?? false) : false,
       }
 
       const selectSvc = { id: true, categoryId: true } as const
@@ -295,6 +332,7 @@ export async function PATCH(req: NextRequest) {
               ...(unit && { unit }),
               ...(typeof description === 'string' ? { description } : {}),
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
+              ...schedulingData,
             }
           })
           await prisma.serviceProviderService.delete({ where: { id: serviceProviderServiceId } })
@@ -307,6 +345,7 @@ export async function PATCH(req: NextRequest) {
               ...(unit && { unit }),
               ...(typeof description === 'string' ? { description } : {}),
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
+              ...schedulingData,
             }
           })
         }
@@ -319,11 +358,17 @@ export async function PATCH(req: NextRequest) {
             ...(unit && { unit }),
             ...(typeof description === 'string' ? { description } : {}),
             ...(typeof isActive === 'boolean' ? { isActive } : {}),
+            ...schedulingData,
           }
         })
       }
     } else {
       // Sem troca de categoria — atualiza campos
+      const currentAllows = sps.service?.category.allowScheduling ?? true
+      const schedulingData: { offersScheduling?: boolean } = currentAllows
+        ? (requestedScheduling !== undefined ? { offersScheduling: requestedScheduling } : {})
+        : { offersScheduling: false }
+
       await prisma.serviceProviderService.update({
         where: { id: serviceProviderServiceId },
         data: {
@@ -331,9 +376,12 @@ export async function PATCH(req: NextRequest) {
           ...(unit && { unit }),
           ...(typeof description === 'string' ? { description } : {}),
           ...(typeof isActive === 'boolean' ? { isActive } : {}),
+          ...schedulingData,
         }
       })
     }
+
+    await syncProviderSchedulingFlag(sps.serviceProviderId)
 
     return NextResponse.json({ success: true })
   } catch (e) {

@@ -13,6 +13,7 @@ const createSchema = z.object({
   parentId: z.string().uuid().nullish(),
   isActive: z.boolean().optional().default(true),
   requiresDriverLicense: z.boolean().optional().default(false),
+  allowScheduling: z.boolean().optional().default(true),
 })
 
 export async function POST(req: NextRequest) {
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
         displayOrder,
         isActive: input.isActive,
         requiresDriverLicense: input.requiresDriverLicense,
+        allowScheduling: input.allowScheduling,
       },
     })
 

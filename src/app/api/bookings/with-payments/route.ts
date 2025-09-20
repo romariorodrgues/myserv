@@ -97,6 +97,13 @@ export async function GET(request: NextRequest) {
       createdAt: booking.createdAt.toISOString(),
       estimatedPrice: booking.estimatedPrice,
       finalPrice: booking.finalPrice,
+      travelCost: booking.travelCost,
+      basePriceSnapshot: booking.basePriceSnapshot,
+      travelDistanceKm: booking.travelDistanceKm,
+      travelDurationMinutes: booking.travelDurationMinutes,
+      travelRatePerKmSnapshot: booking.travelRatePerKmSnapshot,
+      travelMinimumFeeSnapshot: booking.travelMinimumFeeSnapshot,
+      travelFixedFeeSnapshot: booking.travelFixedFeeSnapshot,
       service: booking.service,
       client,
       serviceProvider: {

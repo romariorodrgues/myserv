@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { EmailService } from '@/lib/email-service'
 import { PaymentService } from '@/lib/payment-service'
-import GoogleMapsService from '@/lib/maps-service'
+import GoogleMapsServerService from '@/lib/maps-server'
 
 const testSchema = z.object({
   service: z.enum(['whatsapp', 'email', 'payment', 'maps']),
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           break
         }
 
-        const locationResult = await GoogleMapsService.geocodeAddress(testData.address)
+        const locationResult = await GoogleMapsServerService.geocodeAddress(testData.address)
         results.success = !!locationResult
         results.message = locationResult 
           ? 'Endereço geocodificado com sucesso' 
@@ -175,8 +175,8 @@ export async function GET(request: NextRequest) {
           }
         },
         maps: {
-          configured: !!process.env.GOOGLE_MAPS_API_KEY,
-          apiKey: process.env.GOOGLE_MAPS_API_KEY ? 'Configurado' : 'Não configurado'
+          configured: !!(process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY),
+          apiKey: process.env.GOOGLE_MAPS_API_KEY || process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ? 'Configurado' : 'Não configurado'
         },
         system: {
           environment: process.env.NODE_ENV || 'development',

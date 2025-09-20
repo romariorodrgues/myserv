@@ -5,7 +5,7 @@
  * Custom hook for handling geolocation functionality
  */
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 
 interface Coordinates {
@@ -20,6 +20,8 @@ interface LocationData {
   country: string
   postalCode?: string
   formatted: string
+  lat?: number
+  lng?: number
 }
 
 export function useGeolocation() {

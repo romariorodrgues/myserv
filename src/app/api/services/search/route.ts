@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
+import GoogleMapsServerService from '@/lib/maps-server'
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
@@ -69,7 +70,8 @@ const advancedSearchSchema = z.object({
   lat: z.number().optional(),
   lng: z.number().optional(),
   radiusKm: z.number().default(30),
-  sortBy: z.enum(['RELEVANCE', 'PRICE_LOW', 'PRICE_HIGH', 'NEWEST']).default('RELEVANCE'),
+  hasScheduling: z.boolean().optional(),
+  sortBy: z.enum(['RELEVANCE', 'DISTANCE', 'PRICE_LOW', 'PRICE_HIGH', 'NEWEST']).default('RELEVANCE'),
   page: z.number().default(1),
   limit: z.number().default(20)
 })
@@ -103,10 +105,46 @@ const input = advancedSearchSchema.parse({
   // novos:
   lat: searchParams.get('lat') ? Number(searchParams.get('lat')) : undefined,
   lng: searchParams.get('lng') ? Number(searchParams.get('lng')) : undefined,
-  radiusKm: searchParams.get('radiusKm') ? Number(searchParams.get('radiusKm')) : undefined
+  radiusKm: searchParams.get('radiusKm') ? Number(searchParams.get('radiusKm')) : undefined,
+  hasScheduling: searchParams.get('hasScheduling') === 'true' ? true : undefined,
 })
 
-const radiusKm = Math.max(1, Math.min(input.radiusKm, 200)); // clamp 1–200 km
+let resolvedLat = typeof input.lat === 'number' && Number.isFinite(input.lat) ? input.lat : null
+let resolvedLng = typeof input.lng === 'number' && Number.isFinite(input.lng) ? input.lng : null
+let resolvedCity = input.city ?? null
+let resolvedState = input.state ?? null
+
+try {
+  if ((resolvedLat == null || resolvedLng == null) && localParam) {
+    const geocoded = await GoogleMapsServerService.geocodeAddress(localParam)
+    if (geocoded) {
+      if (resolvedLat == null) resolvedLat = geocoded.latitude
+      if (resolvedLng == null) resolvedLng = geocoded.longitude
+      if (!resolvedCity && geocoded.address.city) resolvedCity = geocoded.address.city
+      if (!resolvedState && geocoded.address.state) resolvedState = geocoded.address.state
+    }
+  }
+
+  if ((resolvedCity == null || resolvedState == null) && resolvedLat != null && resolvedLng != null) {
+    const reverse = await GoogleMapsServerService.reverseGeocode(resolvedLat, resolvedLng)
+    if (reverse) {
+      if (!resolvedCity && reverse.address.city) resolvedCity = reverse.address.city
+      if (!resolvedState && reverse.address.state) resolvedState = reverse.address.state
+    }
+  }
+} catch (locationError) {
+  console.error('[services/search] location resolution error', locationError)
+}
+
+const rawRadiusKm = Math.max(1, Math.min(input.radiusKm, 200));
+const cityRadiusThreshold = 50;
+const normalize = (value?: string | null) =>
+  value ? value.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().trim() : ''
+const normalizedCity = normalize(resolvedCity)
+const normalizedState = normalize(resolvedState)
+const resolvedStateFilter = resolvedState ? resolvedState.toUpperCase() : null
+const enforceCityOnly = rawRadiusKm > cityRadiusThreshold && !!normalizedCity
+const radiusKm = enforceCityOnly ? cityRadiusThreshold : rawRadiusKm
 
     // where em Service
     const whereService: Prisma.ServiceWhereInput = { isActive: true }
@@ -139,10 +177,11 @@ if (input.leafCategoryId) {
     const whereProvider: Prisma.ServiceProviderServiceWhereInput = { isActive: true }
     if (input.minPrice != null) whereProvider.basePrice = { ...(whereProvider.basePrice as any || {}), gte: input.minPrice }
     if (input.maxPrice != null) whereProvider.basePrice = { ...(whereProvider.basePrice as any || {}), lte: input.maxPrice }
+    if (input.hasScheduling) whereProvider.offersScheduling = true
 
-    if (input.city || input.state) {
-  const cityVariants = input.city
-    ? Array.from(new Set([input.city, input.city.toLowerCase(), input.city.toUpperCase()]))
+    if (resolvedCity || resolvedState) {
+  const cityVariants = resolvedCity
+    ? Array.from(new Set([resolvedCity, resolvedCity.toLowerCase(), resolvedCity.toUpperCase()]))
     : null
 
   whereProvider.serviceProvider = {
@@ -154,7 +193,7 @@ if (input.leafCategoryId) {
               ...(cityVariants
                 ? { OR: cityVariants.map(v => ({ city: { contains: v } })) }
                 : {}),
-              ...(input.state ? { state: { equals: input.state } } : {}),
+              ...(resolvedStateFilter ? { state: { equals: resolvedStateFilter } } : {}),
             }
           }
         }
@@ -210,7 +249,8 @@ if (input.leafCategoryId) {
           name: p.serviceProvider.user.name,
           profileImage: p.serviceProvider.user.profileImage,
           basePrice: p.basePrice ?? 0,
-          description: p.description
+          description: p.description,
+          offersScheduling: p.offersScheduling,
         }))
       }))
 
@@ -231,8 +271,8 @@ if (input.leafCategoryId) {
         const addr = p.serviceProvider.user.address
         const loc = addr ? (addr.state ? `${addr.city}, ${addr.state}` : addr.city ?? '') : ''
         const dist =
-  (input.lat != null && input.lng != null && addr?.latitude != null && addr?.longitude != null)
-    ? haversine(input.lat, input.lng, addr.latitude!, addr.longitude!)
+  (resolvedLat != null && resolvedLng != null && addr?.latitude != null && addr?.longitude != null)
+    ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
     : undefined
 
         if (!providerMap.has(pid)) {
@@ -240,24 +280,48 @@ if (input.leafCategoryId) {
             id: pid,
             name: p.serviceProvider.user.name,
             profileImage: p.serviceProvider.user.profileImage ?? undefined,
+            primaryServiceId: p.serviceId,
             location: loc,
+            city: addr?.city ?? null,
+            state: addr?.state ?? null,
+            latitude: addr?.latitude ?? null,
+            longitude: addr?.longitude ?? null,
             services: [svc.name],
             category: svc.category.name,
             rating: 0,
             reviewCount: 0,
             basePrice: p.basePrice ?? 0,
-            distance: dist,  
-            available: true
+            distance: dist,
+            available: true,
+            offersScheduling: p.offersScheduling,
+            travel: {
+              chargesTravel: p.serviceProvider.chargesTravel,
+              travelRatePerKm: p.serviceProvider.travelRatePerKm,
+              travelMinimumFee: p.serviceProvider.travelMinimumFee,
+              travelFixedFee: p.serviceProvider.travelCost,
+              waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
+            },
           })
         } else {
           const entry = providerMap.get(pid)
           if (!entry.services.includes(svc.name)) entry.services.push(svc.name)
+          if (!entry.primaryServiceId) entry.primaryServiceId = p.serviceId
           entry.basePrice = Math.min(entry.basePrice, p.basePrice ?? entry.basePrice)
-        if (dist != null && (entry.distance == null || dist < entry.distance)) {
-    entry.distance = dist
+          if (dist != null && (entry.distance == null || dist < entry.distance)) {
+            entry.distance = dist
+          }
+          if (p.offersScheduling && !entry.offersScheduling) entry.offersScheduling = true
+          if (!entry.travel) {
+            entry.travel = {
+              chargesTravel: p.serviceProvider.chargesTravel,
+              travelRatePerKm: p.serviceProvider.travelRatePerKm,
+              travelMinimumFee: p.serviceProvider.travelMinimumFee,
+              travelFixedFee: p.serviceProvider.travelCost,
+              waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
+            }
+          }
         }
       }
-    }
     }
 
  let results = Array.from(providerMap.values())
@@ -266,20 +330,35 @@ if (input.leafCategoryId) {
 if (input.sortBy === 'PRICE_LOW') results.sort((a, b) => (a.basePrice ?? 0) - (b.basePrice ?? 0))
 if (input.sortBy === 'PRICE_HIGH') results.sort((a, b) => (b.basePrice ?? 0) - (a.basePrice ?? 0))
 
-// se vieram coordenadas, filtra por raio e ordena por distância (com tie-break por preço)
-if (input.lat != null && input.lng != null) {
-  // mantém quem não tem distância (endereço sem lat/lng) **ou** quem está no raio
-  results = results.filter(r => r.distance == null || r.distance <= radiusKm)
+// se vieram coordenadas, filtra por raio e, se solicitado, ordena por distância
+if (resolvedLat != null && resolvedLng != null) {
+  results = results.filter((r) => r.distance == null || r.distance <= radiusKm)
 
-  results.sort((a, b) => {
-    const da = a.distance ?? Number.POSITIVE_INFINITY
-    const db = b.distance ?? Number.POSITIVE_INFINITY
-    if (da !== db) return da - db
-    // empate: menor preço primeiro
-    const pa = a.basePrice ?? Number.POSITIVE_INFINITY
-    const pb = b.basePrice ?? Number.POSITIVE_INFINITY
-    return pa - pb
-  })
+  if (enforceCityOnly) {
+    results = results.filter((r) => {
+      if (!normalizedCity) return true
+      const providerCity = r.city ?? (typeof r.location === 'string' ? r.location.split(',')[0] : null)
+      const providerState = r.state ?? (typeof r.location === 'string' ? r.location.split(',')[1]?.trim() : null)
+      const cityMatch = normalize(providerCity) === normalizedCity
+      const stateMatch = normalizedState ? normalize(providerState) === normalizedState : true
+      return cityMatch && stateMatch
+    })
+  }
+
+  if (input.sortBy === 'DISTANCE' || input.sortBy === 'RELEVANCE') {
+    results.sort((a, b) => {
+      const da = a.distance ?? Number.POSITIVE_INFINITY
+      const db = b.distance ?? Number.POSITIVE_INFINITY
+      if (da !== db) return da - db
+      const pa = a.basePrice ?? Number.POSITIVE_INFINITY
+      const pb = b.basePrice ?? Number.POSITIVE_INFINITY
+      return pa - pb
+    })
+  }
+}
+
+if (input.availability) {
+  results = results.filter((r) => r.offersScheduling)
 }
 // --- Paginação dos providers "results" (lista achatada)
 const resultsTotal = results.length
@@ -299,6 +378,8 @@ return NextResponse.json({
       pages: Math.ceil(totalCount / input.limit),
     },
     appliedRadiusKm: radiusKm,
+    requestedRadiusKm: rawRadiusKm,
+    cityFilterApplied: enforceCityOnly,
   },
   results: pagedResults,
   resultsPagination: {

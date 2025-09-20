@@ -24,7 +24,7 @@ export default function AdminCategoriesPage() {
   const [selectedLeafId, setSelectedLeafId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', icon: '', requiresDriverLicense: false })
+  const [form, setForm] = useState({ name: '', description: '', icon: '', requiresDriverLicense: false, allowScheduling: true })
   const parentId = useMemo(() => currentPath.at(-1)?.id ?? null, [currentPath])
 
   const [editing, setEditing] = useState<Cat | null>(null)
@@ -42,7 +42,7 @@ export default function AdminCategoriesPage() {
       })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data?.error || 'Erro ao criar categoria')
-      setForm({ name: '', description: '', icon: '', requiresDriverLicense: false })
+      setForm({ name: '', description: '', icon: '', requiresDriverLicense: false, allowScheduling: true })
       setCreating(false)
       // força recarregar picker mudando o path (no-op)
       setCurrentPath((p) => [...p])
@@ -94,7 +94,7 @@ export default function AdminCategoriesPage() {
     }
   }
 
-  const [selectedDetails, setSelectedDetails] = useState<{ id: string; requiresDriverLicense: boolean } | null>(null)
+  const [selectedDetails, setSelectedDetails] = useState<{ id: string; requiresDriverLicense: boolean; allowScheduling: boolean } | null>(null)
 
   useEffect(() => {
     const current = currentPath.at(-1)
@@ -104,7 +104,11 @@ export default function AdminCategoriesPage() {
         const res = await fetch(`/api/admin/categories/${current.id}`)
         const data = await res.json()
         if (res.ok && data.success) {
-          setSelectedDetails({ id: data.category.id, requiresDriverLicense: !!data.category.requiresDriverLicense })
+          setSelectedDetails({
+            id: data.category.id,
+            requiresDriverLicense: !!data.category.requiresDriverLicense,
+            allowScheduling: data.category.allowScheduling !== false
+          })
         }
       } catch {}
     })()
@@ -124,6 +128,28 @@ export default function AdminCategoriesPage() {
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data?.error || 'Erro')
       setSelectedDetails((d) => d ? { ...d, requiresDriverLicense: newVal } : d)
+    } catch (e) {
+      console.error(e)
+      alert('Erro ao atualizar')
+    } finally {
+      setToggling(null)
+    }
+  }
+
+  const toggleAllowScheduling = async () => {
+    const node = currentPath.at(-1)
+    if (!node || !selectedDetails) return
+    const newVal = !selectedDetails.allowScheduling
+    setToggling(node.id)
+    try {
+      const res = await fetch(`/api/admin/categories/${node.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ allowScheduling: newVal })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Erro')
+      setSelectedDetails((d) => d ? { ...d, allowScheduling: newVal } : d)
     } catch (e) {
       console.error(e)
       alert('Erro ao atualizar')
@@ -191,12 +217,19 @@ export default function AdminCategoriesPage() {
               <Label>Descrição</Label>
               <Input value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} />
             </div>
+              <div className="flex items-center justify-between rounded-md border p-3">
+                <div>
+                  <Label>Exige CNH</Label>
+                  <p className="text-xs text-gray-500">Marque para categorias como Transporte/Frete/Motoboy etc.</p>
+                </div>
+                <Switch checked={form.requiresDriverLicense} onCheckedChange={(v) => setForm((f) => ({ ...f, requiresDriverLicense: v }))} />
+              </div>
             <div className="flex items-center justify-between rounded-md border p-3">
               <div>
-                <Label>Exige CNH</Label>
-                <p className="text-xs text-gray-500">Marque para categorias como Transporte/Frete/Motoboy etc.</p>
+                <Label>Permite agendamento</Label>
+                <p className="text-xs text-gray-500">Controle se serviços desta categoria podem abrir agenda.</p>
               </div>
-              <Switch checked={form.requiresDriverLicense} onCheckedChange={(v) => setForm((f) => ({ ...f, requiresDriverLicense: v }))} />
+              <Switch checked={form.allowScheduling} onCheckedChange={(v) => setForm((f) => ({ ...f, allowScheduling: v }))} />
             </div>
             <div className="flex gap-2">
               <Button onClick={handleCreate} disabled={saving || !form.name.trim()}>
@@ -250,6 +283,21 @@ export default function AdminCategoriesPage() {
                   </div>
                   <Switch disabled={!selectedDetails} checked={!!selectedDetails?.requiresDriverLicense} onCheckedChange={toggleRequiresDL} />
                 </div>
+
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">Permitir agendamento</div>
+                    <div className="text-xs text-gray-500">Quando desativado, prestadores só poderão receber orçamentos.</div>
+                  </div>
+                  <Switch
+                    disabled={!selectedDetails || !currentPath.at(-1)?.isLeaf}
+                    checked={!!selectedDetails?.allowScheduling}
+                    onCheckedChange={toggleAllowScheduling}
+                  />
+                </div>
+                {!currentPath.at(-1)?.isLeaf && (
+                  <p className="text-xs text-gray-500 text-right">Disponível apenas para folhas da árvore de categorias.</p>
+                )}
               </>
             )}
           </CardContent>

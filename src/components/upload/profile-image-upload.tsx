@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Image from 'next/image'
 import { Camera, Upload, X, User, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -120,6 +120,8 @@ export function ProfileImageUpload({
     fileInputRef.current?.click()
   }
 
+  const isBlobPreview = preview?.startsWith('blob:') || preview?.startsWith('data:')
+
   return (
     <div className={className}>
       <input
@@ -134,20 +136,24 @@ export function ProfileImageUpload({
         {/* Current Image Display */}
         <div className="flex justify-center">
           <div className="relative">
-            {preview ? (
-              <Image
-                src={preview}
-                alt={userName}
-                width={128}
-                height={128}
-                className="h-32 w-32 rounded-full object-cover border-4 border-white shadow-lg"
-              />
-            ) : (
-              <div className="h-32 w-32 rounded-full bg-gray-300 flex items-center justify-center border-4 border-white shadow-lg">
-                <User className="h-12 w-12 text-gray-600" />
-              </div>
-            )}
-            
+            <div className="relative h-32 w-32 rounded-full border-4 border-white shadow-lg overflow-hidden bg-gray-200">
+              {preview ? (
+                <Image
+                  src={preview}
+                  alt={userName}
+                  fill
+                  sizes="128px"
+                  quality={95}
+                  unoptimized={isBlobPreview}
+                  className="object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gray-300">
+                  <User className="h-12 w-12 text-gray-600" />
+                </div>
+              )}
+            </div>
+
             {preview && !uploading && (
               <button
                 onClick={handleRemoveImage}
@@ -159,7 +165,7 @@ export function ProfileImageUpload({
             )}
             
             {uploading && (
-              <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+              <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
                 <Loader2 className="h-8 w-8 text-white animate-spin" />
               </div>
             )}
@@ -264,6 +270,13 @@ export function ProfileImageUploadCompact({
   const [preview, setPreview] = useState<string | null>(currentImage ? cdnImageUrl(currentImage) : null)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [cropSrc, setCropSrc] = useState<string | null>(null)
+  const [initialCenter, setInitialCenter] = useState<{ x: number; y: number } | undefined>(undefined)
+  const [initialZoom, setInitialZoom] = useState<number | undefined>(undefined)
+
+  useEffect(() => {
+    setPreview(currentImage ? cdnImageUrl(currentImage) : null)
+  }, [currentImage])
 
   const handleFileSelect = async (file: File) => {
     if (!file) return
@@ -282,31 +295,26 @@ export function ProfileImageUploadCompact({
     setError('')
     setUploading(true)
 
+    if (cropSrc) {
+      URL.revokeObjectURL(cropSrc)
+    }
+
+    const localUrl = URL.createObjectURL(file)
+    setPreview(localUrl)
+    setCropSrc(localUrl)
+
     try {
-      const previewUrl = URL.createObjectURL(file)
-      setPreview(previewUrl)
-
-      const formData = new FormData()
-      formData.append('image', file)
-
-      const response = await fetch('/api/upload/profile-image', {
-        method: 'POST',
-        body: formData
-      })
-
-      const data = await response.json()
-
-      if (data.success) {
-        setPreview(data.data.imagePath)
-        onImageUpdate?.(data.data.imagePath)
-        URL.revokeObjectURL(previewUrl)
+      const auto = await getAutoCenter(file)
+      if (auto) {
+        setInitialCenter(auto.center)
+        setInitialZoom(auto.zoom)
       } else {
-        setError(data.error || 'Erro ao fazer upload')
-        setPreview(currentImage || null)
+        setInitialCenter(undefined)
+        setInitialZoom(undefined)
       }
     } catch {
-      setError('Erro ao fazer upload')
-      setPreview(currentImage || null)
+      setInitialCenter(undefined)
+      setInitialZoom(undefined)
     } finally {
       setUploading(false)
     }
@@ -323,6 +331,8 @@ export function ProfileImageUploadCompact({
     fileInputRef.current?.click()
   }
 
+  const compactBlobPreview = preview?.startsWith('blob:') || preview?.startsWith('data:')
+
   return (
     <div className={className}>
       <input
@@ -335,22 +345,26 @@ export function ProfileImageUploadCompact({
 
       <div className="flex items-center space-x-4">
         <div className="relative">
-          {preview ? (
-            <Image
-              src={preview}
-              alt={userName}
-              width={64}
-              height={64}
-              className="h-16 w-16 rounded-full object-cover border-2 border-gray-200"
-            />
-          ) : (
-            <div className="h-16 w-16 rounded-full bg-gray-300 flex items-center justify-center border-2 border-gray-200">
-              <User className="h-6 w-6 text-gray-600" />
-            </div>
-          )}
-          
+          <div className="relative h-16 w-16 rounded-full border-2 border-gray-200 overflow-hidden bg-gray-200">
+            {preview ? (
+              <Image
+                src={preview}
+                alt={userName}
+                fill
+                sizes="64px"
+                quality={95}
+                unoptimized={compactBlobPreview}
+                className="object-cover"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gray-300">
+                <User className="h-6 w-6 text-gray-600" />
+              </div>
+            )}
+          </div>
+
           {uploading && (
-            <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/50 rounded-full flex items-center justify-center">
               <Loader2 className="h-4 w-4 text-white animate-spin" />
             </div>
           )}
@@ -374,6 +388,67 @@ export function ProfileImageUploadCompact({
           )}
         </div>
       </div>
+      {cropSrc && (
+        <AvatarCropperModal
+          src={cropSrc}
+          initialCenter={initialCenter}
+          initialZoom={initialZoom}
+          onCancel={() => {
+            URL.revokeObjectURL(cropSrc)
+            setCropSrc(null)
+            setPreview(currentImage ? cdnImageUrl(currentImage) : null)
+          }}
+          onConfirm={async (pixels) => {
+            try {
+              setUploading(true)
+              const blob = await getCroppedImg(cropSrc, pixels)
+              const presignRes = await fetch('/api/uploads/avatar/presign', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mime: 'image/jpeg', filename: 'avatar.jpg' })
+              })
+
+              if (!presignRes.ok) {
+                throw new Error('Falha ao gerar URL de upload')
+              }
+
+              const { data } = await presignRes.json()
+              const form = new FormData()
+              Object.entries(data.fields || {}).forEach(([key, value]) => form.append(key, String(value)))
+              form.append('file', blob, 'avatar.jpg')
+
+              const uploadRes = await fetch(data.url, { method: 'POST', body: form })
+              if (!uploadRes.ok) {
+                throw new Error('Falha ao enviar imagem')
+              }
+
+              const updateRes = await fetch('/api/users/me', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ profileImageKey: data.key })
+              })
+
+              if (!updateRes.ok) {
+                throw new Error('Erro ao atualizar perfil')
+              }
+
+              const host = (data.cdnHost || '').replace(/^https?:\/\//, '')
+              const absolute = host ? `https://${host}/${data.key}` : data.key
+              setPreview(absolute)
+              onImageUpdate?.(absolute)
+              setError('')
+            } catch (err: any) {
+              console.error('Compact crop upload error:', err)
+              setError(err?.message || 'Erro ao fazer upload')
+              setPreview(currentImage ? cdnImageUrl(currentImage) : null)
+            } finally {
+              URL.revokeObjectURL(cropSrc)
+              setCropSrc(null)
+              setUploading(false)
+            }
+          }}
+        />
+      )}
     </div>
   )
 }

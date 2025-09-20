@@ -51,6 +51,8 @@ model ServiceProvider {
   hasQuoting         Boolean                  @default(true)
   chargesTravel      Boolean                  @default(false)
   travelCost         Float?
+  travelRatePerKm    Float?
+  travelMinimumFee   Float?
   waivesTravelOnHire Boolean                  @default(false)
   isHighlighted      Boolean                  @default(false)
   highlightUntil     DateTime?
@@ -140,6 +142,7 @@ model ServiceCategory {
   isLeaf       Boolean           @default(false)
   displayOrder Int               @default(0)
   requiresDriverLicense Boolean  @default(false)
+  allowScheduling      Boolean   @default(true)
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   parent       ServiceCategory?  @relation("CategoryToParent", fields: [parentId], references: [id])
@@ -172,6 +175,7 @@ model ServiceProviderService {
   unit              String
   description       String?
   isActive          Boolean         @default(true)
+  offersScheduling  Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   service           Service         @relation(fields: [serviceId], references: [id])
@@ -194,6 +198,12 @@ model ServiceRequest {
   estimatedPrice Float?
   finalPrice     Float?
   travelCost     Float?
+  basePriceSnapshot        Float?
+  travelDistanceKm         Float?
+  travelDurationMinutes    Float?
+  travelRatePerKmSnapshot  Float?
+  travelMinimumFeeSnapshot Float?
+  travelFixedFeeSnapshot   Float?
   schedulingFee  Float?
   isVisitVirtual Boolean   @default(false)
   expiresAt      DateTime?

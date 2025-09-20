@@ -12,8 +12,21 @@ export default withAuth(
     const token = (req as any).nextauth?.token
     const { pathname } = req.nextUrl
     if (token && (pathname === '/entrar' || pathname === '/cadastrar')) {
+      const referer = req.headers.get('referer')
+      if (referer) {
+        try {
+          const refererUrl = new URL(referer)
+          const sameOrigin = refererUrl.origin === req.nextUrl.origin
+          const notAuthPage = !['/entrar', '/cadastrar'].includes(refererUrl.pathname)
+          if (sameOrigin && notAuthPage) {
+            return NextResponse.redirect(refererUrl)
+          }
+        } catch {
+          // ignore malformed referer
+        }
+      }
       const url = req.nextUrl.clone()
-      url.pathname = '/perfil'
+      url.pathname = '/'
       return NextResponse.redirect(url)
     }
   },
@@ -33,10 +46,10 @@ export default withAuth(
         }
         
         // Require authentication for dashboard routes
-        if (pathname.startsWith('/dashboard')) {
+        if (pathname.startsWith('/dashboard') || pathname === '/perfil') {
           return !!token
         }
-        
+
         // Admin routes require admin user type
         if (pathname.startsWith('/admin')) {
           return token?.userType === 'ADMIN'
@@ -52,6 +65,7 @@ export const config = {
   matcher: [
     '/entrar',
     '/cadastrar',
+    '/perfil',
     '/dashboard/:path*',
     '/admin/:path*',
     '/api/protected/:path*'

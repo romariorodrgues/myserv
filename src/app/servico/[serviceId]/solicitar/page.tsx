@@ -7,14 +7,14 @@
 
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
-import { ArrowLeft, Calendar, Clock, MapPin, Phone, Mail, User, LogIn } from 'lucide-react'
+import { ArrowLeft, Calendar, Clock, MapPin, Phone, Mail, User, LogIn, Loader2 } from 'lucide-react'
 
 interface Service {
   id: string
@@ -29,6 +29,7 @@ interface Service {
     basePrice: number
     description: string
     isActive: boolean
+    offersScheduling: boolean
     serviceProvider: {
       id: string
       hasScheduling: boolean
@@ -54,6 +55,28 @@ interface BookingData {
   city: string
   state: string
   zipCode: string
+}
+
+interface TravelQuote {
+  success: boolean
+  providerLocation?: { lat: number; lng: number }
+  clientLocation?: { lat: number; lng: number }
+  distanceKm?: number | null
+  distanceText?: string
+  durationMinutes?: number | null
+  durationText?: string
+  travelCost: number
+  travelCostBreakdown: {
+    perKmPortion: number
+    fixedFee: number
+    minimumFee: number
+    appliedMinimum: boolean
+    travelRatePerKm?: number | null
+    waivesTravelOnHire?: boolean | null
+  }
+  estimatedTotal?: number | null
+  usedFallback: boolean
+  warnings: string[]
 }
 
 export default function ServiceRequestPage() {
@@ -94,6 +117,15 @@ export default function ServiceRequestPage() {
     state: '',
     zipCode: ''
   })
+  const [travelQuote, setTravelQuote] = useState<TravelQuote | null>(null)
+  const [travelLoading, setTravelLoading] = useState(false)
+  const [travelError, setTravelError] = useState<string | null>(null)
+  const travelDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const [showTravelDetails, setShowTravelDetails] = useState(false)
+
+  const selectedProviderData = service?.providers.find((p) => p.id === selectedProvider)
+  const providerSupportsScheduling = selectedProviderData?.offersScheduling ?? selectedProviderData?.serviceProvider.hasScheduling ?? false
+  const providerHasQuoting = selectedProviderData?.serviceProvider.hasQuoting ?? false
 
   const fetchUserProfile = useCallback(async () => {
     if (!session?.user?.id) return
@@ -200,12 +232,12 @@ export default function ServiceRequestPage() {
           basePrice: chosen?.basePrice ?? prev?.basePrice,
           description: chosen?.description ?? prev?.description,
         }))
-      } catch (e) {
+      } catch {
         // ignora; fallback já cobre
       }
     }
     loadProviderProfile()
-  }, [selectedProvider, selectedProviderProfileId, service])
+  }, [selectedProvider, selectedProviderProfileId, service, providerProfile])
 
   // Sempre que o provider selecionado mudar, sincroniza no bookingData.providerId
   useEffect(() => {
@@ -215,6 +247,94 @@ export default function ServiceRequestPage() {
       setBookingData((prev) => ({ ...prev, providerId: selected.serviceProvider.id }))
     }
   }, [selectedProvider, service])
+
+  useEffect(() => {
+    let isActive = true
+
+    if (!selectedProviderProfileId) {
+      setTravelQuote(null)
+      setTravelError(null)
+      setTravelLoading(false)
+      return
+    }
+
+    const hasAddressInfo =
+      bookingData.address.trim().length > 4 &&
+      bookingData.city.trim().length > 0 &&
+      bookingData.state.trim().length > 0
+
+    if (!hasAddressInfo) {
+      setTravelQuote(null)
+      if (!bookingData.address && !bookingData.city && !bookingData.state) {
+        setTravelError(null)
+      }
+      setTravelLoading(false)
+      return
+    }
+
+    if (travelDebounceRef.current) {
+      clearTimeout(travelDebounceRef.current)
+    }
+
+    setTravelQuote(null)
+    setTravelError(null)
+    setTravelLoading(true)
+
+    travelDebounceRef.current = setTimeout(async () => {
+      try {
+        const response = await fetch('/api/services/travel-cost', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerId: selectedProviderProfileId,
+            serviceId,
+            clientAddress: bookingData.address,
+            clientCity: bookingData.city,
+            clientState: bookingData.state,
+            clientZipCode: bookingData.zipCode || undefined,
+          }),
+        })
+
+        if (!isActive) return
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => null)
+          setTravelQuote(null)
+          setTravelError(errorData?.error || 'Não foi possível calcular o deslocamento.')
+          return
+        }
+
+        const data = await response.json()
+        const travelData = data?.data?.travel as TravelQuote | undefined
+        if (travelData) {
+          setTravelQuote(travelData)
+          setShowTravelDetails(false)
+          setTravelError(null)
+        } else {
+          setTravelQuote(null)
+          setTravelError('Não foi possível calcular o deslocamento.')
+        }
+      } catch (error) {
+        console.error('Erro ao calcular deslocamento:', error)
+        if (!isActive) return
+        setTravelQuote(null)
+        setTravelError('Erro ao calcular deslocamento.')
+      } finally {
+        if (isActive) {
+          setTravelLoading(false)
+        }
+      }
+    }, 600)
+
+    return () => {
+      isActive = false
+      if (travelDebounceRef.current) {
+        clearTimeout(travelDebounceRef.current)
+        travelDebounceRef.current = null
+      }
+      setTravelLoading(false)
+    }
+  }, [selectedProviderProfileId, bookingData.address, bookingData.city, bookingData.state, bookingData.zipCode, serviceId])
 
   useEffect(() => {
     fetchService()
@@ -230,23 +350,7 @@ export default function ServiceRequestPage() {
     }))
   }
 
-  const handleProviderSelect = (providerServiceId: string) => {
-    // Encontrar o provider e usar o serviceProvider.id
-    const selectedProviderData = service?.providers.find(p => p.id === providerServiceId)
-    if (selectedProviderData) {
-      setSelectedProvider(providerServiceId)
-      setSelectedProviderProfileId(selectedProviderData.serviceProvider.id)
-      setBookingData(prev => ({
-        ...prev,
-        providerId: selectedProviderData.serviceProvider.id
-      }))
-    }
-  }
-
   const isFormValid = () => {
-    const selectedProviderData = service?.providers.find(p => p.id === selectedProvider)
-    const hasScheduling = selectedProviderData?.serviceProvider.hasScheduling
-
     // Campos obrigatórios básicos
     const basicFields = [
       bookingData.description.trim(),
@@ -458,7 +562,7 @@ export default function ServiceRequestPage() {
                 </div>
 
                 {/* Date and Time - Show only if provider DOES NOT have scheduling */}
-                {selectedProvider && !service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling && (
+                {selectedProviderData && !providerSupportsScheduling && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -487,7 +591,7 @@ export default function ServiceRequestPage() {
                 )}
 
                 {/* Quote Request Message - Show only if provider has quoting */}
-                {selectedProvider && service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasQuoting && !service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.hasScheduling && (
+                {selectedProviderData && providerHasQuoting && !providerSupportsScheduling && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h3 className="font-medium text-blue-900 mb-2">Solicitação de Orçamento</h3>
                     <p className="text-sm text-blue-700">
@@ -608,7 +712,7 @@ export default function ServiceRequestPage() {
                   )}
                   
                   <div className="flex justify-end gap-2">
-                    {selectedProvider ? (
+                    {selectedProvider && providerSupportsScheduling ? (
                       <Button
                         type="button"
                         disabled={!isFormValid() || submitting}
@@ -671,41 +775,138 @@ export default function ServiceRequestPage() {
                   const price = (providerProfile?.basePrice ?? chosen?.basePrice)
                   const desc = providerProfile?.description ?? chosen?.description
 
-                  return (
-                    <div className="flex items-start gap-4">
-                      {/* Avatar */}
-                      <div className="flex-shrink-0">
-                        {photo ? (
-                          <Image src={photo} alt={name} width={64} height={64} className="w-16 h-16 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-16 h-16 rounded-full bg-brand-cyan/10 flex items-center justify-center">
-                            <User className="h-8 w-8 text-brand-cyan" />
-                          </div>
-                        )}
-                      </div>
+                  const travelCostValue = travelQuote?.travelCost ?? null
+                  const totalEstimate = travelQuote?.estimatedTotal ?? (
+                    typeof price === 'number' && travelCostValue != null
+                      ? Math.round((price + travelCostValue) * 100) / 100
+                      : typeof price === 'number'
+                        ? price
+                        : travelCostValue
+                  )
+                  const distanceLabel = travelQuote?.distanceText || (travelQuote?.distanceKm != null
+                    ? `${travelQuote.distanceKm.toFixed(1)} km`
+                    : null)
+                  const travelWarnings = travelQuote?.warnings ?? []
 
-                      {/* Info */}
-                      <div className="flex-1">
-                        <h3 className="font-semibold text-brand-navy text-lg">{name}</h3>
-                        <div className="flex items-center gap-2 text-sm text-gray-600 mt-1">
-                          {/* Placeholder Rating */}
-                          <span className="inline-flex items-center">
-                            <span className="text-yellow-500">★</span>
-                            <span className="ml-1 font-medium">{(providerProfile?.stats?.averageRating ?? 0).toFixed(1)}</span>
-                            <span className="ml-1 text-gray-500">({providerProfile?.stats?.totalReviews ?? 0})</span>
-                          </span>
-                          {city && state && (
-                            <span className="inline-flex items-center">
-                              <MapPin className="h-4 w-4 mr-1" />
-                              {city}, {state}
-                            </span>
+                  return (
+                    <div className="space-y-6">
+                      <div className="flex items-start gap-4">
+                        {/* Avatar */}
+                        <div className="flex-shrink-0">
+                          {photo ? (
+                            <Image src={photo} alt={name} width={64} height={64} className="w-16 h-16 rounded-full object-cover" />
+                          ) : (
+                            <div className="w-16 h-16 rounded-full bg-brand-cyan/10 flex items-center justify-center">
+                              <User className="h-8 w-8 text-brand-cyan" />
+                            </div>
                           )}
                         </div>
-                        {desc && <p className="text-sm text-gray-600 mt-2 line-clamp-3">{desc}</p>}
+
+                        {/* Info */}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-brand-navy text-lg">{name}</h3>
+                          <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 mt-1">
+                            <span className="inline-flex items-center">
+                              <span className="text-yellow-500">★</span>
+                              <span className="ml-1 font-medium">{(providerProfile?.stats?.averageRating ?? 0).toFixed(1)}</span>
+                              <span className="ml-1 text-gray-500">({providerProfile?.stats?.totalReviews ?? 0})</span>
+                            </span>
+                            {city && state && (
+                              <span className="inline-flex items-center">
+                                <MapPin className="h-4 w-4 mr-1" />
+                                {city}, {state}
+                              </span>
+                            )}
+                          </div>
+                          {desc && <p className="text-sm text-gray-600 mt-2 line-clamp-3">{desc}</p>}
                         {typeof price === 'number' && (
                           <p className="text-sm font-medium text-green-600 mt-2">
                             A partir de R$ {price.toFixed(2)}
                           </p>
+                        )}
+                        <p className="text-xs text-gray-500 mt-2">
+                          {providerSupportsScheduling
+                            ? 'Você pode reservar um horário direto na agenda do profissional.'
+                            : 'Este profissional responde primeiro com um orçamento para combinar a data.'}
+                        </p>
+                      </div>
+                    </div>
+
+                      <div className="border-t pt-4">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-sm font-medium text-gray-700">Estimativa de valores</h3>
+                          {travelLoading && <Loader2 className="h-4 w-4 animate-spin text-brand-cyan" />}
+                        </div>
+
+                        <div className="mt-3 space-y-2 text-sm text-gray-700">
+                          {typeof price === 'number' && (
+                            <div className="flex items-center justify-between">
+                              <span>Serviço base</span>
+                              <span>R$ {price.toFixed(2)}</span>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between">
+                            <span>Deslocamento</span>
+                            <span>
+                              {travelLoading && 'Calculando...'}
+                              {!travelLoading && travelQuote && `R$ ${travelQuote.travelCost.toFixed(2)}`}
+                              {!travelLoading && !travelQuote && !travelError && 'Informe o endereço'}
+                              {!travelLoading && distanceLabel && travelQuote && (
+                                <span className="text-xs text-gray-500 ml-2">({distanceLabel})</span>
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between font-semibold text-brand-navy border-t pt-2">
+                            <span>Total estimado</span>
+                            <span>
+                              {travelLoading ? '—' : totalEstimate != null ? `R$ ${totalEstimate.toFixed(2)}` : '—'}
+                            </span>
+                          </div>
+                        </div>
+
+                        {travelError && (
+                          <p className="mt-2 text-xs text-red-600">{travelError}</p>
+                        )}
+
+                        {!travelLoading && travelQuote && (
+                          <div className="mt-3 space-y-2">
+                            <button
+                              type="button"
+                              className="text-xs text-brand-cyan hover:underline"
+                              onClick={() => setShowTravelDetails((prev) => !prev)}
+                            >
+                              {showTravelDetails ? 'Ocultar detalhes' : 'Ver detalhes do cálculo'}
+                            </button>
+
+                            {showTravelDetails && (
+                              <div className="space-y-1 text-xs text-gray-600">
+                                <div>
+                                  Parcela por km: R$ {travelQuote.travelCostBreakdown.perKmPortion.toFixed(2)}
+                                  {travelQuote.travelCostBreakdown.travelRatePerKm != null && distanceLabel && (
+                                    <span className="text-gray-500"> (taxa de R$ {travelQuote.travelCostBreakdown.travelRatePerKm.toFixed(2)}/km)</span>
+                                  )}
+                                </div>
+                                <div>Taxa fixa: R$ {travelQuote.travelCostBreakdown.fixedFee.toFixed(2)}</div>
+                                {travelQuote.travelCostBreakdown.minimumFee > 0 && (
+                                  <div>
+                                    Taxa mínima: R$ {travelQuote.travelCostBreakdown.minimumFee.toFixed(2)}
+                                    {travelQuote.travelCostBreakdown.appliedMinimum && ' (aplicada)'}
+                                  </div>
+                                )}
+                                {travelQuote.travelCostBreakdown.waivesTravelOnHire && (
+                                  <div>O profissional informa que pode isentar o deslocamento ao fechar o serviço.</div>
+                                )}
+                                {travelQuote.usedFallback && (
+                                  <div>Medição aproximada – distância calculada por estimativa.</div>
+                                )}
+                                {travelWarnings.map((warning, index) => (
+                                  <div key={index} className="text-amber-600">{warning}</div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
                     </div>

@@ -6,49 +6,44 @@
  */
 
 import { Loader } from '@googlemaps/js-api-loader'
-import { geocodingCache, distanceCache } from './cache-service'
+import { geocodingCache } from './cache-service'
+import type { Address, DistanceResult, LocationResult } from './maps-types'
 
-export interface Address {
-  street: string
-  number: string
-  district: string
-  city: string
-  state: string
-  zipCode: string
-  latitude?: number
-  longitude: number
-}
+export type { Address, DistanceResult, LocationResult } from './maps-types'
 
-export interface LocationResult {
-  address: Address
-  latitude: number
-  longitude: number
-  formattedAddress: string
-}
-
-export interface DistanceResult {
-  distance: number // in kilometers
-  duration: number // in minutes
-  distanceText: string
-  durationText: string
-}
+const BROWSER_MAPS_API_KEY =
+  process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ||
+  process.env.GOOGLE_MAPS_API_KEY ||
+  ''
 
 export class GoogleMapsService {
-  private static loader = new Loader({
-    apiKey: process.env.GOOGLE_MAPS_API_KEY || '',
-    version: 'weekly',
-    libraries: ['places', 'geometry']
-  })
-
-  private static google: any = null
+  private static loader: Loader | null = null
+  private static google: typeof google | null = null
 
   /**
    * Initialize Google Maps API
    */
   private static async initializeGoogle() {
+    if (typeof window === 'undefined') {
+      throw new Error('Google Maps JS API só está disponível no navegador')
+    }
+
+    if (!BROWSER_MAPS_API_KEY) {
+      throw new Error('Google Maps API key não configurada')
+    }
+
+    if (!this.loader) {
+      this.loader = new Loader({
+        apiKey: BROWSER_MAPS_API_KEY,
+        version: 'weekly',
+        libraries: ['places', 'geometry']
+      })
+    }
+
     if (!this.google) {
       this.google = await this.loader.load()
     }
+
     return this.google
   }
 

@@ -8,7 +8,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { User, Settings, Heart, History, HelpCircle, LogOut, Edit, Camera } from 'lucide-react'
+import { User, Settings, Heart, History, HelpCircle, LogOut, Edit, Camera, LayoutDashboard, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -62,8 +62,24 @@ export default function PerfilPage() {
     return new Date().getFullYear().toString()
   }, [profile?.id])
 
+  const dashboardUrl = useMemo(() => {
+    if (!session?.user) return '/entrar'
+    if (session.user.userType === 'ADMIN') return '/admin/dashboard'
+    if (session.user.userType === 'SERVICE_PROVIDER') return '/dashboard/profissional'
+    return '/dashboard/cliente'
+  }, [session?.user])
+
   const menuItems = useMemo(() => {
     const isProvider = session?.user?.userType === 'SERVICE_PROVIDER'
+    if (session?.user?.userType === 'ADMIN') {
+      return [
+        { icon: LayoutDashboard, title: 'Painel Administrativo', description: 'Visão geral da plataforma', href: '/admin/dashboard' },
+        { icon: Users, title: 'Gerenciar Prestadores', description: 'Aprovar e administrar cadastros', href: '/admin/providers' },
+        { icon: Settings, title: 'Configurações da Plataforma', description: 'Planos, integrações e parâmetros', href: '/admin/settings' },
+        { icon: HelpCircle, title: 'Central de Ajuda', description: 'Documentação e suporte', href: '/ajuda' },
+      ]
+    }
+
     if (isProvider) {
       return [
         { icon: Edit, title: 'Editar Perfil', description: 'Dados e foto do prestador', href: '/dashboard/profissional?tab=settings' },
@@ -91,25 +107,31 @@ export default function PerfilPage() {
     {/* Avatar */}
     <div className="flex flex-col items-center gap-2 md:flex-row md:items-center md:gap-6">
       <div className="relative">
-        <Avatar className="w-24 h-24">
-          <AvatarImage src={profile?.profileImage || ''} alt={profile?.name || ''} />
+        <Avatar className="w-28 h-28 lg:w-32 lg:h-32 shadow-lg">
+          <AvatarImage
+            src={profile?.profileImage || ''}
+            alt={profile?.name || ''}
+            size={200}
+            priority
+          />
           <AvatarFallback className="text-2xl bg-[#ecf4f6] text-[#00a9d4]">
             {(profile?.name || 'US').split(' ').map((n: string) => n[0]).join('')}
           </AvatarFallback>
         </Avatar>
         <Button
           size="sm"
-          className="absolute -bottom-1 -right-1 w-7 h-7 rounded-full p-0 border border-gray-300 bg-white shadow-sm"
+          className="absolute -bottom-1 -right-1 w-9 h-9 rounded-full p-0 border border-gray-200 bg-white shadow-md hover:bg-brand-cyan/10 z-20"
           onClick={() => {
             if (session?.user?.userType === 'SERVICE_PROVIDER') {
               window.location.href = '/dashboard/profissional?tab=settings'
             } else if (session?.user?.userType === 'ADMIN') {
-              window.location.href = '/dashboard/cliente?tab=settings'
+              window.location.href = '/admin/settings'
             } else {
               window.location.href = '/dashboard/cliente?tab=settings'
             }
           }}
           title="Alterar foto"
+          aria-label="Alterar foto de perfil"
         >
           <Camera className="w-4 h-4 text-brand-navy" />
         </Button>
@@ -146,12 +168,12 @@ export default function PerfilPage() {
     <div className="mt-4 md:mt-0 md:ml-auto">
       <div className="flex gap-2">
         <Button variant="outline" asChild>
-          <Link href={session?.user?.userType === 'SERVICE_PROVIDER' ? '/dashboard/profissional' : '/dashboard/cliente'}>
+          <Link href={dashboardUrl}>
             Ir para Dashboard
           </Link>
         </Button>
         <Button variant="outline" asChild>
-          <Link href={session?.user?.userType === 'SERVICE_PROVIDER' ? '/dashboard/profissional?tab=settings' : '/dashboard/cliente?tab=settings'}>
+          <Link href={session?.user?.userType === 'SERVICE_PROVIDER' ? '/dashboard/profissional?tab=settings' : session?.user?.userType === 'ADMIN' ? '/admin/settings' : '/dashboard/cliente?tab=settings'}>
             <Edit className="h-4 w-4 mr-2" />
             Editar Perfil
           </Link>

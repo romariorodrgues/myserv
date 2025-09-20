@@ -11,6 +11,7 @@ export type CascCat = {
   isLeaf: boolean
   isActive: boolean
   serviceCount: number
+  allowScheduling: boolean
 }
 
 type Props = {

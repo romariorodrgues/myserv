@@ -21,6 +21,7 @@ export async function createAvatarPresignedPost(params: { bucket: string; key: s
     ['starts-with', '$Content-Type', 'image/'],
     { 'Cache-Control': 'public, max-age=31536000, immutable' },
     ['starts-with', '$key', 'public/avatars/'],
+    ['eq', '$acl', 'public-read'],
   ]
 
   const { url, fields } = await createPresignedPost(s3, {
@@ -30,6 +31,7 @@ export async function createAvatarPresignedPost(params: { bucket: string; key: s
     Fields: {
       'Cache-Control': 'public, max-age=31536000, immutable',
       'Content-Type': params.contentType || 'image/jpeg',
+      acl: 'public-read',
     },
     Expires: 60,
   })

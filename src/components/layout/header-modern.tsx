@@ -15,10 +15,11 @@ import { motion } from 'framer-motion'
 import { 
   Menu, User, LogOut, 
   Settings, Bell, Heart, ChevronDown,
-  Home, ListChecks, MessageSquare, HelpCircle,
-  Briefcase, UserPlus
+  Home, Search as SearchIcon, HelpCircle,
+  Briefcase, UserPlus, LayoutDashboard
 } from 'lucide-react'
 import { NotificationDropdown } from '@/components/notifications/real-time-notifications'
+import { usePathname } from 'next/navigation'
 
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -31,7 +32,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
 
 interface MobileNavItemProps {
   href: string
@@ -77,11 +77,11 @@ const DesktopNavItem = ({ href, children, active = false }: DesktopNavItemProps)
 
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false)
-  const [activeTab, setActiveTab] = useState('/')
   const { data: session, status } = useSession()
   const isLoading = status === 'loading'
   const isAuthenticated = status === 'authenticated'
   const [mobileOpen, setMobileOpen] = useState(false)
+  const pathname = usePathname()
   
   // Handle scroll effect
   useEffect(() => {
@@ -93,28 +93,26 @@ export function Header() {
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  // Handle active tab based on current URL
-  useEffect(() => {
-    setActiveTab(window.location.pathname)
-  }, [])
-
   const handleSignOut = async () => {
     await signOut({ callbackUrl: '/' })
   }
 
   // Determine dashboard URL based on user type
-  const getDashboardUrl = () => {
-    if (!session?.user) return '/entrar'
-    
-    // Add routing logic based on user type (admin, provider, client)
-    if (session.user.userType === 'ADMIN') {
-      return '/admin/dashboard'
-    } else if (session.user.userType === 'SERVICE_PROVIDER') {
-      return '/dashboard/profissional' 
-    } else {
-      return '/dashboard/cliente'
-    }
-  }
+  const dashboardUrl = session?.user
+    ? session.user.userType === 'ADMIN'
+      ? '/admin/dashboard'
+      : session.user.userType === 'SERVICE_PROVIDER'
+        ? '/dashboard/profissional'
+        : '/dashboard/cliente'
+    : '/entrar'
+
+  const desktopNavItems = [
+    { href: '/', label: 'Início' },
+    { href: '/pesquisa', label: 'Pesquisar' },
+    { href: '/como-funciona', label: 'Como Funciona' },
+    { href: '/seja-profissional', label: 'Seja um Profissional' },
+    { href: dashboardUrl, label: 'Dashboard' }
+  ]
 
   // Get user initials for avatar fallback
   const getUserInitials = () => {
@@ -162,9 +160,10 @@ export function Header() {
                 </Link>
               </div>
               <MobileNavItem href="/" icon={Home} onClick={() => setMobileOpen(false)}>Início</MobileNavItem>
-              <MobileNavItem href="/servicos" icon={ListChecks} onClick={() => setMobileOpen(false)}>Serviços</MobileNavItem>
+              <MobileNavItem href="/pesquisa" icon={SearchIcon} onClick={() => setMobileOpen(false)}>Pesquisar</MobileNavItem>
               <MobileNavItem href="/como-funciona" icon={HelpCircle} onClick={() => setMobileOpen(false)}>Como Funciona</MobileNavItem>
               <MobileNavItem href="/seja-profissional" icon={Briefcase} onClick={() => setMobileOpen(false)}>Seja um Profissional</MobileNavItem>
+              <MobileNavItem href={dashboardUrl} icon={LayoutDashboard} onClick={() => setMobileOpen(false)}>Dashboard</MobileNavItem>
               <div className="border-t border-gray-200 my-2"></div>
               {isAuthenticated ? (
                 <>
@@ -218,18 +217,15 @@ export function Header() {
         </div>
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center space-x-2">
-          <DesktopNavItem href="/" active={activeTab === '/'}>
-            Início
-          </DesktopNavItem>
-          <DesktopNavItem href="/servicos" active={activeTab.startsWith('/servicos')}>
-            Serviços
-          </DesktopNavItem>
-          <DesktopNavItem href="/como-funciona" active={activeTab === '/como-funciona'}>
-            Como Funciona
-          </DesktopNavItem>
-          <DesktopNavItem href="/seja-profissional" active={activeTab === '/seja-profissional'}>
-            Seja um Profissional
-          </DesktopNavItem>
+          {desktopNavItems.map((item) => (
+            <DesktopNavItem
+              key={item.href}
+              href={item.href}
+              active={pathname === item.href || (item.href !== '/' && pathname.startsWith(item.href))}
+            >
+              {item.label}
+            </DesktopNavItem>
+          ))}
         </nav>
         {/* User Actions */}
         <div className="col-start-3 flex justify-end gap-2">
@@ -244,7 +240,7 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2 hidden md:flex hover:bg-brand-cyan/10 transition-colors duration-200">
                     <Avatar className="h-8 w-8 shadow-md">
-                      <AvatarImage src={session.user.image ?? ''} alt={session.user.name || 'User'} />
+                      <AvatarImage src={session.user.image ?? ''} alt={session.user.name || 'User'} size={32} />
                       <AvatarFallback className="bg-primary text-xs">
                         {getUserInitials()}
                       </AvatarFallback>

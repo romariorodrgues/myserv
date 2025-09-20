@@ -6,9 +6,8 @@
 'use client'
 
 import { useCallback } from 'react'
-import { ServiceCategory } from '@/types'
 import { useState, useEffect } from 'react'
-import { DollarSign, Edit, Save, X, Plus, Trash2, TrendingUp, AlertCircle, Copy, Eye } from 'lucide-react'
+import { DollarSign, Edit, Save, X, Plus, Trash2, Copy, Eye } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +35,8 @@ interface ServicePrice {
   isPromotional: boolean
   promotionalPrice?: number
   promotionalEndDate?: string
+  offersScheduling?: boolean
+  allowScheduling?: boolean
   variations: Array<{
     id: string
     name: string
@@ -99,7 +100,7 @@ export function ProviderPriceManagement() {
   const [leafCategoryId, setLeafCategoryId] = useState<string | null>(null)
   const [selectedLeaf, setSelectedLeaf] = useState<CascCat | null>(null)
 
-  const [newService, setNewService] = useState({
+const [newService, setNewService] = useState({
   name: '',
   description: '',
   basePrice: 0,
@@ -107,6 +108,7 @@ export function ProviderPriceManagement() {
   categoryId: '',
   isActive: true,
   isPromotional: false,
+  offersScheduling: false,
   // customUnit: '',
   promotionalPrice: 0,
   promotionalEndDate: '',
@@ -116,8 +118,8 @@ export function ProviderPriceManagement() {
 
 
 type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
-  category: { id: string, name: string },
-  serviceProviderServiceId: string // ← ADICIONE ESTA LINHA
+  category: { id: string; name: string; icon?: string; allowScheduling?: boolean }
+  serviceProviderServiceId: string
 }
 
 
@@ -148,6 +150,8 @@ type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
           // maxPrice: s.maxPrice || s.basePrice,
           isActive: s.isActive ?? true,
           isPromotional: s.isPromotional ?? false,
+          offersScheduling: s.offersScheduling ?? false,
+          allowScheduling: s.category?.allowScheduling ?? true,
           promotionalPrice: s.promotionalPrice ?? null,
           promotionalEndDate: s.promotionalEndDate ?? null,
           variations: s.variations ?? [],
@@ -196,6 +200,7 @@ const handleUpdateService = async (service: ServicePrice) => {
       unit: service.unit,
       description: typeof service.description === 'string' ? service.description : undefined,
       isActive: service.isActive,
+      offersScheduling: service.offersScheduling,
     }
     if (service.categoryId && service.categoryId !== current?.categoryId) {
       body.leafCategoryId = service.categoryId
@@ -244,6 +249,7 @@ const handleUpdateService = async (service: ServicePrice) => {
         unit: newService.unit,                         // string/enum que você usa na UI
         description: newService.description || undefined,
         isActive: newService.isActive, // opcional
+        offersScheduling: newService.offersScheduling,
       }),
     });
 
@@ -253,7 +259,7 @@ const handleUpdateService = async (service: ServicePrice) => {
     await fetchServices();
     // limpa só os campos realmente usados
     setLeafCategoryId(null);
-    setNewService(prev => ({ ...prev, description: '', basePrice: 0 } as any));
+    setNewService(prev => ({ ...prev, description: '', basePrice: 0, offersScheduling: false } as any));
     setShowAddService(false);
     toast.success('Serviço adicionado com sucesso!');
   } catch (error) {
@@ -314,7 +320,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       return
     }
 
-        setNewService({
+    setNewService({
       name: template.name,
       description: '',
       basePrice: template.basePrice,
@@ -322,6 +328,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       categoryId: matchedCategory.id,
       isActive: true,
       isPromotional: false,
+      offersScheduling: false,
       // customUnit: '',
       promotionalPrice: 0,
       promotionalEndDate: '',
@@ -345,14 +352,6 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
     
     setServices(prev => [...prev, duplicated])
     toast.success('Serviço duplicado com sucesso!')
-  }
-
-  const calculateFinalPrice = (service: ServicePrice, quantity: number = 1) => {
-    const basePrice = service.isPromotional && service.promotionalPrice 
-      ? service.promotionalPrice 
-      : service.basePrice
-      
-    return basePrice * quantity
   }
 
   const getCompetitorComparison = (service: ServicePrice) => {
@@ -476,7 +475,8 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                   setNewService(prev => ({
                     ...prev,
                     categoryId: leafId ?? '',
-                    name: leaf?.name ?? ''   // nome padronizado da leaf
+                    name: leaf?.name ?? '',   // nome padronizado da leaf
+                    offersScheduling: leaf?.allowScheduling ? prev.offersScheduling ?? false : false,
                   }))
                 }}
               />
@@ -525,6 +525,20 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
               </div>
               
               <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={selectedLeaf?.allowScheduling ? newService.offersScheduling : false}
+                    onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, offersScheduling: checked }))}
+                    disabled={!selectedLeaf?.allowScheduling}
+                  />
+                  <div>
+                    <Label>Oferecer agendamento</Label>
+                    {!selectedLeaf?.allowScheduling && (
+                      <p className="text-xs text-gray-500">Esta categoria só aceita solicitações de orçamento.</p>
+                    )}
+                  </div>
+                </div>
+
                 <div className="flex items-center space-x-2">
                   <Switch
                     checked={newService.isActive || false}
@@ -586,6 +600,15 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                           )}
                           {service.isPromotional && (
                             <Badge className="bg-red-100 text-red-800">Promoção</Badge>
+                          )}
+                          {service.allowScheduling ? (
+                            service.offersScheduling ? (
+                              <Badge className="bg-blue-100 text-blue-800">Agendamento ativo</Badge>
+                            ) : (
+                              <Badge className="bg-amber-100 text-amber-800">Só orçamento</Badge>
+                            )
+                          ) : (
+                            <Badge className="bg-amber-100 text-amber-800">Somente orçamento</Badge>
                           )}
                         </div>
                         
@@ -778,17 +801,22 @@ interface ServiceEditFormProps {
 function ServiceEditForm({ service, onSave, onCancel, saving, categories }: ServiceEditFormProps) {
   const [editedService, setEditedService] = useState<ServicePrice>({ ...service })
   const [editedLeafId, setEditedLeafId] = useState<string | null>(service.categoryId || null)
-  const [editedLeafName, setEditedLeafName] = useState<string>(service.category || '')
 
   const handleSave = () => {
-  if (!editedService.categoryId) {
-    const fallbackCategory = categories.find(c => c.name === service.category)
-    if (fallbackCategory) {
-      editedService.categoryId = fallbackCategory.id
+    const next = { ...editedService }
+    if (!next.categoryId) {
+      const fallbackCategory = categories.find(c => c.name === service.category)
+      if (fallbackCategory) {
+        next.categoryId = fallbackCategory.id
+      }
     }
+    if (!(next.allowScheduling ?? true)) {
+      next.offersScheduling = false
+    }
+    onSave(next)
   }
-  onSave(editedService)
-}
+
+  const allowsScheduling = editedService.allowScheduling ?? true
 
 
   return (
@@ -809,11 +837,12 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
             onChange={(leafId, path) => {
               const leaf = path.at(-1)
               setEditedLeafId(leafId)
-              setEditedLeafName(leaf?.name ?? service.category)
               setEditedService(prev => ({
                 ...prev,
                 categoryId: leafId ?? prev.categoryId,
                 name: leaf?.name ?? prev.name, // pré-visualização do nome canônico
+                allowScheduling: leaf?.allowScheduling ?? prev.allowScheduling,
+                offersScheduling: leaf?.allowScheduling ? prev.offersScheduling ?? false : false,
               }))
             }}
           />
@@ -868,6 +897,22 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
       </div>
 
       <div className="flex items-center space-x-6">
+        <div className="flex items-center space-x-2">
+          <Switch
+            checked={allowsScheduling ? (editedService.offersScheduling ?? false) : false}
+            onCheckedChange={(checked: boolean) =>
+              setEditedService(prev => ({ ...prev, offersScheduling: checked }))
+            }
+            disabled={!allowsScheduling}
+          />
+          <div>
+            <Label>Oferecer agendamento</Label>
+            {!allowsScheduling && (
+              <p className="text-xs text-gray-500">Esta categoria aceita apenas solicitações de orçamento.</p>
+            )}
+          </div>
+        </div>
+
         <div className="flex items-center space-x-2">
           <Switch
             checked={editedService.isActive}

@@ -18,11 +18,13 @@ export default function ServiceSuggestInput({
   placeholder = 'Ex.: lavagem de estofados',
   defaultValue = '',
   onSelect,
-  inputClassName, // <-- novo
+  onTextChange,
+  inputClassName,
 }: {
   placeholder?: string
   defaultValue?: string
   onSelect: (item: { type: 'leaf' | 'text'; id?: string; name: string }) => void
+  onTextChange?: (value: string) => void
   inputClassName?: string
 }) {
   const [query, setQuery] = useState(defaultValue)
@@ -79,9 +81,11 @@ export default function ServiceSuggestInput({
     if ('id' in item) {
       onSelect({ type: 'leaf', id: item.id, name: item.name })
       setQuery(item.name)
+      onTextChange?.(item.name)
     } else {
       onSelect({ type: 'text', name: item.name })
       setQuery(item.name)
+      onTextChange?.(item.name)
     }
     setOpen(false)
   }
@@ -118,7 +122,10 @@ export default function ServiceSuggestInput({
         <Input
           placeholder={placeholder}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value)
+            onTextChange?.(e.target.value)
+          }}
           onFocus={() => setOpen(items.length > 0)}
           onKeyDown={onKeyDown}
           className={cn('pl-12 pr-12 h-14 text-lg', inputClassName)}

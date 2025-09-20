@@ -8,7 +8,7 @@
 import { ProfileVisibility } from '@/types/index'
 import { getMyProfile } from '@/lib/api/get-my-profile'
 import { useState } from 'react'
-import { User, MapPin, Bell, Shield, Eye, EyeOff, Save } from 'lucide-react'
+import { User, MapPin, Bell, Shield, Eye, EyeOff, Save, Navigation } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -149,6 +149,29 @@ export function ClientProfileSettings() {
     toast.success('Foto de perfil atualizada!')
   }
 
+  const updateProviderSettings = (
+    changes: Partial<NonNullable<ClientProfileData['serviceProviderSettings']>>
+  ) => {
+    setProfileData(prev => {
+      if (!prev) return prev
+      const current = prev.serviceProviderSettings ?? {
+        chargesTravel: false,
+        travelCost: undefined,
+        travelRatePerKm: undefined,
+        travelMinimumFee: undefined,
+        waivesTravelOnHire: false,
+      }
+
+      return {
+        ...prev,
+        serviceProviderSettings: {
+          ...current,
+          ...changes,
+        },
+      }
+    })
+  }
+
   const tabs = [
     { id: 'profile', label: 'Perfil', icon: User },
     { id: 'preferences', label: 'Notificações', icon: Bell },
@@ -163,38 +186,50 @@ useEffect(() => {
       const data = await getMyProfile()
 
       setProfileData({
-  id: data.id,
-  name: data.name,
-  email: data.email,
-  phone: data.phone,
-  profileImage: data.profileImage ?? null,
-  userType: data.userType,
-  description: data.description ?? '', // Ensure description is set
-  cpfCnpj: data.cpfCnpj ?? '', // Optional, if available
-  address: {
-    street: data.address?.street ?? '',
-    number: data.address?.number ?? '',
-    district: data.address?.district ?? '',
-    city: data.address?.city ?? '',
-    state: data.address?.state ?? '',
-    zipCode: data.address?.zipCode ?? '',
-    complement: data.address?.complement ?? '',
-  },
-  preferences: {
-    emailNotifications: data.preferences?.emailNotifications ?? false,
-    smsNotifications: data?.preferences?.smsNotifications ?? false,
-    whatsappNotifications: data?.preferences?.whatsappNotifications ?? false,
-    marketingEmails: data?.preferences?.marketingEmails ?? false,
-    serviceReminders: data?.preferences?.serviceReminders ?? false,
-    reviewRequests: data?.preferences?.reviewRequests ?? false,
-  },
-  privacy: {
-    profileVisibility: data?.privacy?.profileVisibility ?? ProfileVisibility.PUBLIC,
-    showPhone: data?.privacy?.showPhone ?? false,
-    showEmail: data?.privacy?.showEmail ?? false,
-    showLocation: data?.privacy?.showLocation ?? false,
-  },
-})
+        id: data.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        profileImage: data.profileImage ?? null,
+        userType: data.userType,
+        description: data.description ?? '',
+        cpfCnpj: data.cpfCnpj ?? '',
+        address: {
+          street: data.address?.street ?? '',
+          number: data.address?.number ?? '',
+          district: data.address?.district ?? '',
+          city: data.address?.city ?? '',
+          state: data.address?.state ?? '',
+          zipCode: data.address?.zipCode ?? '',
+          complement: data.address?.complement ?? '',
+          latitude: data.address?.latitude,
+          longitude: data.address?.longitude,
+        },
+        preferences: {
+          emailNotifications: data.preferences?.emailNotifications ?? false,
+          smsNotifications: data.preferences?.smsNotifications ?? false,
+          whatsappNotifications: data.preferences?.whatsappNotifications ?? false,
+          marketingEmails: data.preferences?.marketingEmails ?? false,
+          serviceReminders: data.preferences?.serviceReminders ?? false,
+          reviewRequests: data.preferences?.reviewRequests ?? false,
+        },
+        privacy: {
+          profileVisibility: data.privacy?.profileVisibility ?? ProfileVisibility.PUBLIC,
+          showPhone: data.privacy?.showPhone ?? false,
+          showEmail: data.privacy?.showEmail ?? false,
+          showLocation: data.privacy?.showLocation ?? false,
+        },
+        serviceProviderSettings: data.serviceProviderSettings
+          ? {
+              chargesTravel: data.serviceProviderSettings.chargesTravel,
+              travelCost: data.serviceProviderSettings.travelCost,
+              travelRatePerKm: data.serviceProviderSettings.travelRatePerKm,
+              travelMinimumFee: data.serviceProviderSettings.travelMinimumFee,
+              waivesTravelOnHire: data.serviceProviderSettings.waivesTravelOnHire,
+            }
+          : undefined,
+        plan: data.plan,
+      })
     } catch (error) {
       console.error('Erro ao carregar perfil:', error)
       toast.error('Erro ao carregar perfil')
@@ -455,6 +490,105 @@ if (loading || !profileData) {
                 </div>
               </div>
             </div>
+
+            {profileData?.userType === 'SERVICE_PROVIDER' && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-lg font-medium mb-4 flex items-center space-x-2">
+                    <Navigation className="w-5 h-5" />
+                    <span>Configurações de deslocamento</span>
+                  </h3>
+
+                  <p className="text-sm text-gray-500 mb-4">
+                    Defina como você cobra o deslocamento até o cliente. Esses valores são exibidos como estimativa,
+                    não são cobrados pela plataforma.
+                  </p>
+
+                  <div className="flex items-center justify-between bg-gray-50 border rounded-lg p-4">
+                    <div>
+                      <p className="font-medium">Cobrar taxa de deslocamento</p>
+                      <p className="text-sm text-gray-500">
+                        Ative para informar um valor por quilômetro percorrido.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={profileData.serviceProviderSettings?.chargesTravel ?? false}
+                      onCheckedChange={(checked) =>
+                        updateProviderSettings({ chargesTravel: checked })
+                      }
+                    />
+                  </div>
+
+                  {(profileData.serviceProviderSettings?.chargesTravel ?? false) && (
+                    <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="travelRatePerKm">Valor por km (R$)</Label>
+                        <Input
+                          id="travelRatePerKm"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={profileData.serviceProviderSettings?.travelRatePerKm ?? ''}
+                          onChange={(e) =>
+                            updateProviderSettings({
+                              travelRatePerKm: e.target.value ? parseFloat(e.target.value) : undefined,
+                            })
+                          }
+                          placeholder="Ex.: 2.50"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="travelMinimumFee">Taxa mínima (R$)</Label>
+                        <Input
+                          id="travelMinimumFee"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={profileData.serviceProviderSettings?.travelMinimumFee ?? ''}
+                          onChange={(e) =>
+                            updateProviderSettings({
+                              travelMinimumFee: e.target.value ? parseFloat(e.target.value) : undefined,
+                            })
+                          }
+                          placeholder="Ex.: 20,00"
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="travelBaseFee">Taxa fixa adicional (opcional)</Label>
+                        <Input
+                          id="travelBaseFee"
+                          type="number"
+                          min="0"
+                          step="0.1"
+                          value={profileData.serviceProviderSettings?.travelCost ?? ''}
+                          onChange={(e) =>
+                            updateProviderSettings({
+                              travelCost: e.target.value ? parseFloat(e.target.value) : undefined,
+                            })
+                          }
+                          placeholder="Ex.: 10,00"
+                        />
+                      </div>
+
+                      <div className="col-span-full flex items-center justify-between bg-gray-50 border rounded-lg p-3">
+                        <span className="text-sm text-gray-600">
+                          Descontar a taxa de deslocamento quando o serviço for fechado?
+                        </span>
+                        <Switch
+                          checked={profileData.serviceProviderSettings?.waivesTravelOnHire ?? false}
+                          onCheckedChange={(checked) =>
+                            updateProviderSettings({ waivesTravelOnHire: checked })
+                          }
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="flex justify-end">
               <Button onClick={handleSaveProfile} disabled={saving}>

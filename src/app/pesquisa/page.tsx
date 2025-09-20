@@ -5,22 +5,44 @@
 
 'use client'
 
-import { useState, useEffect, Suspense } from 'react'
-import { Search, MapPin, Filter, Star, Heart, Phone, MessageCircle, Loader2, Crosshair } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from 'react'
+import Image from 'next/image'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useSession } from 'next-auth/react'
+import {
+  Search,
+  MapPin,
+  Star,
+  Heart,
+  Phone,
+  MessageCircle,
+  Loader2,
+  Compass,
+  Crosshair,
+  X,
+} from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { useSession } from 'next-auth/react'
+import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
 import { useGeolocation } from '@/hooks/use-geolocation'
+import { AdvancedSearchFilters, DEFAULT_RADIUS_KM, type SearchFilters } from '@/components/search/advanced-filters'
+import type { CascCat } from '@/components/categories/cascading-category-picker'
+import { formatCurrency } from '@/lib/utils'
+import type { TravelCalculationResult } from '@/lib/travel-calculator'
 import ServiceSuggestInput from '@/components/services/service-suggest-input'
-import { AdvancedSearchFilters } from '@/components/search/advanced-filters'
 
-interface ServiceProvider {
+interface SearchResultProvider {
   id: string
   name: string
   profileImage?: string
+  primaryServiceId?: string
   location: string
+  city: string | null
+  state: string | null
+  latitude: number | null
+  longitude: number | null
   services: string[]
   category: string
   rating: number
@@ -28,97 +50,304 @@ interface ServiceProvider {
   basePrice: number
   distance?: number
   available: boolean
+  offersScheduling: boolean
+  travel?: {
+    chargesTravel: boolean
+    travelRatePerKm?: number | null
+    travelMinimumFee?: number | null
+    travelFixedFee?: number | null
+    waivesTravelOnHire?: boolean | null
+  }
 }
 
-type SortByUI =
-  | 'RELEVANCE'
-  | 'PRICE_LOW'
-  | 'PRICE_HIGH'
-  | 'NEWEST'
-  | 'RATING'
-  | 'DISTANCE';
-
-type Filters = {
-  q?: string
-  leafCategoryId?: string
-  city?: string
-  state?: string
-  minPrice?: number
-  maxPrice?: number
-  sortBy?: SortByUI
+const DEFAULT_FILTERS: SearchFilters = {
+  sortBy: 'RELEVANCE',
+  radius: DEFAULT_RADIUS_KM,
 }
 
 function PesquisaPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { data: session } = useSession()
-  const { getCurrentLocation, address, loading: locationLoading } = useGeolocation()
+  const {
+    address,
+    loading: geoLoading,
+    error: geoError,
+    getCurrentLocation,
+    forwardGeocode,
+  } = useGeolocation()
 
   const [searchTerm, setSearchTerm] = useState('')
-  const [location, setLocation] = useState('')
-  const [providers, setProviders] = useState<ServiceProvider[]>([])
+  const [filters, setFilters] = useState<SearchFilters>({ ...DEFAULT_FILTERS })
+  const [providers, setProviders] = useState<SearchResultProvider[]>([])
   const [loading, setLoading] = useState(false)
+  const [hasSearched, setHasSearched] = useState(false)
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const [favoriteLoading, setFavoriteLoading] = useState<string | null>(null)
-  const [filters, setFilters] = useState<Filters>({})
-  const [hasSearched, setHasSearched] = useState(false)
+  const [locationInput, setLocationInput] = useState('')
+  const [appliedLocationLabel, setAppliedLocationLabel] = useState('')
+  const [isApplyingLocation, setIsApplyingLocation] = useState(false)
+  const [travelQuotes, setTravelQuotes] = useState<Record<string, TravelCalculationResult>>({})
+  const [travelErrors, setTravelErrors] = useState<Record<string, string>>({})
+  const [travelLoading, setTravelLoading] = useState(false)
+  const skipAddressEffectRef = useRef(false)
 
-  // Atualiza campo de localização quando hook resolver endereço
+  const locationDefined = useMemo(() => {
+    const hasCoords = filters.latitude != null && filters.longitude != null
+    return hasCoords || Boolean(filters.city || filters.state)
+  }, [filters.latitude, filters.longitude, filters.city, filters.state])
+
   useEffect(() => {
-    if (address?.formatted) setLocation(address.formatted)
+    if (!address) return
+    if (address.lat == null || address.lng == null) return
+    if (skipAddressEffectRef.current) {
+      skipAddressEffectRef.current = false
+      return
+    }
+    const label = address.formatted || [address.city, address.state].filter(Boolean).join(', ')
+    applyLocation({
+      label,
+      latitude: address.lat,
+      longitude: address.lng,
+      city: address.city ?? undefined,
+      state: address.state ?? undefined,
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address])
 
-  const handleLocationClick = async () => {
-    await getCurrentLocation()
+  const applyFilters = (patch: Partial<SearchFilters>) => {
+    const next: SearchFilters = {
+      ...DEFAULT_FILTERS,
+      ...filters,
+      ...patch,
+    }
+    if (next.radius == null) next.radius = DEFAULT_RADIUS_KM
+    setFilters(next)
+    return next
   }
 
-  const handleSearch = async () => {
-    const q = searchTerm.trim()
-    const local = location.trim()
-    if (!q && !filters.leafCategoryId && !local) return
+  const executeSearch = async (
+    overrideFilters?: SearchFilters,
+    overrideTerm?: string
+  ) => {
+    const activeFilters = overrideFilters ?? filters
+    const term = (overrideTerm ?? searchTerm).trim()
+
+    if (!term && !activeFilters.leafCategoryId && !activeFilters.city && !activeFilters.latitude) {
+      toast.info('Informe um serviço ou defina sua localização para iniciar a busca.')
+      return
+    }
+
     setHasSearched(true)
     setLoading(true)
-
     try {
-      // mapeia valores extras da UI para os que a API aceita
-      const apiSortBy:
-        | 'RELEVANCE'
-        | 'PRICE_LOW'
-        | 'PRICE_HIGH'
-        | 'NEWEST'
-        | undefined =
-        filters.sortBy === 'PRICE_LOW'  ? 'PRICE_LOW'  :
-        filters.sortBy === 'PRICE_HIGH' ? 'PRICE_HIGH' :
-        filters.sortBy === 'NEWEST'     ? 'NEWEST'     :
-        filters.sortBy ? 'RELEVANCE' : undefined
+      const params = new URLSearchParams()
 
-      const params = new URLSearchParams({
-        ...(q && { q }),
-        ...(local && { local }),
-        ...(filters.leafCategoryId && { leafCategoryId: filters.leafCategoryId }),
-        ...(filters.minPrice != null && { minPrice: String(filters.minPrice) }),
-        ...(filters.maxPrice != null && { maxPrice: String(filters.maxPrice) }),
-        ...(apiSortBy && { sortBy: apiSortBy }),
-      })
+      if (term) params.set('q', term)
+      if (activeFilters.leafCategoryId) params.set('leafCategoryId', activeFilters.leafCategoryId)
+      if (activeFilters.city) params.set('city', activeFilters.city)
+      if (activeFilters.state) params.set('state', activeFilters.state)
+      if (activeFilters.latitude != null) params.set('lat', String(activeFilters.latitude))
+      if (activeFilters.longitude != null) params.set('lng', String(activeFilters.longitude))
+      if (activeFilters.radius != null) params.set('radiusKm', String(activeFilters.radius))
+      if (activeFilters.minPrice != null) params.set('minPrice', String(activeFilters.minPrice))
+      if (activeFilters.maxPrice != null) params.set('maxPrice', String(activeFilters.maxPrice))
+      if (activeFilters.rating != null) params.set('rating', String(activeFilters.rating))
+      if (activeFilters.availability) params.set('availability', activeFilters.availability)
+      if (activeFilters.hasScheduling) params.set('hasScheduling', 'true')
+      if (activeFilters.hasQuoting) params.set('hasQuoting', 'true')
+      if (activeFilters.isHighlighted) params.set('isHighlighted', 'true')
+      if (activeFilters.sortBy && activeFilters.sortBy !== 'RELEVANCE') {
+        params.set('sortBy', activeFilters.sortBy)
+      }
 
-      const res = await fetch(`/api/services/search?${params}`)
-      if (!res.ok) {
+      const endpoint = params.toString()
+        ? `/api/services/search?${params.toString()}`
+        : '/api/services/search'
+
+      const response = await fetch(endpoint)
+      if (!response.ok) {
         toast.error('Erro ao buscar serviços')
         return
       }
-      const data = await res.json()
-      setProviders(data.results || [])
-    } catch (err) {
-      console.error('Error searching services:', err)
+
+      const data = await response.json()
+      const results: SearchResultProvider[] = Array.isArray(data.results) ? data.results : []
+      setProviders(results)
+    } catch (error) {
+      console.error('Error searching services:', error)
       toast.error('Erro ao buscar serviços')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSearch()
+  const handleSearch = async () => {
+    await executeSearch()
   }
 
-  // Favoritos (inalterado)
+  const handleSortChange = async (value: SearchFilters['sortBy']) => {
+    const next = applyFilters({ sortBy: value })
+    await executeSearch(next)
+  }
+
+  const handleFiltersUpdate = async (patch: Partial<SearchFilters>) => {
+    const next = applyFilters(patch)
+    await executeSearch(next)
+  }
+
+  const handleResetFilters = async () => {
+    const preservedLocation: Partial<SearchFilters> = {
+      city: filters.city,
+      state: filters.state,
+      latitude: filters.latitude,
+      longitude: filters.longitude,
+    }
+    const next: SearchFilters = {
+      ...DEFAULT_FILTERS,
+      ...preservedLocation,
+      sortBy: filters.sortBy,
+    }
+    setFilters(next)
+    await executeSearch(next)
+  }
+
+  const handleSelectCategory = (leafId: string | null, path: CascCat[]) => {
+    if (leafId && path.length) {
+      const label = path.map((item) => item.name).join(' › ')
+      setSearchTerm(label)
+    }
+  }
+
+  const applyLocation = async (data: {
+    label: string
+    latitude: number
+    longitude: number
+    city?: string
+    state?: string
+  }) => {
+    setLocationInput(data.label)
+    setAppliedLocationLabel(data.label)
+    const next = applyFilters({
+      latitude: data.latitude,
+      longitude: data.longitude,
+      city: data.city,
+      state: data.state,
+    })
+    await executeSearch(next)
+  }
+
+  const handleApplyLocation = async () => {
+    const query = locationInput.trim()
+    if (!query) {
+      setAppliedLocationLabel('')
+      const next = applyFilters({
+        city: undefined,
+        state: undefined,
+        latitude: undefined,
+        longitude: undefined,
+      })
+      await executeSearch(next)
+      return
+    }
+
+    setIsApplyingLocation(true)
+    try {
+      skipAddressEffectRef.current = true
+      const result = await forwardGeocode(query)
+      if (result && result.lat != null && result.lng != null) {
+        await applyLocation({
+          label: result.formatted || query,
+          latitude: result.lat,
+          longitude: result.lng,
+          city: result.city ?? undefined,
+          state: result.state ?? undefined,
+        })
+      } else {
+        toast.error('Não foi possível localizar esse endereço')
+      }
+    } finally {
+      skipAddressEffectRef.current = false
+      setIsApplyingLocation(false)
+    }
+  }
+
+  const handleUseCurrentLocation = async () => {
+    setIsApplyingLocation(true)
+    try {
+      await getCurrentLocation()
+    } finally {
+      setIsApplyingLocation(false)
+    }
+  }
+
+  const handleClearLocation = async () => {
+    setLocationInput('')
+    setAppliedLocationLabel('')
+    const next = applyFilters({
+      city: undefined,
+      state: undefined,
+      latitude: undefined,
+      longitude: undefined,
+    })
+    await executeSearch(next)
+  }
+
+  useEffect(() => {
+    const paramsKey = searchParams.toString()
+    if (!paramsKey) return
+
+    const q = searchParams.get('q') || ''
+    const leafCategoryId = searchParams.get('leafCategoryId') || undefined
+    const city = searchParams.get('city') || undefined
+    const state = searchParams.get('state') || undefined
+    const minPrice = searchParams.get('minPrice')
+    const maxPrice = searchParams.get('maxPrice')
+    const rating = searchParams.get('rating')
+    const availability = searchParams.get('availability') as SearchFilters['availability'] | null
+    const hasScheduling = searchParams.get('hasScheduling') === 'true' ? true : undefined
+    const hasQuoting = searchParams.get('hasQuoting') === 'true' ? true : undefined
+    const isHighlighted = searchParams.get('isHighlighted') === 'true' ? true : undefined
+    const sortBy = (searchParams.get('sortBy') as SearchFilters['sortBy']) || 'RELEVANCE'
+    const radiusParam = searchParams.get('radiusKm') || searchParams.get('radius')
+    const latParam = searchParams.get('lat')
+    const lngParam = searchParams.get('lng')
+
+    const initialFilters: SearchFilters = {
+      ...DEFAULT_FILTERS,
+      leafCategoryId,
+      city,
+      state,
+      minPrice: minPrice ? Number(minPrice) : undefined,
+      maxPrice: maxPrice ? Number(maxPrice) : undefined,
+      rating: rating ? Number(rating) : undefined,
+      availability: availability || undefined,
+      hasScheduling,
+      hasQuoting,
+      isHighlighted,
+      sortBy,
+      radius: radiusParam ? Number(radiusParam) : DEFAULT_RADIUS_KM,
+      latitude: latParam ? Number(latParam) : undefined,
+      longitude: lngParam ? Number(lngParam) : undefined,
+    }
+
+    setFilters(initialFilters)
+    if (q) setSearchTerm(q)
+
+    const labelFromParams = searchParams.get('local') || [city, state].filter(Boolean).join(', ')
+    if (labelFromParams) {
+      setLocationInput(labelFromParams)
+      setAppliedLocationLabel(labelFromParams)
+    } else if (initialFilters.latitude != null && initialFilters.longitude != null) {
+      const fallbackLabel = `${initialFilters.latitude.toFixed(4)}, ${initialFilters.longitude.toFixed(4)}`
+      setLocationInput(fallbackLabel)
+      setAppliedLocationLabel(fallbackLabel)
+    }
+
+    void executeSearch(initialFilters, q)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams.toString()])
+
   const toggleFavorite = async (providerId: string) => {
     if (!session?.user) {
       toast.error('Faça login para favoritar')
@@ -132,9 +361,8 @@ function PesquisaPage() {
     try {
       const response = await fetch('/api/favorites', {
         method: isFavorited ? 'DELETE' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: isFavorited ? {} : { 'Content-Type': 'application/json' },
         ...(isFavorited ? {} : { body: JSON.stringify({ providerId }) }),
-        ...(isFavorited && { method: 'DELETE', headers: {}, body: undefined }),
       })
 
       const deleteResponse = isFavorited
@@ -143,8 +371,13 @@ function PesquisaPage() {
 
       if ((isFavorited ? deleteResponse : response).ok) {
         const next = new Set(favorites)
-        if (isFavorited) { next.delete(providerId); toast.success('Removido dos favoritos') }
-        else { next.add(providerId); toast.success('Adicionado aos favoritos') }
+        if (isFavorited) {
+          next.delete(providerId)
+          toast.success('Removido dos favoritos')
+        } else {
+          next.add(providerId)
+          toast.success('Adicionado aos favoritos')
+        }
         setFavorites(next)
       } else {
         toast.error('Erro ao atualizar favoritos')
@@ -157,214 +390,461 @@ function PesquisaPage() {
     }
   }
 
+  const handleSolicitar = (provider: SearchResultProvider) => {
+    const targetHref = provider.primaryServiceId
+      ? `/servico/${provider.primaryServiceId}/solicitar?providerId=${provider.id}`
+      : null
+
+    if (!session?.user) {
+      const next = targetHref ?? '/pesquisa'
+      router.push(`/entrar?next=${encodeURIComponent(next)}`)
+      return
+    }
+
+    if (targetHref) {
+      router.push(targetHref)
+    } else {
+      toast.info('Serviço indisponível para solicitação no momento.')
+    }
+  }
+
+  const fetchTravelForProvider = useCallback(
+    async (provider: SearchResultProvider) => {
+      if (!filters.latitude || !filters.longitude) return null
+      try {
+        const response = await fetch('/api/services/travel-cost', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerId: provider.id,
+            serviceId: provider.primaryServiceId,
+            clientLat: filters.latitude,
+            clientLng: filters.longitude,
+            clientAddress: appliedLocationLabel || locationInput,
+          }),
+        })
+        if (!response.ok) throw new Error('Falha ao calcular deslocamento')
+        const data = await response.json()
+        if (!data.success || !data.data?.travel) {
+          throw new Error(data.error || 'Não foi possível calcular o deslocamento')
+        }
+        return data.data.travel as TravelCalculationResult
+      } catch (error) {
+        throw error instanceof Error ? error : new Error('Erro ao calcular deslocamento')
+      }
+    },
+    [appliedLocationLabel, filters.latitude, filters.longitude, locationInput]
+  )
+
+  useEffect(() => {
+    if (!providers.length) {
+      setTravelQuotes({})
+      setTravelErrors({})
+      return
+    }
+
+    if (!filters.latitude || !filters.longitude) {
+      setTravelQuotes({})
+      setTravelErrors({})
+      return
+    }
+
+    const targets = providers.filter((provider) => provider.travel?.chargesTravel)
+    if (!targets.length) {
+      setTravelQuotes({})
+      setTravelErrors({})
+      return
+    }
+
+    let cancelled = false
+    const run = async () => {
+      setTravelLoading(true)
+      const quotes: Record<string, TravelCalculationResult> = {}
+      const errors: Record<string, string> = {}
+
+      try {
+        const results = await Promise.allSettled(
+          targets.map(async (provider) => {
+            const travel = await fetchTravelForProvider(provider)
+            return { id: provider.id, travel }
+          })
+        )
+
+        if (cancelled) return
+
+        results.forEach((item, index) => {
+          const provider = targets[index]
+          if (item.status === 'fulfilled') {
+            if (item.value.travel) {
+              quotes[item.value.id] = item.value.travel
+            }
+          } else if (provider) {
+            errors[provider.id] = item.reason?.message || 'Erro ao calcular deslocamento'
+          }
+        })
+
+        setTravelQuotes(quotes)
+        setTravelErrors(errors)
+      } finally {
+        if (!cancelled) setTravelLoading(false)
+      }
+    }
+
+    run()
+
+    return () => {
+      cancelled = true
+    }
+  }, [providers, filters.latitude, filters.longitude, fetchTravelForProvider])
+
+  const handleCalculateTravel = async (provider: SearchResultProvider) => {
+    try {
+      const travel = await fetchTravelForProvider(provider)
+      if (travel) {
+        setTravelQuotes((prev) => ({ ...prev, [provider.id]: travel }))
+        setTravelErrors((prev) => {
+          const next = { ...prev }
+          delete next[provider.id]
+          return next
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao calcular deslocamento'
+      setTravelErrors((prev) => ({ ...prev, [provider.id]: message }))
+      toast.error(message)
+    }
+  }
+
+  const renderTravelInfo = (provider: SearchResultProvider) => {
+    const travelSettings = provider.travel
+    if (!travelSettings || !travelSettings.chargesTravel || travelSettings.waivesTravelOnHire) {
+      return (
+        <p className="text-sm text-emerald-700">Deslocamento grátis informado pelo profissional.</p>
+      )
+    }
+
+    const quote = travelQuotes[provider.id]
+    if (quote) {
+      const total = provider.basePrice + quote.travelCost
+      return (
+        <div className="space-y-1 text-sm">
+          {quote.distanceText ? (
+            <p className="text-gray-600">Distância estimada: {quote.distanceText}</p>
+          ) : quote.distanceKm != null ? (
+            <p className="text-gray-600">Distância estimada: {quote.distanceKm.toFixed(1)} km</p>
+          ) : null}
+          <p className="text-gray-600">
+            Deslocamento: <span className="font-medium text-brand-navy">{formatCurrency(quote.travelCost)}</span>
+          </p>
+          {quote.travelCostBreakdown?.perKmPortion ? (
+            <p className="text-xs text-gray-500">
+              {formatCurrency(quote.travelCostBreakdown.perKmPortion)} por km +{' '}
+              {formatCurrency(quote.travelCostBreakdown.fixedFee)} de taxa fixa
+            </p>
+          ) : null}
+          <p className="text-gray-700 font-semibold">
+            Estimativa total: {formatCurrency(total)}
+          </p>
+          {quote.usedFallback && (
+            <p className="text-xs text-amber-600">
+              Distância calculada por aproximação. Confirme com o profissional.
+            </p>
+          )}
+        </div>
+      )
+    }
+
+    const error = travelErrors[provider.id]
+    if (error) {
+      return (
+        <div className="space-y-2 text-sm text-red-600">
+          <p>{error}</p>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => handleCalculateTravel(provider)}
+            className="text-brand-cyan border-brand-cyan hover:bg-brand-cyan/10"
+          >
+            Tentar novamente
+          </Button>
+        </div>
+      )
+    }
+
+    if (!filters.latitude || !filters.longitude) {
+      return (
+        <p className="text-sm text-gray-500">
+          Informe sua localização para estimar o custo de deslocamento.
+        </p>
+      )
+    }
+
+    return (
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => handleCalculateTravel(provider)}
+        className="text-brand-cyan border-brand-cyan hover:bg-brand-cyan/10"
+      >
+        Calcular deslocamento
+      </Button>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-brand-bg via-white to-brand-teal/5">
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-brand-navy mb-2">Pesquisar Serviços</h1>
           <p className="text-gray-600">Encontre os melhores profissionais da sua região</p>
         </div>
 
-        {/* Search Bar */}
         <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1 relative">
+          <CardContent className="space-y-4 p-4">
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="flex-1">
                 <ServiceSuggestInput
-                  placeholder="O que você está procurando?"
+                  placeholder="O que você procura?"
                   defaultValue={searchTerm}
-                  onSelect={(item) => {
-                    if (item.type === 'leaf') {
-                      setFilters((prev) => ({ ...prev, leafCategoryId: item.id }))
-                      setSearchTerm(item.name)
-                      handleSearch()
-                    } else {
-                      setFilters((prev) => ({ ...prev, leafCategoryId: undefined }))
-                      setSearchTerm(item.name)
-                      handleSearch()
-                    }
+                  onTextChange={(value) => setSearchTerm(value)}
+                  onSelect={async (item) => {
+                    const next = applyFilters({ leafCategoryId: item.type === 'leaf' ? item.id : undefined })
+                    setSearchTerm(item.name)
+                    await executeSearch(next, item.name)
                   }}
+                  inputClassName="w-full"
                 />
               </div>
-
-              <div className="flex-1 relative">
-                <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <input
-                  type="text"
-                  placeholder="Sua localização"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  onKeyPress={handleKeyPress}
-                  className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-brand-cyan focus:border-transparent"
+            </div>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <MapPin className="h-5 w-5 text-brand-cyan" />
+                <Input
+                  placeholder="Cidade, bairro ou endereço"
+                  value={locationInput}
+                  onChange={(event) => setLocationInput(event.target.value)}
+                  onKeyDown={(event) => event.key === 'Enter' && handleApplyLocation()}
                 />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLocationClick}
-                  disabled={locationLoading}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8 p-0"
-                >
-                  {locationLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
-                </Button>
+                {locationDefined && (
+                  <Button variant="ghost" size="sm" onClick={handleClearLocation} title="Limpar localização">
+                    <X className="h-4 w-4" />
+                  </Button>
+                )}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleApplyLocation}
+                    disabled={isApplyingLocation}
+                    title="Aplicar localização"
+                  >
+                    {isApplyingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleUseCurrentLocation}
+                    disabled={isApplyingLocation || geoLoading}
+                    title="Usar minha localização"
+                  >
+                    {isApplyingLocation || geoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Crosshair className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
-
               <Button
                 onClick={handleSearch}
-                disabled={loading || (!searchTerm.trim() && !filters.leafCategoryId && !location.trim())}
-                className="px-6"
+                disabled={loading}
+                className="w-full md:w-auto"
               >
-                {loading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4 mr-2" />}
                 Buscar
               </Button>
             </div>
+            {appliedLocationLabel && (
+              <p className="text-xs text-gray-500 flex items-center gap-1">
+                <Compass className="h-3 w-3" /> Localização aplicada: {appliedLocationLabel}
+              </p>
+            )}
+            {geoError && (
+              <p className="text-xs text-red-600">{geoError}</p>
+            )}
           </CardContent>
         </Card>
 
-        {/* Filtros avançados (inclui picker em cascata) */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <AdvancedSearchFilters
-              priceRange={{ min: 0, max: 10000 }}
-              onFiltersChange={(f) => {
-                if (typeof f.q === 'string') setSearchTerm(f.q)
-                if (typeof f.city === 'string') setLocation(f.city)
-                setFilters({
-                  q: f.q,
-                  leafCategoryId: f.leafCategoryId,
-                  city: f.city,
-                  state: f.state,
-                  minPrice: f.minPrice,
-                  maxPrice: f.maxPrice,
-                  sortBy: f.sortBy as SortByUI | undefined,
-                })
-                // se quiser buscar automaticamente ao escolher a leaf:
-                // if (f.leafCategoryId) handleSearch()
-              }}
-            />
-          </CardContent>
-        </Card>
+        <div className="mb-6">
+          <AdvancedSearchFilters
+            filters={filters}
+            onUpdate={handleFiltersUpdate}
+            onReset={handleResetFilters}
+            locationLabel={appliedLocationLabel}
+            onRequestLocation={handleUseCurrentLocation}
+            hasLocation={locationDefined}
+            onCategorySelected={handleSelectCategory}
+          />
+        </div>
 
-        {/* Results */}
         {loading ? (
           <div className="flex items-center justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-brand-cyan" />
           </div>
         ) : providers.length > 0 ? (
           <div className="space-y-4">
-            <div className="flex items-center justify-between mb-4">
+            <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <p className="text-gray-600">
                 {providers.length} resultado{providers.length !== 1 ? 's' : ''} encontrado{providers.length !== 1 ? 's' : ''}
               </p>
-              <Button variant="outline" size="sm">
-                <Filter className="h-4 w-4 mr-2" />
-                Filtros
-              </Button>
+              <div className="flex items-center gap-2">
+                <label htmlFor="sortBy" className="text-sm text-gray-500">
+                  Ordenar por
+                </label>
+                <select
+                  id="sortBy"
+                  value={filters.sortBy ?? 'RELEVANCE'}
+                  onChange={(event) => handleSortChange(event.target.value as SearchFilters['sortBy'])}
+                  className="rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-cyan"
+                >
+                  <option value="RELEVANCE">Relevância</option>
+                  <option value="PRICE_LOW">Menor preço</option>
+                  <option value="PRICE_HIGH">Maior preço</option>
+                  <option value="DISTANCE" disabled={!locationDefined}>
+                    Mais perto
+                  </option>
+                  <option value="RATING">Melhor avaliados</option>
+                  <option value="NEWEST">Mais recentes</option>
+                </select>
+              </div>
             </div>
 
-            {providers.map((provider) => (
-              <Card key={provider.id} className="hover:shadow-lg transition-shadow">
-                <CardContent className="p-6">
-                  <div className="flex items-start gap-4">
-                    {/* Avatar */}
-                    <div className="w-16 h-16 bg-brand-cyan/10 rounded-full flex items-center justify-center overflow-hidden">
-                      {provider.profileImage ? (
-                        <img src={provider.profileImage} alt={provider.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-2xl font-semibold text-brand-cyan">
-                          {provider.name.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+            {providers.map((provider) => {
+              const favoriteActive = favorites.has(provider.id)
+              return (
+                <Card key={provider.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="flex flex-col gap-4 p-6 md:flex-row">
+                    <div className="flex justify-center md:block">
+                      <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-brand-cyan/20 bg-brand-cyan/10">
+                        {provider.profileImage ? (
+                          <Image
+                            src={provider.profileImage}
+                            alt={provider.name}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-2xl font-semibold text-brand-cyan">
+                            {provider.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
                     </div>
 
-                    {/* Info */}
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 space-y-3">
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div>
-                          <h3 className="font-semibold text-brand-navy text-lg">{provider.name}</h3>
-                          <p className="text-gray-600">{provider.category}</p>
-                          <p className="text-sm text-gray-500">{provider.services.join(', ')}</p>
+                          <h3 className="text-lg font-semibold text-brand-navy">{provider.name}</h3>
+                          <p className="text-sm text-gray-600">{provider.category}</p>
+                          <p className="text-xs text-gray-500">{provider.services.join(', ')}</p>
                         </div>
-                        {session?.user && (
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1 text-sm text-gray-600">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span>{provider.rating}</span>
+                            <span className="text-gray-400">({provider.reviewCount})</span>
+                          </div>
                           <Button
                             variant="ghost"
-                            size="sm"
+                            size="icon"
                             onClick={() => toggleFavorite(provider.id)}
                             disabled={favoriteLoading === provider.id}
-                            className={`${
-                              favorites.has(provider.id)
-                                ? 'text-red-500 hover:text-red-700'
-                                : 'text-gray-400 hover:text-red-500'
-                            } hover:bg-red-50`}
+                            className={`${favoriteActive ? 'text-red-500' : 'text-gray-400'} hover:bg-red-50`}
                           >
                             {favoriteLoading === provider.id ? (
-                              <Loader2 className="h-5 w-5 animate-spin" />
+                              <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
-                              <Heart className={`h-5 w-5 ${favorites.has(provider.id) ? 'fill-current' : ''}`} />
+                              <Heart className={`h-5 w-5 ${favoriteActive ? 'fill-current' : ''}`} />
                             )}
                           </Button>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3 text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <MapPin className="h-4 w-4" />
+                          <span>{provider.location || 'Localização não informada'}</span>
+                        </div>
+                        {provider.distance != null && filters.latitude && (
+                          <Badge variant="secondary">{provider.distance.toFixed(1)} km de distância</Badge>
+                        )}
+                        {provider.offersScheduling && (
+                          <Badge variant="outline" className="border-emerald-300 text-emerald-700">
+                            Agendamento online
+                          </Badge>
                         )}
                       </div>
 
-                      {/* Rating and Location */}
-                      <div className="flex items-center gap-4 mb-3">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm font-medium">{provider.rating}</span>
-                          <span className="text-sm text-gray-500">({provider.reviewCount})</span>
+                      <div className="grid gap-3 rounded-lg border border-brand-cyan/20 bg-white/80 p-4 md:grid-cols-2">
+                        <div className="space-y-2">
+                          <p className="text-sm text-gray-500">Serviço a partir de</p>
+                          <p className="text-xl font-semibold text-brand-navy">
+                            {provider.basePrice > 0 ? formatCurrency(provider.basePrice) : 'Sob consulta'}
+                          </p>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Phone className="mr-2 h-4 w-4" /> Ligar
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-1 text-sm text-gray-500">
-                          <MapPin className="h-4 w-4" />
-                          <span>{provider.location}</span>
-                          {provider.distance && <span className="ml-1">({provider.distance.toFixed(1)} km)</span>}
+                        <div className="rounded-md bg-brand-cyan/5 p-3">
+                          <h4 className="text-sm font-medium text-brand-navy">Deslocamento</h4>
+                          <div className="mt-2 space-y-2">
+                            {renderTravelInfo(provider)}
+                          </div>
                         </div>
-                        <Badge variant={provider.available ? 'default' : 'secondary'}>
-                          {provider.available ? 'Disponível' : 'Ocupado'}
-                        </Badge>
                       </div>
 
-                      {/* Price and Actions */}
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-brand-navy">
-                          {provider.basePrice > 0 ? `A partir de R$ ${provider.basePrice.toFixed(2)}` : 'Sob consulta'}
-                        </span>
-                        <div className="flex gap-2">
-                          <Button variant="outline" size="sm">
-                            <Phone className="h-4 w-4 mr-2" />
-                            Ligar
-                          </Button>
-                          <Button variant="outline" size="sm">
-                            <MessageCircle className="h-4 w-4 mr-2" />
-                            WhatsApp
-                          </Button>
-                          <Button size="sm">Solicitar</Button>
-                        </div>
+                      <div className="flex justify-end">
+                        <Button onClick={() => handleSolicitar(provider)}>
+                          Solicitar
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardContent>
+                </Card>
+              )
+            })}
+
+            {travelLoading && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="h-4 w-4 animate-spin" /> Calculando deslocamento...
+              </div>
+            )}
           </div>
         ) : hasSearched ? (
-          /* No Results */
           <Card>
             <CardContent className="p-12 text-center">
-              <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">Nenhum resultado encontrado</h3>
-              <p className="text-gray-500 mb-6">Tente buscar com outros termos ou ajustar sua localização</p>
-              <Button variant="outline" onClick={() => setSearchTerm('')}>
-                Limpar Busca
+              <Search className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+              <h3 className="mb-2 text-xl font-semibold text-gray-600">Nenhum resultado encontrado</h3>
+              <p className="mb-6 text-gray-500">
+                Tente ajustar os filtros ou usar outra combinação de termos e localização.
+              </p>
+              <Button variant="outline" onClick={handleResetFilters}>
+                Limpar filtros
               </Button>
             </CardContent>
           </Card>
         ) : (
-          /* Initial State */
           <Card>
             <CardContent className="p-12 text-center">
-              <Search className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">Digite o que você está procurando</h3>
-              <p className="text-gray-500">Use a barra de pesquisa acima para encontrar profissionais</p>
+              <Search className="mx-auto mb-4 h-16 w-16 text-gray-300" />
+              <h3 className="mb-2 text-xl font-semibold text-gray-600">
+                Digite o que você está procurando
+              </h3>
+              <p className="text-gray-500">
+                Utilize a barra de pesquisa acima para encontrar profissionais ou serviços específicos.
+              </p>
             </CardContent>
           </Card>
         )}
@@ -373,12 +853,10 @@ function PesquisaPage() {
   )
 }
 
-const SearchPage: React.FC = () => {
-  return (
-    <Suspense fallback={<div>Carregando...</div>}>
-      <PesquisaPage />
-    </Suspense>
-  );
-}
+const SearchPage: React.FC = () => (
+  <Suspense fallback={<div className="p-10 text-center">Carregando...</div>}>
+    <PesquisaPage />
+  </Suspense>
+)
 
-export default SearchPage;
+export default SearchPage

@@ -1,11 +1,45 @@
+let modelsLoaded = false
+
+async function loadTinyFaceModel(faceapi: typeof import('face-api.js')) {
+  if (modelsLoaded && (faceapi.nets.tinyFaceDetector.params as any)) {
+    return true
+  }
+
+  const basePaths = Array.from(new Set([
+    typeof window !== 'undefined' ? (window as any).__FACE_API_MODELS_URL as string | undefined : undefined,
+    process.env.NEXT_PUBLIC_FACEAPI_MODELS_URL,
+    '/face-models/tiny_face_detector',
+    '/models',
+    'https://raw.githubusercontent.com/justadudewhohacks/face-api.js/master/weights'
+  ].filter(Boolean))) as string[]
+
+  for (const base of basePaths) {
+    try {
+      await faceapi.nets.tinyFaceDetector.loadFromUri(base)
+      modelsLoaded = true
+      return true
+    } catch (error) {
+      // log once per base to help diagnose missing assets
+      console.warn('[face-auto-center] tinyFaceDetector load failed from', base, error)
+    }
+  }
+
+  return false
+}
+
 export async function ensureFaceApi(): Promise<typeof import('face-api.js') | null> {
   try {
     const faceapi = await import('face-api.js')
-    if (!(faceapi.nets.tinyFaceDetector.params as any)) {
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models')
+    const hasParams = Boolean((faceapi.nets.tinyFaceDetector.params as any))
+    if (!hasParams) {
+      const loaded = await loadTinyFaceModel(faceapi)
+      if (!loaded) {
+        return null
+      }
     }
     return faceapi
-  } catch {
+  } catch (error) {
+    console.warn('[face-auto-center] failed to load face-api.js', error)
     return null
   }
 }
@@ -26,4 +60,3 @@ export async function getAutoCenter(file: File): Promise<{ center: { x: number; 
     return { center: { x: cx, y: cy }, zoom }
   } catch { return null } finally { URL.revokeObjectURL(url) }
 }
-

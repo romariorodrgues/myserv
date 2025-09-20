@@ -7,13 +7,13 @@
 
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Eye, EyeOff, Mail, Lock, User, Phone, FileText, IdCard } from 'lucide-react'
 import { UserTypeValues } from '@/types'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 type RegisterFormData = {
   name: string
@@ -35,7 +35,7 @@ type RegisterFormData = {
   driverLicenseExpiresAt?: string
 }
 
-export default function RegisterPage() {
+function RegisterPageContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -59,6 +59,7 @@ export default function RegisterPage() {
   })
 
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [step, setStep] = useState<1 | 2>(1)
   const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM' | 'ENTERPRISE' | null>(null)
@@ -101,6 +102,23 @@ export default function RegisterPage() {
     })()
   }, [])
 
+  useEffect(() => {
+    const qsUserType = searchParams.get('userType')
+    const qsPlan = searchParams.get('plan')?.toUpperCase() as ('FREE' | 'PREMIUM' | 'ENTERPRISE' | undefined)
+
+    if (qsUserType === UserTypeValues.SERVICE_PROVIDER && step === 1) {
+      setFormData((prev) => ({
+        ...prev,
+        userType: UserTypeValues.SERVICE_PROVIDER,
+        personType: qsPlan === 'ENTERPRISE' ? 'PJ' : prev.personType,
+      }))
+      if (qsPlan) {
+        setSelectedPlan(qsPlan)
+        setStep(2)
+      }
+    }
+  }, [searchParams, step])
+
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
   setIsLoading(true)
@@ -116,7 +134,6 @@ if (passwordInput.value !== confirmInput.value) {
 } else {
   confirmInput.setCustomValidity('') // limpa o erro se estiver tudo certo
 }
-
 
   try {
     // Se for prestador, aplicamos o wizard de planos
@@ -607,5 +624,13 @@ if (passwordInput.value !== confirmInput.value) {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Carregando...</div>}>
+      <RegisterPageContent />
+    </Suspense>
   )
 }

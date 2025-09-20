@@ -8,18 +8,17 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { 
   Home, 
   Search, 
-  Calendar, 
   User,
   Heart,
-  Briefcase
+  LayoutDashboard
 } from 'lucide-react'
 import { cn } from '@/utils'
+import { useSession } from 'next-auth/react'
 
 type NavItem = {
   href: string
@@ -27,47 +26,39 @@ type NavItem = {
   label: string
 }
 
-const navItems: NavItem[] = [
-  { href: '/', icon: Home, label: 'Início' },
-  { href: '/servicos', icon: Briefcase, label: 'Serviços' },
-  { href: '/pesquisa', icon: Search, label: 'Pesquisar' },
-  { href: '/agenda', icon: Calendar, label: 'Agenda' },
-  { href: '/perfil', icon: User, label: 'Perfil' }
-]
-
 export function MobileNavigation() {
+  const { data: session } = useSession()
   const pathname = usePathname()
-  const [visible, setVisible] = useState(true)
-  const [lastScrollY, setLastScrollY] = useState(0)
-  
-  // Hide navigation on scroll down, show on scroll up
-  // useEffect(() => {
-  //   const handleScroll = () => {
-  //     const currentScrollY = window.scrollY
-      
-  //     if (currentScrollY > lastScrollY && currentScrollY > 100) {
-  //       setVisible(false)
-  //     } else {
-  //       setVisible(true)
-  //     }
-      
-  //     setLastScrollY(currentScrollY)
-  //   }
-    
-  //   window.addEventListener('scroll', handleScroll, { passive: true })
-  //   return () => window.removeEventListener('scroll', handleScroll)
-  // }, [lastScrollY])
 
   if (pathname?.startsWith('/admin') || pathname?.startsWith('/auth')) {
     return null // Don't show mobile navigation on admin or auth pages
   }
 
+  if (!session?.user) {
+    return null
+  }
+
+  const dashboardHref = session?.user
+    ? session.user.userType === 'ADMIN'
+      ? '/admin/dashboard'
+      : session.user.userType === 'SERVICE_PROVIDER'
+        ? '/dashboard/profissional'
+        : '/dashboard/cliente'
+    : '/entrar'
+
+  const navItems: NavItem[] = [
+    { href: '/', icon: Home, label: 'Início' },
+    { href: '/pesquisa', icon: Search, label: 'Pesquisar' },
+    { href: dashboardHref, icon: LayoutDashboard, label: 'Dashboard' },
+    { href: '/favoritos', icon: Heart, label: 'Favoritos' },
+    { href: '/perfil', icon: User, label: 'Perfil' }
+  ]
+
   return (
     <motion.nav 
       className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-2xl md:hidden z-40"
       initial={{ y: 0 }}
-      // animate={{ y: visible ? 0 : 100 }}
-      animate={{ y: 0 }} // Always show for now, can be toggled later
+      animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
       <div className="flex items-center justify-around h-16">

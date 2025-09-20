@@ -38,6 +38,11 @@ import axios from 'axios'
 import PaymentHistory from '@/components/dashboard/payments-history'
 import React from 'react'
 
+const formatCurrency = (value?: number | null) =>
+  typeof value === 'number' && Number.isFinite(value)
+    ? value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : '—'
+
 interface ProviderBooking {
   id: string
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'HOLD'
@@ -48,6 +53,15 @@ interface ProviderBooking {
   address: string
   city: string
   state: string
+  estimatedPrice?: number | null
+  finalPrice?: number | null
+  travelCost?: number | null
+  basePriceSnapshot?: number | null
+  travelDistanceKm?: number | null
+  travelDurationMinutes?: number | null
+  travelRatePerKmSnapshot?: number | null
+  travelMinimumFeeSnapshot?: number | null
+  travelFixedFeeSnapshot?: number | null
   service: {
     name: string
   }
@@ -167,6 +181,7 @@ function ProviderDashboardContent() {
   }
 
   const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
+  const [openPricingId, setOpenPricingId] = useState<string | null>(null)
   const openScheduleFor = (id: string) => {
     setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
   }
@@ -196,7 +211,7 @@ function ProviderDashboardContent() {
       setActiveTab(tab as TDashboardTab)
     }
 
-  }, [searchParams])
+  }, [searchParams, status])
 
   if (!session && status === 'unauthenticated') {
     router.push('/entrar')
@@ -511,7 +526,14 @@ function ProviderDashboardContent() {
                     bookings
                       .filter(booking => booking.status === 'PENDING' || booking.status === 'HOLD')
                       .slice(0, 3)
-                      .map((booking) => (
+                      .map((booking) => {
+                        const basePrice = booking.basePriceSnapshot ?? null
+                        const travelCost = booking.travelCost ?? null
+                        const totalEstimate = booking.estimatedPrice ?? ((basePrice ?? 0) + (travelCost ?? 0))
+                        const distanceLabel = typeof booking.travelDistanceKm === 'number' ? `${booking.travelDistanceKm.toFixed(1)} km` : null
+                        const isPricingOpen = openPricingId === booking.id
+
+                        return (
                         <div key={booking.id} className="p-3 border rounded-lg">
                           <div className="flex items-center justify-between mb-2">
                             <p className="font-medium">{booking.service.name}</p>
@@ -524,6 +546,55 @@ function ProviderDashboardContent() {
                           </div>
                           <p className="text-sm text-muted-foreground mb-2">{booking.client.name}</p>
                           <p className="text-sm text-muted-foreground mb-3">{booking.description}</p>
+
+                          <div className="mb-3 rounded-lg border bg-gray-50 p-3 text-sm text-gray-700 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span>Serviço base</span>
+                              <span>{formatCurrency(basePrice)}</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span>Deslocamento</span>
+                              <span>
+                                {formatCurrency(travelCost)}
+                                {distanceLabel && (
+                                  <span className="text-xs text-gray-500 ml-2">({distanceLabel})</span>
+                                )}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between font-semibold text-brand-navy border-t pt-2">
+                              <span>Total estimado</span>
+                              <span>{formatCurrency(totalEstimate)}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-gray-500 pt-1">
+                              <span>
+                                {booking.travelRatePerKmSnapshot != null
+                                  ? `Taxa por km: R$ ${booking.travelRatePerKmSnapshot.toFixed(2)}`
+                                  : 'Taxa por km não configurada'}
+                              </span>
+                              <button
+                                type="button"
+                                className="text-brand-cyan hover:underline"
+                                onClick={() => setOpenPricingId((prev) => prev === booking.id ? null : booking.id)}
+                              >
+                                {isPricingOpen ? 'Ocultar detalhes' : 'Detalhes de preço'}
+                              </button>
+                            </div>
+
+                            {isPricingOpen && (
+                              <div className="mt-2 space-y-1 text-xs text-gray-600">
+                                <div>Taxa fixa: {formatCurrency(booking.travelFixedFeeSnapshot)}</div>
+                                {booking.travelMinimumFeeSnapshot != null && (
+                                  <div>Taxa mínima configurada: {formatCurrency(booking.travelMinimumFeeSnapshot)}</div>
+                                )}
+                                {typeof booking.travelDurationMinutes === 'number' && (
+                                  <div>Duração estimada: ~{Math.round(booking.travelDurationMinutes)} min</div>
+                                )}
+                                {!distanceLabel && (
+                                  <div>Mantenha os endereços atualizados para obter uma distância precisa.</div>
+                                )}
+                              </div>
+                            )}
+                          </div>
 
                           {/* Action buttons for pending bookings */}
                           <div className="flex flex-col gap-2 mb-3">
@@ -545,7 +616,17 @@ function ProviderDashboardContent() {
                                       <input type="time" value={schedMap[booking.id]?.time || ''} onChange={(e) => updateSchedField(booking.id, 'time', e.target.value)} className="block border rounded px-2 py-1 text-sm" />
                                     </div>
                                     <Button size="sm" onClick={() => scheduleFromQuote(booking.id)}>Confirmar</Button>
-                                    <Button size="sm" variant="outline" onClick={() => setSchedMap((m) => { const { [booking.id]: _, ...rest } = m; return rest })}>Cancelar</Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setSchedMap((m) => {
+                                        const next = { ...m }
+                                        delete next[booking.id]
+                                        return next
+                                      })}
+                                    >
+                                      Cancelar
+                                    </Button>
                                   </div>
                                 )}
                               </>
@@ -566,7 +647,7 @@ function ProviderDashboardContent() {
                             />
                           )}
                         </div>
-                      ))
+                      )})
                   ) : (
                     <div className="text-center py-8 text-muted-foreground">
                       <AlertCircle className="w-12 h-12 mx-auto mb-3 text-gray-300" />

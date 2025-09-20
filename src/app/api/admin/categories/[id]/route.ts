@@ -12,7 +12,36 @@ const updateSchema = z.object({
   icon: z.string().optional(),
   isActive: z.boolean().optional(),
   requiresDriverLicense: z.boolean().optional(),
+  allowScheduling: z.boolean().optional(),
 })
+
+async function syncProvidersForServices(serviceIds: string[]) {
+  if (!serviceIds.length) return
+
+  const providers = await prisma.serviceProviderService.findMany({
+    where: { serviceId: { in: serviceIds } },
+    select: { serviceProviderId: true },
+    distinct: ['serviceProviderId'],
+    orderBy: { serviceProviderId: 'asc' }
+  })
+
+  await Promise.all(
+    providers.map(async ({ serviceProviderId }) => {
+      const hasScheduling = await prisma.serviceProviderService.count({
+        where: {
+          serviceProviderId,
+          offersScheduling: true,
+          isActive: true
+        }
+      }) > 0
+
+      await prisma.serviceProvider.update({
+        where: { id: serviceProviderId },
+        data: { hasScheduling }
+      })
+    })
+  )
+}
 
 export async function PATCH(
   req: NextRequest,
@@ -27,6 +56,26 @@ export async function PATCH(
     if (!node) return NextResponse.json({ success: false, error: 'Categoria não encontrada' }, { status: 404 })
 
     const updated = await prisma.serviceCategory.update({ where: { id }, data: input })
+
+    if (typeof input.allowScheduling === 'boolean') {
+      const relatedServices = await prisma.service.findMany({
+        where: { categoryId: id },
+        select: { id: true }
+      })
+
+      if (relatedServices.length) {
+        const serviceIds = relatedServices.map((s) => s.id)
+
+        if (!input.allowScheduling) {
+          await prisma.serviceProviderService.updateMany({
+            where: { serviceId: { in: serviceIds } },
+            data: { offersScheduling: false }
+          })
+        }
+
+        await syncProvidersForServices(serviceIds)
+      }
+    }
 
     // Sincroniza nome com Service canônico se for leaf e renomeado
     if (input.name && updated.isLeaf) {
@@ -60,6 +109,7 @@ export async function GET(
         isActive: true,
         isLeaf: true,
         requiresDriverLicense: true,
+        allowScheduling: true,
       }
     })
     if (!node) return NextResponse.json({ success: false, error: 'Categoria não encontrada' }, { status: 404 })

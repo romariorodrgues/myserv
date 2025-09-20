@@ -1,23 +1,51 @@
 /**
  * Geolocation API endpoint
  * Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
- * 
- * Handles geolocation services and address lookup
+ *
+ * Handles geolocation services and address lookup using Google Maps APIs
  */
 
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
+import GoogleMapsServerService from '@/lib/maps-server'
 
-// Validation schema for reverse geocoding
 const reverseGeocodeSchema = z.object({
   lat: z.number(),
   lng: z.number()
 })
 
-// Validation schema for forward geocoding
 const forwardGeocodeSchema = z.object({
   address: z.string().min(1)
 })
+
+function formatLocationResponse(location: Awaited<ReturnType<typeof GoogleMapsServerService.geocodeAddress>>): NextResponse {
+  if (!location) {
+    return NextResponse.json(
+      { success: false, error: 'Endereço não encontrado' },
+      { status: 404 }
+    )
+  }
+
+  const addressLine = [
+    location.address.street,
+    location.address.number
+  ].filter(Boolean).join(', ')
+
+  return NextResponse.json({
+    success: true,
+    result: {
+      lat: location.latitude,
+      lng: location.longitude,
+      address: addressLine,
+      city: location.address.city,
+      state: location.address.state,
+      country: 'Brasil',
+      postalCode: location.address.zipCode,
+      formatted: location.formattedAddress,
+      components: location.address
+    }
+  })
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,56 +54,40 @@ export async function POST(request: NextRequest) {
     const type = searchParams.get('type') || 'reverse'
 
     if (type === 'reverse') {
-      // Reverse geocoding: lat/lng to address
       const { lat, lng } = reverseGeocodeSchema.parse(body)
+      const location = await GoogleMapsServerService.reverseGeocode(lat, lng)
+      return formatLocationResponse(location)
+    }
 
-      // Use a simple mock for now - in production you'd use Google Maps API or similar
-      const mockResponse = {
-        address: 'Rua Exemplo, 123',
-        city: 'São Paulo',
-        state: 'SP',
-        country: 'Brasil',
-        postalCode: '01234-567',
-        formatted: 'Rua Exemplo, 123, São Paulo - SP, 01234-567'
-      }
-
-      return NextResponse.json({
-        success: true,
-        result: mockResponse,
-        coordinates: { lat, lng }
-      })
-
-    } else if (type === 'forward') {
-      // Forward geocoding: address to lat/lng
+    if (type === 'forward') {
       const { address } = forwardGeocodeSchema.parse(body)
+      const location = await GoogleMapsServerService.geocodeAddress(address)
+      return formatLocationResponse(location)
+    }
 
-      // Mock response - in production use real geocoding service
-      const mockResponse = {
-        lat: -23.5505 + (Math.random() - 0.5) * 0.1,
-        lng: -46.6333 + (Math.random() - 0.5) * 0.1,
-        address: address,
-        city: 'São Paulo',
-        state: 'SP',
-        country: 'Brasil',
-        formatted: `${address}, São Paulo - SP`
-      }
+    return NextResponse.json(
+      { success: false, error: 'Tipo de operação inválido' },
+      { status: 400 }
+    )
+  } catch (error) {
+    console.error('Error in geolocation API:', error)
 
-      return NextResponse.json({
-        success: true,
-        result: mockResponse
-      })
-
-    } else {
+    if (error instanceof z.ZodError) {
       return NextResponse.json(
-        { error: 'Tipo de operação inválido' },
+        { success: false, error: 'Dados inválidos', details: error.errors },
         { status: 400 }
       )
     }
 
-  } catch (error) {
-    console.error('Error in geolocation API:', error)
+    if (error instanceof Error && error.message.includes('API key')) {
+      return NextResponse.json(
+        { success: false, error: 'Google Maps API key não configurada' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { success: false, error: 'Erro interno do servidor' },
       { status: 500 }
     )
   }
@@ -88,34 +100,38 @@ export async function GET(request: NextRequest) {
 
     if (!query) {
       return NextResponse.json(
-        { error: 'Query é obrigatória' },
+        { success: false, error: 'Query é obrigatória' },
         { status: 400 }
       )
     }
 
-    // Mock location suggestions
-    const suggestions = [
-      'São Paulo, SP',
-      'Rio de Janeiro, RJ',
-      'Belo Horizonte, MG',
-      'Brasília, DF',
-      'Salvador, BA',
-      'Fortaleza, CE',
-      'Curitiba, PR',
-      'Recife, PE'
-    ].filter(location => 
-      location.toLowerCase().includes(query.toLowerCase())
-    ).slice(0, 5)
+    const lat = searchParams.get('lat')
+    const lng = searchParams.get('lng')
+    const radius = searchParams.get('radius')
 
-    return NextResponse.json({
-      suggestions,
-      total: suggestions.length
+    const predictions = await GoogleMapsServerService.autocomplete(query, {
+      location: lat && lng ? { lat: Number(lat), lng: Number(lng) } : undefined,
+      radius: radius ? Number(radius) : undefined
     })
 
+    return NextResponse.json({
+      success: true,
+      suggestions: predictions.map((prediction) => prediction.description),
+      predictions,
+      total: predictions.length
+    })
   } catch (error) {
     console.error('Error fetching location suggestions:', error)
+
+    if (error instanceof Error && error.message.includes('API key')) {
+      return NextResponse.json(
+        { success: false, error: 'Google Maps API key não configurada' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json(
-      { error: 'Erro interno do servidor' },
+      { success: false, error: 'Erro interno do servidor' },
       { status: 500 }
     )
   }

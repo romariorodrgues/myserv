@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
         name: true,
         isLeaf: true,
         isActive: true,
+        allowScheduling: true,
       },
     })
 
@@ -82,6 +83,7 @@ export async function GET(request: NextRequest) {
           name: node.name,
           isLeaf: node.isLeaf,
           isActive: node.isActive,
+          allowScheduling: node.allowScheduling,
           serviceCount,
         }
       }),

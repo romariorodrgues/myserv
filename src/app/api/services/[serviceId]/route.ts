@@ -44,12 +44,17 @@ export async function GET(
                 id: true,
                 hasScheduling: true,
                 hasQuoting: true,
+                chargesTravel: true,
+                travelCost: true,
+                travelRatePerKm: true,
+                travelMinimumFee: true,
+                waivesTravelOnHire: true,
                 user: {
                   select: {
                     id: true,
                     name: true,
                     profileImage: true,
-                    address: { select: { city: true, state: true } }
+                    address: { select: { city: true, state: true, latitude: true, longitude: true, street: true, number: true } }
                   }
                 }
               }

@@ -31,28 +31,39 @@ const AvatarImage = React.forwardRef<
     src: string
     size?: number
   }
->(({ className, alt = "", src, size = 40, ...props }, ref) => {
-  const finalSrc = cdnImageUrl(src)
+>(({ className, alt = "", src, size = 96, onError, ...props }, ref) => {
+  const [failed, setFailed] = React.useState(false)
+
+  React.useEffect(() => {
+    setFailed(false)
+  }, [src])
+
+  const finalSrc = failed ? '' : cdnImageUrl(src)
+  if (!finalSrc) {
+    return null
+  }
+
+  const handleError = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    setFailed(true)
+    onError?.(event)
+  }
+
   return (
     <div
       ref={ref}
-      className={cn("relative h-full w-full", className)}
+      className={cn("absolute inset-0 h-full w-full z-10", className)}
       style={{ width: '100%', height: '100%' }}
     >
-      {finalSrc ? (
-        <Image
-          src={finalSrc}
-          alt={alt}
-          fill
-          sizes={`${size}px`}
-          className="object-cover rounded-full"
-          {...(props as any)}
-        />
-      ) : (
-        <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-sm text-gray-600">
-          ?
-        </div>
-      )}
+      <Image
+        src={finalSrc}
+        alt={alt}
+        fill
+        sizes={`${size}px`}
+        quality={95}
+        className="object-cover rounded-full"
+        onError={handleError}
+        {...(props as any)}
+      />
     </div>
   )
 })
@@ -65,7 +76,7 @@ const AvatarFallback = React.forwardRef<
   <div
     ref={ref}
     className={cn(
-      "flex h-full w-full items-center justify-center rounded-full bg-muted",
+      "absolute inset-0 flex h-full w-full items-center justify-center rounded-full bg-muted z-0",
       className
     )}
     {...props}

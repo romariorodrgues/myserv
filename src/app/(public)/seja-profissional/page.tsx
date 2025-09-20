@@ -43,10 +43,10 @@ export default async function SejaProfissionalPage() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button size="lg" asChild>
-                  <Link href="/cadastrar">Cadastrar-se</Link>
+                  <Link href="/cadastrar?userType=SERVICE_PROVIDER">Cadastrar-se</Link>
                 </Button>
-                <Button size="lg" variant="outline">
-                  Ver como funciona
+                <Button size="lg" variant="outline" asChild>
+                  <Link href="/como-funciona">Ver como funciona</Link>
                 </Button>
               </div>
               {/* Métricas promocionais removidas até termos dados reais */}
@@ -149,7 +149,9 @@ export default async function SejaProfissionalPage() {
                 <li>Desbloqueio unitário</li>
                 <li>Sem mensalidade</li>
               </ul>
-              <Button className="w-full" variant="outline">Começar grátis</Button>
+              <Button className="w-full" variant="outline" asChild>
+                <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=FREE">Começar grátis</Link>
+              </Button>
             </div>
             <div className="rounded-lg shadow p-6 border-2 border-green-500 bg-green-50">
               <h3 className="text-xl font-bold mb-1">Mensal • Profissional</h3>
@@ -159,7 +161,9 @@ export default async function SejaProfissionalPage() {
                 <li>Perfil completo e avaliações</li>
                 <li>Suporte por e-mail</li>
               </ul>
-              <Button className="w-full">Assinar</Button>
+              <Button className="w-full" asChild>
+                <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=PREMIUM">Assinar plano mensal</Link>
+              </Button>
             </div>
             <div className="rounded-lg shadow p-6 bg-white border">
               <h3 className="text-xl font-bold mb-1">Empresarial</h3>
@@ -169,7 +173,9 @@ export default async function SejaProfissionalPage() {
                 <li>Relatórios avançados</li>
                 <li>Suporte prioritário</li>
               </ul>
-              <Button asChild variant="outline" className="w-full"><a href="mailto:contato@myserv.com.br?subject=Plano%20Empresarial">Falar com vendas</a></Button>
+              <Button className="w-full" variant="secondary" asChild>
+                <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=ENTERPRISE">Assinar plano empresarial</Link>
+              </Button>
             </div>
           </div>
         </div>

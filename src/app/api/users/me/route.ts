@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client"
+import GoogleMapsServerService from "@/lib/maps-server";
 import { ClientProfileData } from "@/types";
 
 export async function GET() {
@@ -36,10 +38,28 @@ export async function GET() {
   });
 
   if (!user) {
-    return NextResponse.json(
-      { error: "Usuário não encontrado" },
-      { status: 404 }
-    );
+    const fallback: ClientProfileData = {
+      id: session.user.id,
+      name: session.user.name ?? 'Usuário',
+      email: session.user.email ?? '',
+      phone: session.user.phone ?? '',
+      cpfCnpj: '',
+      description: '',
+      userType: session.user.userType,
+      profileImage: session.user.image ?? '',
+      address: undefined,
+      preferences: undefined,
+      privacy: undefined,
+      serviceProviderSettings: session.user.userType === 'SERVICE_PROVIDER'
+        ? {
+            chargesTravel: false,
+            waivesTravelOnHire: false,
+          }
+        : undefined,
+      plan: 'Start',
+    }
+
+    return NextResponse.json({ user: fallback, missingProfile: true })
   }
 
   const activeSubscription = user.serviceProvider?.subscriptions?.[0];
@@ -81,18 +101,57 @@ export async function PUT(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const body: Partial<ClientProfileData & { profileImageKey?: string }> = await req.json();
+  const body: Partial<ClientProfileData & { profileImageKey?: string | null }> = await req.json();
+
+  const existingUser = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: { id: true, userType: true },
+  });
+
+  if (!existingUser) {
+    return NextResponse.json(
+      { error: 'Usuário não encontrado ou sessão expirada' },
+      { status: 404 }
+    );
+  }
+
+  let geocodedAddress = null as Awaited<ReturnType<typeof GoogleMapsServerService.geocodeAddress>>;
+  const providerSettings = body.serviceProviderSettings;
+
+  if (body.address) {
+    const parts = [
+      body.address.street && body.address.number
+        ? `${body.address.street}, ${body.address.number}`
+        : body.address.street,
+      body.address.district,
+      body.address.city,
+      body.address.state,
+      body.address.zipCode
+    ].filter(Boolean)
+
+    if (parts.length) {
+      try {
+        geocodedAddress = await GoogleMapsServerService.geocodeAddress(parts.join(', '))
+      } catch (error) {
+        console.error('[PUT /api/users/me] geocode error', error)
+        geocodedAddress = null
+      }
+    }
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
       // Atualiza dados básicos do usuário
       await tx.user.update({
-        where: { id: session.user.id },
+        where: { id: existingUser.id },
         data: {
           name: body.name,
           phone: body.phone,
           email: body.email,
-          profileImage: (body as any).profileImageKey ?? body.profileImage ?? undefined,
+          profileImage:
+            body.profileImageKey !== undefined
+              ? body.profileImageKey
+              : body.profileImage ?? undefined,
           description: body.description ?? undefined,
           cpfCnpj: body.cpfCnpj,
           address: body.address
@@ -106,6 +165,8 @@ export async function PUT(req: Request) {
                     number: body.address.number!,
                     zipCode: body.address.zipCode!,
                     complement: body.address.complement ?? "",
+                    latitude: geocodedAddress?.latitude ?? body.address.latitude ?? null,
+                    longitude: geocodedAddress?.longitude ?? body.address.longitude ?? null,
                   },
                   update: {
                     state: body.address.state!,
@@ -115,23 +176,42 @@ export async function PUT(req: Request) {
                     number: body.address.number!,
                     zipCode: body.address.zipCode!,
                     complement: body.address.complement ?? "",
+                    latitude: geocodedAddress?.latitude ?? body.address.latitude ?? null,
+                    longitude: geocodedAddress?.longitude ?? body.address.longitude ?? null,
                   },
                 },
               }
             : undefined,
-          clientProfile: {
-            upsert: {
-              create: {},
-              update: {},
-            },
-          },
+          serviceProvider:
+            existingUser.userType === 'SERVICE_PROVIDER' && providerSettings
+              ? {
+                  upsert: {
+                    create: {
+                      hasQuoting: true,
+                      hasScheduling: false,
+                      chargesTravel: providerSettings.chargesTravel,
+                      travelCost: providerSettings.travelCost ?? null,
+                      travelRatePerKm: providerSettings.travelRatePerKm ?? null,
+                      travelMinimumFee: providerSettings.travelMinimumFee ?? null,
+                      waivesTravelOnHire: providerSettings.waivesTravelOnHire,
+                    },
+                    update: {
+                      chargesTravel: providerSettings.chargesTravel,
+                      travelCost: providerSettings.travelCost ?? null,
+                      travelRatePerKm: providerSettings.travelRatePerKm ?? null,
+                      travelMinimumFee: providerSettings.travelMinimumFee ?? null,
+                      waivesTravelOnHire: providerSettings.waivesTravelOnHire,
+                    },
+                  },
+                }
+              : undefined,
         },
       });
 
       const profile = await tx.clientProfile.upsert({
-        where: { userId: session.user.id },
+        where: { userId: existingUser.id },
         update: {},
-        create: { userId: session.user.id },
+        create: { userId: existingUser.id },
       });
 
       // Preferences
@@ -202,18 +282,35 @@ export async function PUT(req: Request) {
             state: updatedUser!.address.state,
             zipCode: updatedUser!.address.zipCode,
             complement: updatedUser!.address.complement ?? "",
+            latitude: updatedUser!.address.latitude ?? undefined,
+            longitude: updatedUser!.address.longitude ?? undefined,
           }
         : undefined,
       preferences: updatedUser!.clientProfile
         ?.preferences as ClientProfileData["preferences"],
       privacy: updatedUser!.clientProfile
         ?.privacy as ClientProfileData["privacy"],
+      serviceProviderSettings: updatedUser!.serviceProvider
+        ? {
+            chargesTravel: updatedUser!.serviceProvider.chargesTravel,
+            travelCost: updatedUser!.serviceProvider.travelCost ?? undefined,
+            travelRatePerKm: updatedUser!.serviceProvider.travelRatePerKm ?? undefined,
+            travelMinimumFee: updatedUser!.serviceProvider.travelMinimumFee ?? undefined,
+            waivesTravelOnHire: updatedUser!.serviceProvider.waivesTravelOnHire,
+          }
+        : undefined,
       plan: updatedPlanName,
     };
 
     return NextResponse.json({ user: responseData });
   } catch (error) {
     console.error("[PUT /me]", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+      return NextResponse.json(
+        { error: 'Usuário não encontrado para atualização' },
+        { status: 404 }
+      )
+    }
     return NextResponse.json(
       { error: "Erro ao atualizar perfil" },
       { status: 500 }

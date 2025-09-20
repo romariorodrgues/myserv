@@ -10,6 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { EmailService } from '@/lib/email-service'
+import calculateTravelPricing from '@/lib/travel-calculator'
 
 // Validation schema for booking creation
 const createBookingSchema = z.object({
@@ -26,6 +27,11 @@ const createBookingSchema = z.object({
   state: z.string().min(2, 'Estado é obrigatório'),
   zipCode: z.string().min(8, 'CEP deve ter 8 caracteres')
 })
+
+function buildAddressString(parts: Array<string | null | undefined>): string | undefined {
+  const value = parts.filter((item) => item && item.toString().trim().length > 0).join(', ')
+  return value.length > 0 ? value : undefined
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -56,7 +62,8 @@ export async function POST(request: NextRequest) {
           select: {
             name: true,
             email: true,
-            phone: true
+            phone: true,
+            address: true
           }
         },
         services: {
@@ -83,6 +90,53 @@ export async function POST(request: NextRequest) {
         { status: 404 }
       )
     }
+
+    const providerAddress = serviceProvider.user.address
+    const providerCoords = providerAddress?.latitude != null && providerAddress?.longitude != null
+      ? { lat: providerAddress.latitude, lng: providerAddress.longitude }
+      : undefined
+
+    const providerAddressString = buildAddressString([
+      providerAddress?.street && providerAddress?.number
+        ? `${providerAddress.street}, ${providerAddress.number}`
+        : providerAddress?.street,
+      providerAddress?.district,
+      providerAddress?.city,
+      providerAddress?.state,
+      providerAddress?.zipCode,
+      'Brasil'
+    ])
+
+    const clientAddressString = buildAddressString([
+      validatedData.address,
+      validatedData.city,
+      validatedData.state,
+      validatedData.zipCode,
+      'Brasil'
+    ])
+
+    const providerServiceLink = serviceProvider.services?.[0]
+
+    const travelQuote = await calculateTravelPricing({
+      provider: {
+        coords: providerCoords,
+        addressString: providerAddressString,
+        travel: {
+          chargesTravel: serviceProvider.chargesTravel,
+          travelRatePerKm: serviceProvider.travelRatePerKm,
+          travelMinimumFee: serviceProvider.travelMinimumFee,
+          travelFixedFee: serviceProvider.travelCost,
+          waivesTravelOnHire: serviceProvider.waivesTravelOnHire,
+        },
+      },
+      client: {
+        coords: undefined,
+        addressString: clientAddressString,
+      },
+      basePrice: providerServiceLink?.basePrice ?? null,
+    })
+
+    const estimatedPrice = travelQuote.estimatedTotal ?? providerServiceLink?.basePrice ?? null
 
     // For now, we'll create a temporary user or use a guest booking system
     // In a real implementation, we'd get the user from the session
@@ -189,7 +243,15 @@ export async function POST(request: NextRequest) {
         status: requestType === 'SCHEDULING'
           ? (autoAccept ? 'ACCEPTED' : 'HOLD')
           : 'PENDING',
-        expiresAt: requestType === 'SCHEDULING' && !autoAccept ? holdExpiresAt : null
+        expiresAt: requestType === 'SCHEDULING' && !autoAccept ? holdExpiresAt : null,
+        estimatedPrice,
+        travelCost: travelQuote.travelCost,
+        basePriceSnapshot: providerServiceLink?.basePrice ?? null,
+        travelDistanceKm: travelQuote.success ? travelQuote.distanceKm ?? null : null,
+        travelDurationMinutes: travelQuote.success ? travelQuote.durationMinutes ?? null : null,
+        travelRatePerKmSnapshot: serviceProvider.travelRatePerKm ?? null,
+        travelMinimumFeeSnapshot: serviceProvider.travelMinimumFee ?? null,
+        travelFixedFeeSnapshot: serviceProvider.travelCost ?? null
       },
       include: {
         service: {
@@ -252,6 +314,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       booking,
+      travel: travelQuote,
+      warnings: travelQuote.warnings,
       message: 'Solicitação criada com sucesso! O profissional será notificado.'
     })
 
