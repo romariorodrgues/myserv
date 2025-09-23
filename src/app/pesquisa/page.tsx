@@ -91,6 +91,8 @@ function PesquisaPage() {
   const [travelErrors, setTravelErrors] = useState<Record<string, string>>({})
   const [travelLoading, setTravelLoading] = useState(false)
   const skipAddressEffectRef = useRef(false)
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const searchAbortRef = useRef<AbortController | null>(null)
 
   const locationDefined = useMemo(() => {
     const hasCoords = filters.latitude != null && filters.longitude != null
@@ -138,6 +140,10 @@ function PesquisaPage() {
       return
     }
 
+    const controller = new AbortController()
+    searchAbortRef.current?.abort()
+    searchAbortRef.current = controller
+
     setHasSearched(true)
     setLoading(true)
     try {
@@ -165,7 +171,7 @@ function PesquisaPage() {
         ? `/api/services/search?${params.toString()}`
         : '/api/services/search'
 
-      const response = await fetch(endpoint)
+      const response = await fetch(endpoint, { signal: controller.signal })
       if (!response.ok) {
         toast.error('Erro ao buscar serviços')
         return
@@ -175,14 +181,21 @@ function PesquisaPage() {
       const results: SearchResultProvider[] = Array.isArray(data.results) ? data.results : []
       setProviders(results)
     } catch (error) {
+      if (error instanceof DOMException && error.name === 'AbortError') {
+        return
+      }
       console.error('Error searching services:', error)
       toast.error('Erro ao buscar serviços')
     } finally {
+      if (searchAbortRef.current === controller) {
+        searchAbortRef.current = null
+      }
       setLoading(false)
     }
   }
 
   const handleSearch = async () => {
+    clearScheduledSearch()
     await executeSearch()
   }
 
@@ -191,9 +204,27 @@ function PesquisaPage() {
     await executeSearch(next)
   }
 
-  const handleFiltersUpdate = async (patch: Partial<SearchFilters>) => {
+  const clearScheduledSearch = useCallback(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current)
+      searchTimeoutRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      clearScheduledSearch()
+      searchAbortRef.current?.abort()
+    }
+  }, [clearScheduledSearch])
+
+  const handleFiltersUpdate = (patch: Partial<SearchFilters>) => {
     const next = applyFilters(patch)
-    await executeSearch(next)
+    clearScheduledSearch()
+    searchTimeoutRef.current = setTimeout(() => {
+      searchTimeoutRef.current = null
+      void executeSearch(next)
+    }, 350)
   }
 
   const handleResetFilters = async () => {
@@ -209,6 +240,7 @@ function PesquisaPage() {
       sortBy: filters.sortBy,
     }
     setFilters(next)
+    clearScheduledSearch()
     await executeSearch(next)
   }
 
@@ -234,6 +266,7 @@ function PesquisaPage() {
       city: data.city,
       state: data.state,
     })
+    clearScheduledSearch()
     await executeSearch(next)
   }
 
@@ -247,6 +280,7 @@ function PesquisaPage() {
         latitude: undefined,
         longitude: undefined,
       })
+      clearScheduledSearch()
       await executeSearch(next)
       return
     }
@@ -290,6 +324,7 @@ function PesquisaPage() {
       latitude: undefined,
       longitude: undefined,
     })
+    clearScheduledSearch()
     await executeSearch(next)
   }
 
@@ -437,68 +472,25 @@ function PesquisaPage() {
   )
 
   useEffect(() => {
-    if (!providers.length) {
+    if (!providers.length || !filters.latitude || !filters.longitude) {
       setTravelQuotes({})
       setTravelErrors({})
+      setTravelLoading(false)
       return
     }
 
-    if (!filters.latitude || !filters.longitude) {
+    const hasChargedTravel = providers.some((provider) => provider.travel?.chargesTravel)
+    if (!hasChargedTravel) {
       setTravelQuotes({})
       setTravelErrors({})
+      setTravelLoading(false)
       return
     }
-
-    const targets = providers.filter((provider) => provider.travel?.chargesTravel)
-    if (!targets.length) {
-      setTravelQuotes({})
-      setTravelErrors({})
-      return
-    }
-
-    let cancelled = false
-    const run = async () => {
-      setTravelLoading(true)
-      const quotes: Record<string, TravelCalculationResult> = {}
-      const errors: Record<string, string> = {}
-
-      try {
-        const results = await Promise.allSettled(
-          targets.map(async (provider) => {
-            const travel = await fetchTravelForProvider(provider)
-            return { id: provider.id, travel }
-          })
-        )
-
-        if (cancelled) return
-
-        results.forEach((item, index) => {
-          const provider = targets[index]
-          if (item.status === 'fulfilled') {
-            if (item.value.travel) {
-              quotes[item.value.id] = item.value.travel
-            }
-          } else if (provider) {
-            errors[provider.id] = item.reason?.message || 'Erro ao calcular deslocamento'
-          }
-        })
-
-        setTravelQuotes(quotes)
-        setTravelErrors(errors)
-      } finally {
-        if (!cancelled) setTravelLoading(false)
-      }
-    }
-
-    run()
-
-    return () => {
-      cancelled = true
-    }
-  }, [providers, filters.latitude, filters.longitude, fetchTravelForProvider])
+  }, [providers, filters.latitude, filters.longitude])
 
   const handleCalculateTravel = async (provider: SearchResultProvider) => {
     try {
+      setTravelLoading(true)
       const travel = await fetchTravelForProvider(provider)
       if (travel) {
         setTravelQuotes((prev) => ({ ...prev, [provider.id]: travel }))
@@ -512,6 +504,8 @@ function PesquisaPage() {
       const message = error instanceof Error ? error.message : 'Erro ao calcular deslocamento'
       setTravelErrors((prev) => ({ ...prev, [provider.id]: message }))
       toast.error(message)
+    } finally {
+      setTravelLoading(false)
     }
   }
 

@@ -8,15 +8,13 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useSession, signOut } from 'next-auth/react'
-import { User, Settings, Heart, History, HelpCircle, LogOut, Edit, Camera, LayoutDashboard, Users } from 'lucide-react'
+import { Settings, Heart, History, HelpCircle, LogOut, Edit, Camera, LayoutDashboard, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Badge } from '@/components/ui/badge'
 
 export default function PerfilPage() {
   const { data: session } = useSession()
-  const [loading, setLoading] = useState(true)
   const [profile, setProfile] = useState<any>(null)
   const [stats, setStats] = useState({ completed: 0, totalSpent: 0, favorites: 0 })
   const [providerAvg, setProviderAvg] = useState<number | null>(null)
@@ -24,7 +22,7 @@ export default function PerfilPage() {
 
   useEffect(() => {
     const load = async () => {
-      if (!session?.user?.id) { setLoading(false); return }
+      if (!session?.user?.id) { return }
       try {
         const [meRes, favRes, histRes] = await Promise.all([
           fetch('/api/users/me'),
@@ -49,12 +47,10 @@ export default function PerfilPage() {
         }
       } catch (e) {
         console.error('Load profile error', e)
-      } finally {
-        setLoading(false)
       }
     }
     load()
-  }, [session?.user?.id])
+  }, [session?.user?.id, session?.user?.userType])
 
   const memberSince = useMemo(() => {
     if (!profile?.id) return ''

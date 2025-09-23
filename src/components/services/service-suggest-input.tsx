@@ -37,6 +37,10 @@ export default function ServiceSuggestInput({
   const containerRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
+    setQuery(defaultValue)
+  }, [defaultValue])
+
+  useEffect(() => {
     const handler = setTimeout(async () => {
       const q = query.trim()
       if (q.length < 2) {
@@ -126,7 +130,9 @@ export default function ServiceSuggestInput({
             setQuery(e.target.value)
             onTextChange?.(e.target.value)
           }}
-          onFocus={() => setOpen(items.length > 0)}
+          onFocus={() => {
+            if (items.length > 0) setOpen(true)
+          }}
           onKeyDown={onKeyDown}
           className={cn('pl-12 pr-12 h-14 text-lg', inputClassName)}
         />
