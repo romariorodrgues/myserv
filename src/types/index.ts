@@ -139,6 +139,7 @@ export interface ClientProfileData {
     travelCost?: number
     travelRatePerKm?: number
     travelMinimumFee?: number
+    serviceRadiusKm?: number
     waivesTravelOnHire: boolean
   }
   plan: string,
@@ -181,6 +182,7 @@ export interface ServiceProvider {
   travelCost?: number
   travelRatePerKm?: number
   travelMinimumFee?: number
+  serviceRadiusKm?: number
   waivesTravelOnHire: boolean
   isHighlighted: boolean
   highlightUntil?: Date

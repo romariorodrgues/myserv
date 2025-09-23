@@ -270,6 +270,7 @@ if (input.leafCategoryId) {
         const pid = p.serviceProvider.id
         const addr = p.serviceProvider.user.address
         const loc = addr ? (addr.state ? `${addr.city}, ${addr.state}` : addr.city ?? '') : ''
+        const providerRadius = p.serviceProvider.serviceRadiusKm ?? null
         const dist =
   (resolvedLat != null && resolvedLng != null && addr?.latitude != null && addr?.longitude != null)
     ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
@@ -292,6 +293,7 @@ if (input.leafCategoryId) {
             reviewCount: 0,
             basePrice: p.basePrice ?? 0,
             distance: dist,
+            serviceRadiusKm: providerRadius,
             available: true,
             offersScheduling: p.offersScheduling,
             travel: {
@@ -309,6 +311,11 @@ if (input.leafCategoryId) {
           entry.basePrice = Math.min(entry.basePrice, p.basePrice ?? entry.basePrice)
           if (dist != null && (entry.distance == null || dist < entry.distance)) {
             entry.distance = dist
+          }
+          if (providerRadius != null) {
+            entry.serviceRadiusKm = entry.serviceRadiusKm == null
+              ? providerRadius
+              : Math.min(entry.serviceRadiusKm, providerRadius)
           }
           if (p.offersScheduling && !entry.offersScheduling) entry.offersScheduling = true
           if (!entry.travel) {
@@ -332,7 +339,16 @@ if (input.sortBy === 'PRICE_HIGH') results.sort((a, b) => (b.basePrice ?? 0) - (
 
 // se vieram coordenadas, filtra por raio e, se solicitado, ordena por distância
 if (resolvedLat != null && resolvedLng != null) {
-  results = results.filter((r) => r.distance == null || r.distance <= radiusKm)
+  const effectiveRadius = Number.isFinite(radiusKm) ? radiusKm : null
+  if (effectiveRadius != null) {
+    results = results.filter((r) => r.distance == null || r.distance <= effectiveRadius)
+  }
+
+  results = results.filter((r) => {
+    if (r.distance == null) return true
+    if (r.serviceRadiusKm == null) return true
+    return r.distance <= r.serviceRadiusKm
+  })
 
   if (enforceCityOnly) {
     results = results.filter((r) => {

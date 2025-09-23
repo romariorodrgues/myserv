@@ -159,6 +159,7 @@ export function ClientProfileSettings() {
         travelCost: undefined,
         travelRatePerKm: undefined,
         travelMinimumFee: undefined,
+        serviceRadiusKm: undefined,
         waivesTravelOnHire: false,
       }
 
@@ -171,6 +172,8 @@ export function ClientProfileSettings() {
       }
     })
   }
+
+  const radiusValue = profileData?.serviceProviderSettings?.serviceRadiusKm ?? null
 
   const tabs = [
     { id: 'profile', label: 'Perfil', icon: User },
@@ -225,6 +228,7 @@ useEffect(() => {
               travelCost: data.serviceProviderSettings.travelCost,
               travelRatePerKm: data.serviceProviderSettings.travelRatePerKm,
               travelMinimumFee: data.serviceProviderSettings.travelMinimumFee,
+              serviceRadiusKm: data.serviceProviderSettings.serviceRadiusKm,
               waivesTravelOnHire: data.serviceProviderSettings.waivesTravelOnHire,
             }
           : undefined,
@@ -504,6 +508,68 @@ if (loading || !profileData) {
                     Defina como você cobra o deslocamento até o cliente. Esses valores são exibidos como estimativa,
                     não são cobrados pela plataforma.
                   </p>
+
+                  <div className="space-y-3 mb-6">
+                    <div className="flex items-center justify-between bg-gray-50 border rounded-lg p-4">
+                      <div>
+                        <p className="font-medium">Definir raio de atuação</p>
+                        <p className="text-sm text-gray-500">
+                          Limite a distância máxima para receber solicitações de novos clientes.
+                        </p>
+                      </div>
+                      <Switch
+                        checked={radiusValue != null}
+                        onCheckedChange={(checked) =>
+                          updateProviderSettings({
+                            serviceRadiusKm: checked
+                              ? Math.min(Math.max(radiusValue ?? 15, 1), 100)
+                              : undefined,
+                          })
+                        }
+                      />
+                    </div>
+
+                    {radiusValue != null && (
+                      <div className="bg-white border rounded-lg p-4 space-y-4">
+                        <div className="flex items-center justify-between text-xs text-gray-500">
+                          <span>1 km</span>
+                          <span>100 km</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={1}
+                          max={100}
+                          step={1}
+                          value={radiusValue}
+                          onChange={(event) =>
+                            updateProviderSettings({
+                              serviceRadiusKm: Number(event.target.value),
+                            })
+                          }
+                          className="w-full"
+                        />
+                        <div className="flex items-center gap-3 text-sm text-gray-600">
+                          <span className="font-semibold text-brand-navy">{radiusValue} km</span>
+                          <Input
+                            type="number"
+                            min={1}
+                            max={100}
+                            step={1}
+                            value={radiusValue}
+                            onChange={(event) => {
+                              const raw = event.target.value
+                              const next = raw ? Math.min(Math.max(Number(raw), 1), 100) : 1
+                              updateProviderSettings({ serviceRadiusKm: next })
+                            }}
+                            className="w-20 h-9"
+                          />
+                          <span className="text-xs text-gray-400">
+                            Ajuste manualmente o valor em quilômetros.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   <div className="flex items-center justify-between bg-gray-50 border rounded-lg p-4">
                     <div>

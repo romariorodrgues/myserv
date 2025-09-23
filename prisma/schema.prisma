@@ -53,6 +53,7 @@ model ServiceProvider {
   travelCost         Float?
   travelRatePerKm    Float?
   travelMinimumFee   Float?
+  serviceRadiusKm    Float?
   waivesTravelOnHire Boolean                  @default(false)
   isHighlighted      Boolean                  @default(false)
   highlightUntil     DateTime?

@@ -53,6 +53,7 @@ export async function GET() {
       serviceProviderSettings: session.user.userType === 'SERVICE_PROVIDER'
         ? {
             chargesTravel: false,
+            serviceRadiusKm: undefined,
             waivesTravelOnHire: false,
           }
         : undefined,
@@ -89,6 +90,16 @@ export async function GET() {
     preferences: user.clientProfile
       ?.preferences as ClientProfileData["preferences"],
     privacy: user.clientProfile?.privacy as ClientProfileData["privacy"],
+    serviceProviderSettings: user.serviceProvider
+      ? {
+          chargesTravel: user.serviceProvider.chargesTravel,
+          travelCost: user.serviceProvider.travelCost ?? undefined,
+          travelRatePerKm: user.serviceProvider.travelRatePerKm ?? undefined,
+          travelMinimumFee: user.serviceProvider.travelMinimumFee ?? undefined,
+          serviceRadiusKm: user.serviceProvider.serviceRadiusKm ?? undefined,
+          waivesTravelOnHire: user.serviceProvider.waivesTravelOnHire,
+        }
+      : undefined,
     plan: planName,
   };
 
@@ -193,6 +204,7 @@ export async function PUT(req: Request) {
                       travelCost: providerSettings.travelCost ?? null,
                       travelRatePerKm: providerSettings.travelRatePerKm ?? null,
                       travelMinimumFee: providerSettings.travelMinimumFee ?? null,
+                      serviceRadiusKm: providerSettings.serviceRadiusKm ?? null,
                       waivesTravelOnHire: providerSettings.waivesTravelOnHire,
                     },
                     update: {
@@ -200,6 +212,7 @@ export async function PUT(req: Request) {
                       travelCost: providerSettings.travelCost ?? null,
                       travelRatePerKm: providerSettings.travelRatePerKm ?? null,
                       travelMinimumFee: providerSettings.travelMinimumFee ?? null,
+                      serviceRadiusKm: providerSettings.serviceRadiusKm ?? null,
                       waivesTravelOnHire: providerSettings.waivesTravelOnHire,
                     },
                   },
@@ -296,6 +309,7 @@ export async function PUT(req: Request) {
             travelCost: updatedUser!.serviceProvider.travelCost ?? undefined,
             travelRatePerKm: updatedUser!.serviceProvider.travelRatePerKm ?? undefined,
             travelMinimumFee: updatedUser!.serviceProvider.travelMinimumFee ?? undefined,
+            serviceRadiusKm: updatedUser!.serviceProvider.serviceRadiusKm ?? undefined,
             waivesTravelOnHire: updatedUser!.serviceProvider.waivesTravelOnHire,
           }
         : undefined,
