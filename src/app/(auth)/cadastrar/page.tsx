@@ -157,11 +157,15 @@ if (passwordInput.value !== confirmInput.value) {
       }
     }
 
-    const payload = {
+    const payload: any = {
       ...formData,
       phone: formData.phone.replace(/\D/g, ''),
       cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
       selectedPlan,
+    }
+
+    if (payload.selectedPlan == null) {
+      delete payload.selectedPlan
     }
 
     const response = await fetch('/api/auth/register', {
@@ -253,11 +257,15 @@ if (passwordInput.value !== confirmInput.value) {
     setIsLoading(true)
     setFormError(null)
     try {
-      const payload = {
+      const payload: any = {
         ...formData,
         phone: formData.phone.replace(/\D/g, ''),
         cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
         selectedPlan,
+      }
+
+      if (payload.selectedPlan == null) {
+        delete payload.selectedPlan
       }
 
       const response = await fetch('/api/auth/register', {
