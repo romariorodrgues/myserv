@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
         type: 'SYSTEM_ALERT',
         title: 'Solicitação de plano empresarial',
         message: `O prestador ${provider.name} (${provider.email}) solicitou contato para Plano Empresarial.`,
-        data: { providerId: provider.id, kind: 'ENTERPRISE_PLAN_REQUEST' } as any,
+        data: { providerId: provider.id, kind: 'PROFESSIONAL_PLAN_REQUEST' } as any,
       }))
     })
 
@@ -32,4 +32,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Erro ao registrar solicitação' }, { status: 500 })
   }
 }
-

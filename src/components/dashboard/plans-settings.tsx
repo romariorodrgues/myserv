@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 
 export default function PlansSettings() {
   const { plan, subscription } = useVerifyPlan();
-  const [prices, setPrices] = useState({ unlock: '4.90', monthly: '39.90', enterprise: '' })
+  const [prices, setPrices] = useState({ unlock: '4.90', monthly: '39.90' })
 
   useEffect(() => {
     (async () => {
@@ -23,7 +23,6 @@ export default function PlansSettings() {
         setPrices({
           unlock: s.PLAN_UNLOCK_PRICE || '4.90',
           monthly: s.PLAN_MONTHLY_PRICE || '39.90',
-          enterprise: s.PLAN_ENTERPRISE_PRICE || '',
         })
       } catch {}
     })()
@@ -83,7 +82,7 @@ export default function PlansSettings() {
 
           {/* Card de plano mensal */}
           <div className='p-4 border-border rounded-sm bg-gradient-to-br from-emerald-50 to-green-100 relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
-            {plan === 'Monthly' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
+            {plan === 'Premium' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
             <h2 className='text-2xl font-bold mb-1 text-brand-navy'>Mensal • Profissional</h2>
             <p className='text-brand-navy mb-4'>R$ {prices.monthly}/mês</p>
             <ul>
@@ -107,38 +106,6 @@ export default function PlansSettings() {
             <Button disabled={createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutate()}>
               {createPreferenceMutation.isPending ? 'Carregando...' : 'Assinar mensal'}
             </Button>
-          </div>
-
-          {/* Card de plano enterprise */}
-          <div className='p-4 border-border rounded-sm bg-gradient-to-br from-brand-cyan to-brand-navy relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
-            {plan === 'Enterprise' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
-
-            <h2 className='text-2xl font-bold mb-1 text-brand-bg'>Empresarial</h2>
-            <p className='text-brand-bg mb-4'>{prices.enterprise ? `R$ ${prices.enterprise}/mês` : 'Sob consulta'}</p>
-            <ul>
-              <li className='flex items-center gap-2'>
-                <Check size={14} className='text-brand-teal' />
-                <span className='font-semibold text-brand-bg text-base'>Equipe multiusuário</span>
-              </li>
-              <li className='flex items-center gap-2'>
-                <Check size={14} className='text-brand-teal' />
-                <span className='font-semibold text-brand-bg text-base'>Relatórios avançados</span>
-              </li>
-              <li className='flex items-center gap-2'>
-                <Check size={14} className='text-brand-teal' />
-                <span className='font-semibold text-brand-bg text-base'>Suporte prioritário</span>
-              </li>
-            </ul>
-            <Button className='w-full mt-4 rounded-sm bg-white text-brand-navy hover:bg-white/90' variant='outline' onClick={async () => {
-              try {
-                const r = await fetch('/api/admin/sales-request', { method: 'POST' })
-                const d = await r.json()
-                if (!r.ok || !d.success) throw new Error(d?.error || 'Falha ao enviar solicitação')
-                window.alert('Solicitação enviada! Um administrador entrará em contato.')
-              } catch (e: any) {
-                window.alert(e?.message || 'Erro ao enviar solicitação')
-              }
-            }}>Falar com vendas</Button>
           </div>
         </div>
         {

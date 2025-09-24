@@ -53,7 +53,10 @@ export const authOptions: NextAuthOptions = {
           profileImage: user.profileImage,
           isApproved: user.isApproved,
           isActive: user.isActive,
-          address: user.address
+          address: user.address,
+          termsVersion: user.termsVersion ?? null,
+          termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
+          deactivatedAt: user.deactivatedAt?.toISOString() ?? null,
         }
       }
     })
@@ -73,6 +76,9 @@ export const authOptions: NextAuthOptions = {
         token.isActive = (user as any).isActive
         token.profileImage = user.profileImage
         token.address = user.address
+        ;(token as any).termsVersion = (user as any).termsVersion
+        ;(token as any).termsAcceptedAt = (user as any).termsAcceptedAt
+        ;(token as any).deactivatedAt = (user as any).deactivatedAt
       }
       return token
     },
@@ -84,6 +90,9 @@ export const authOptions: NextAuthOptions = {
         ;(session.user as any).isActive = token.isActive as boolean
         session.user.profileImage = token.profileImage as string | null
         session.user.address = token.address as any
+        ;(session.user as any).termsVersion = (token as any).termsVersion ?? null
+        ;(session.user as any).termsAcceptedAt = (token as any).termsAcceptedAt ?? null
+        ;(session.user as any).deactivatedAt = (token as any).deactivatedAt ?? null
       }
       return session
     },

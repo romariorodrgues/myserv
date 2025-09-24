@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const code = (searchParams.get('code') || '').toUpperCase().trim()
-  const plan = (searchParams.get('plan') || '').toUpperCase().trim() // FREE | PREMIUM | ENTERPRISE
+  const plan = (searchParams.get('plan') || '').toUpperCase().trim() // FREE | PREMIUM | ANY
   if (!code) return NextResponse.json({ success: false, error: 'Informe o código' }, { status: 400 })
   try {
     const now = new Date()
@@ -21,4 +21,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: e?.message || 'Erro ao validar cupom' }, { status: 500 })
   }
 }
-

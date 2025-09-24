@@ -37,6 +37,9 @@ import { ClientProfileSettings } from '@/components/dashboard/client-profile-set
 import axios from 'axios'
 import PaymentHistory from '@/components/dashboard/payments-history'
 import React from 'react'
+import { TermsConsentPrompt } from '@/components/legal/terms-consent'
+import { SupportChatWidgetWrapper } from '@/components/chat/SupportChatWidgetWrapper'
+import { ProviderReviewModal } from '@/components/dashboard/provider-review-modal'
 
 const formatCurrency = (value?: number | null) =>
   typeof value === 'number' && Number.isFinite(value)
@@ -62,10 +65,14 @@ interface ProviderBooking {
   travelRatePerKmSnapshot?: number | null
   travelMinimumFeeSnapshot?: number | null
   travelFixedFeeSnapshot?: number | null
+  providerReviewRating?: number | null
+  providerReviewComment?: string | null
+  providerReviewGivenAt?: string | null
   service: {
     name: string
   }
   client: {
+    id?: string
     name: string
     profileImage: string | null
     phone?: string
@@ -110,6 +117,21 @@ function ProviderDashboardContent() {
     }
   }, [session])
 
+  const fetchProviderPendingReviews = useCallback(async () => {
+    if (!session?.user?.id) return
+    try {
+      const res = await fetch(`/api/reviews/pending?providerId=${session.user.id}`)
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.success) {
+        setPendingProviderReviews(data.data.count ?? 0)
+        setProviderPendingItems(data.data.items ?? [])
+      }
+    } catch (error) {
+      console.error('Error fetching provider pending reviews:', error)
+    }
+  }, [session?.user?.id])
+
   useEffect(() => {
     if (status === 'loading') return; // Sessão ainda está carregando
     
@@ -137,8 +159,9 @@ function ProviderDashboardContent() {
     }
     
     fetchRatings();
+    fetchProviderPendingReviews();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [status, session, router, searchParams]);
+}, [status, session, router, searchParams, fetchProviderPendingReviews]);
 
     /** 
      * A função a baixo está sendo executada em looping
@@ -167,6 +190,7 @@ function ProviderDashboardContent() {
       if (response.ok) {
         // Refresh bookings list
         await refetchBookings()
+        await fetchProviderPendingReviews()
 
         const statusText = newStatus === 'ACCEPTED' ? 'aceita' : newStatus === 'REJECTED' ? 'rejeitada' : 'marcada como concluída'
         alert(`Solicitação ${statusText} com sucesso!`)
@@ -182,6 +206,9 @@ function ProviderDashboardContent() {
 
   const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
   const [openPricingId, setOpenPricingId] = useState<string | null>(null)
+  const [pendingProviderReviews, setPendingProviderReviews] = useState(0)
+  const [providerPendingItems, setProviderPendingItems] = useState<Array<{ id: string; client: { id: string; name: string; profileImage?: string | null }; serviceName: string }>>([])
+  const [providerReviewBookingId, setProviderReviewBookingId] = useState<string | null>(null)
   const openScheduleFor = (id: string) => {
     setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
   }
@@ -317,6 +344,9 @@ function ProviderDashboardContent() {
   }
 
   return (
+    <>
+    <TermsConsentPrompt />
+    <SupportChatWidgetWrapper />
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
  
       {/* Header */}
@@ -332,7 +362,7 @@ function ProviderDashboardContent() {
       {/* Navigation Tabs */}
       <div className="border-b">
         <nav className="-mb-px flex space-x-8 overflow-x-auto">
-          {tabs.map((tab) => {
+      {tabs.map((tab) => {
             const Icon = tab.icon
             return (
               <button
@@ -456,6 +486,48 @@ function ProviderDashboardContent() {
                   Ver Métricas
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Avaliações pendentes</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pendingProviderReviews > 0 ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-muted-foreground">
+                    Você tem {pendingProviderReviews} avaliação{pendingProviderReviews > 1 ? 's' : ''} para registrar.
+                  </p>
+                  <div className="space-y-3">
+                    {providerPendingItems.slice(0, 3).map((item) => (
+                      <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-brand-cyan/10 flex items-center justify-center text-brand-cyan font-semibold">
+                            {item.client.name.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium text-brand-navy">{item.client.name}</p>
+                            <p className="text-xs text-muted-foreground">{item.serviceName}</p>
+                          </div>
+                        </div>
+                        <Button size="sm" onClick={() => setProviderReviewBookingId(item.id)}>
+                          Avaliar
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  {providerPendingItems.length > 3 && (
+                    <p className="text-xs text-muted-foreground">
+                      Mostrando 3 de {pendingProviderReviews}. Finalize uma avaliação para ver as próximas.
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma avaliação pendente no momento.
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -776,6 +848,22 @@ function ProviderDashboardContent() {
         </div>
       )}
     </div>
+    {providerReviewBookingId && (
+      <ProviderReviewModal
+        bookingId={providerReviewBookingId}
+        onClose={() => setProviderReviewBookingId(null)}
+        onSubmitted={() => {
+          const reviewId = providerReviewBookingId
+          setProviderReviewBookingId(null)
+          if (reviewId) {
+            setProviderPendingItems((items) => items.filter((item) => item.id !== reviewId))
+            setPendingProviderReviews((count) => Math.max(0, count - 1))
+          }
+          fetchProviderPendingReviews()
+        }}
+      />
+    )}
+    </>
   )
 }
 

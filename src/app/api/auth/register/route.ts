@@ -6,6 +6,7 @@ import { UserTypeValues, type UserType } from "@/types";
 import { isValidCPF, isValidCNPJ } from "@/utils";
 import { Preference } from "mercadopago";
 import mercadoPagoConfig from "@/lib/mercadopago";
+import { CURRENT_TERMS_VERSION } from '@/constants/legal'
 
 const UserTypeArray = Object.values(UserTypeValues) as [
   UserType,
@@ -25,7 +26,7 @@ const registerSchema = z.object({
   }),
   // Campos opcionais adicionais (principalmente para prestador)
   personType: z.enum(["PF","PJ"]).optional(),
-  selectedPlan: z.enum(["FREE","PREMIUM","ENTERPRISE"]).optional(),
+  selectedPlan: z.enum(["FREE","PREMIUM"]).optional(),
   gender: z.string().optional(),
   maritalStatus: z.string().optional(),
   dateOfBirth: z.string().optional(), // ISO date
@@ -95,11 +96,8 @@ export async function POST(request: NextRequest) {
     if (fullData.userType === UserTypeValues.SERVICE_PROVIDER) {
       const personType = fullData.personType || (fullData.cpfCnpj.replace(/\D/g, "").length > 11 ? 'PJ' : 'PF')
       const plan = fullData.selectedPlan
-      if (personType === 'PJ' && plan && plan !== 'ENTERPRISE') {
-        return NextResponse.json({ error: 'Pessoa jurídica deve escolher o plano Enterprise' }, { status: 400 })
-      }
-      if (personType === 'PF' && plan === 'ENTERPRISE') {
-        return NextResponse.json({ error: 'Pessoa física não pode escolher o plano Enterprise' }, { status: 400 })
+      if (personType === 'PJ' && plan !== 'PREMIUM') {
+        return NextResponse.json({ error: 'Pessoa jurídica deve escolher o plano Profissional' }, { status: 400 })
       }
     }
 
@@ -143,45 +141,27 @@ export async function POST(request: NextRequest) {
 
       const preference = new Preference(mercadoPagoConfig);
 
-      let itemId: string = fullData.selectedPlan ?? '';
-      let title = "Assinatura MyServ";
-      let unitPrice = 0;
-
-      if (fullData.selectedPlan === "ENTERPRISE") {
-        const enterprisePlan = await prisma.plan.findFirst({
-          where: { name: "Enterprise", isActive: true },
-        });
-        const s = await prisma.systemSettings.findUnique({
-          where: { key: "PLAN_ENTERPRISE_PRICE" },
-        });
-        unitPrice =
-          Number(s?.value || enterprisePlan?.price || 0) ||
-          (enterprisePlan?.price ?? 0);
-        itemId = enterprisePlan?.id || "enterprise";
-        title = "MyServ Plano Enterprise";
-      } else {
-        const premiumPlan = await prisma.plan.upsert({
-          where: { name: "Premium" },
-          update: {},
-          create: {
-            name: "Premium",
-            description: "Plano mensal profissional",
-            price: 39.9,
-            billingCycle: "MONTHLY",
-            features: JSON.stringify([
-              "Propostas ilimitadas",
-              "Agenda personalizada",
-              "Gestão de clientes",
-            ]),
-          },
-        });
-        const s = await prisma.systemSettings.findUnique({
-          where: { key: "PLAN_MONTHLY_PRICE" },
-        });
-        unitPrice = Number(s?.value || premiumPlan.price || 39.9) || 39.9;
-        itemId = premiumPlan.id;
-        title = "MyServ Plano Mensal Profissional";
-      }
+      const premiumPlan = await prisma.plan.upsert({
+        where: { name: "Premium" },
+        update: {},
+        create: {
+          name: "Premium",
+          description: "Plano mensal profissional",
+          price: 39.9,
+          billingCycle: "MONTHLY",
+          features: JSON.stringify([
+            "Propostas ilimitadas",
+            "Agenda personalizada",
+            "Gestão de clientes",
+          ]),
+        },
+      });
+      const s = await prisma.systemSettings.findUnique({
+        where: { key: "PLAN_MONTHLY_PRICE" },
+      });
+      const unitPrice = Number(s?.value || premiumPlan.price || 39.9) || 39.9;
+      const itemId = premiumPlan.id;
+      const title = "MyServ Plano Mensal Profissional";
 
       const { id, init_point } = await preference.create({
         body: {
@@ -210,7 +190,7 @@ export async function POST(request: NextRequest) {
             plan: {
               planId: itemId,
               planName: title,
-              planType: fullData.selectedPlan === "ENTERPRISE" ? "ENTERPRISE" : "PREMIUM",
+              planType: 'PREMIUM',
             },
           },
           external_reference: `pending-registration:${pending.id}`,
@@ -247,6 +227,8 @@ export async function POST(request: NextRequest) {
           dateOfBirth: validatedData.dateOfBirth
             ? new Date(validatedData.dateOfBirth)
             : null,
+          termsAcceptedAt: new Date(),
+          termsVersion: CURRENT_TERMS_VERSION,
         },
       });
     } catch (err) {

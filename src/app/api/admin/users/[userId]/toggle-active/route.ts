@@ -17,22 +17,47 @@ export async function PATCH(
     if (session.user.userType !== 'ADMIN') return NextResponse.json({ error: 'Apenas administradores' }, { status: 403 })
 
     const { userId } = params
-    const { active, reason } = await request.json() as { active: boolean; reason?: string }
-    if (active === undefined) return NextResponse.json({ error: 'Parâmetro "active" é obrigatório' }, { status: 400 })
-    if (active === false && (!reason || reason.trim().length === 0)) {
+    const payload = await request.json() as { active?: boolean; isActive?: boolean; reason?: string }
+    const nextActive = typeof payload.active === 'boolean'
+      ? payload.active
+      : payload.isActive
+
+    if (nextActive === undefined) {
+      return NextResponse.json({ error: 'Parâmetro "active" é obrigatório' }, { status: 400 })
+    }
+
+    const reason = payload.reason
+    if (nextActive === false && (!reason || reason.trim().length === 0)) {
       return NextResponse.json({ error: 'Motivo é obrigatório para desativar' }, { status: 400 })
     }
 
-    const user = await prisma.user.findUnique({ where: { id: userId } })
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { serviceProvider: { select: { id: true } } }
+    })
     if (!user) return NextResponse.json({ error: 'Usuário não encontrado' }, { status: 404 })
 
     await prisma.$transaction(async (tx) => {
-      await tx.user.update({ where: { id: userId }, data: { isActive: active } })
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          isActive: nextActive,
+          deactivatedAt: nextActive ? null : new Date(),
+        }
+      })
+
+      if (user.userType === 'SERVICE_PROVIDER' && user.serviceProvider) {
+        await tx.serviceProviderService.updateMany({
+          where: { serviceProviderId: user.serviceProvider.id },
+          data: { isActive: nextActive },
+        })
+      }
+
       await tx.userModeration.create({
         data: {
           userId,
           adminId: session.user.id,
-          action: active ? 'ACTIVATE' : 'DEACTIVATE',
+          action: nextActive ? 'ACTIVATE' : 'DEACTIVATE',
           reason: reason?.trim() || null,
         }
       })
@@ -44,4 +69,3 @@ export async function PATCH(
     return NextResponse.json({ error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
-

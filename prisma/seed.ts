@@ -193,19 +193,6 @@ await prisma.clientPrivacy.upsert({
     },
   })
 
-  await prisma.plan.upsert({
-    where: { name: 'Enterprise' },
-    update: {},
-    create: {
-      name: 'Enterprise',
-      description: 'Plano avançado com recursos completos para empresas de médio e grande porte.',
-      price: 59.90,
-      features: JSON.stringify(['Propostas ilimitadas', 'Relatórios completos', 'Agenda personalizada', 'Controle de precificação de serviço']),
-      isActive: true,
-      billingCycle: 'MONTHLY',
-    },
-  })
-
   await prisma.subscription.create({
     data: {
       serviceProviderId: serviceProvider.id,

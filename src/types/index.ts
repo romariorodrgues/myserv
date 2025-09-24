@@ -109,6 +109,9 @@ export interface ClientProfileData {
   description?: string
   userType: UserType
   profileImage?: string | null
+  termsAcceptedAt?: string | null
+  termsVersion?: string | null
+  deactivatedAt?: string | null
   address?: {
     street?: string
     number?: string
@@ -158,6 +161,9 @@ export interface User {
   gender?: Gender
   maritalStatus?: MaritalStatus
   description?: string
+  deactivatedAt?: Date
+  termsAcceptedAt?: Date
+  termsVersion?: string
   createdAt: Date
   updatedAt: Date
   address?: Address
@@ -214,6 +220,9 @@ export interface ServiceRequest {
   schedulingFee?: number
   isVisitVirtual: boolean
   expiresAt?: Date
+  providerReviewRating?: number
+  providerReviewComment?: string
+  providerReviewGivenAt?: Date
   client: User
   provider: User
   service: Service
@@ -259,6 +268,7 @@ export interface ServiceProviderService {
   description?: string
   isActive: boolean
   offersScheduling?: boolean
+  providesHomeService?: boolean
   service: Service
 }
 

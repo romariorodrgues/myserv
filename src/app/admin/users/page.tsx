@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 interface User {
   id: string
@@ -61,6 +62,9 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filterType, setFilterType] = useState<string>('ALL')
   const [filterStatus, setFilterStatus] = useState<string>('ALL')
+  const [toggleTarget, setToggleTarget] = useState<{ id: string; isActive: boolean; name: string } | null>(null)
+  const [toggleReason, setToggleReason] = useState('')
+  const [toggling, setToggling] = useState(false)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -134,19 +138,35 @@ export default function AdminUsersPage() {
     }
   }
 
-  const handleToggleActive = async (userId: string, isActive: boolean) => {
+  const handleToggleActive = (user: User) => {
+    setToggleReason('')
+    setToggleTarget({ id: user.id, isActive: user.isActive, name: user.name })
+  }
+
+  const confirmToggle = async () => {
+    if (!toggleTarget) return
+    if (!toggleTarget.isActive && !toggleReason.trim()) {
+      alert('Informe um motivo para desativar o usuário.')
+      return
+    }
     try {
-      const response = await fetch(`/api/admin/users/${userId}/toggle-active`, {
+      setToggling(true)
+      const response = await fetch(`/api/admin/users/${toggleTarget.id}/toggle-active`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ isActive: !isActive })
+        body: JSON.stringify({
+          active: !toggleTarget.isActive,
+          reason: toggleTarget.isActive ? undefined : toggleReason.trim(),
+        })
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
+        setToggleTarget(null)
+        setToggleReason('')
         fetchUsers()
       } else {
         alert('Erro ao alterar status: ' + data.error)
@@ -154,6 +174,8 @@ export default function AdminUsersPage() {
     } catch (error) {
       alert('Erro ao alterar status')
       console.error(error)
+    } finally {
+      setToggling(false)
     }
   }
 
@@ -206,6 +228,7 @@ export default function AdminUsersPage() {
   }
 
   return (
+    <>
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -403,7 +426,7 @@ export default function AdminUsersPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => handleToggleActive(user.id, user.isActive)}
+                        onClick={() => handleToggleActive(user)}
                         className={user.isActive ? 'text-red-600 border-red-600 hover:bg-red-50' : 'text-green-600 border-green-600 hover:bg-green-50'}
                       >
                         {user.isActive ? 'Desativar' : 'Ativar'}
@@ -424,5 +447,42 @@ export default function AdminUsersPage() {
         </Card>
       </div>
     </div>
+
+    {toggleTarget && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <Card className="w-full max-w-lg p-6 space-y-4">
+          <h3 className="text-lg font-semibold">
+            {toggleTarget.isActive ? 'Desativar usuário' : 'Ativar usuário'}
+          </h3>
+          {toggleTarget.isActive && (
+            <div className="space-y-2">
+              <label className="block text-sm text-gray-700">Motivo da desativação</label>
+              <Textarea
+                rows={4}
+                value={toggleReason}
+                onChange={(event) => setToggleReason(event.target.value)}
+                placeholder="Informe o motivo para desativar este usuário"
+              />
+            </div>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                if (toggling) return
+                setToggleTarget(null)
+                setToggleReason('')
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button onClick={confirmToggle} disabled={toggling}>
+              {toggling ? 'Confirmando...' : 'Confirmar'}
+            </Button>
+          </div>
+        </Card>
+      </div>
+    )}
+    </>
   )
 }

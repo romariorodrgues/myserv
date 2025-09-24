@@ -33,7 +33,6 @@ export async function POST(req: NextRequest) {
     // Plan settings
     'PLAN_UNLOCK_PRICE',
     'PLAN_MONTHLY_PRICE',
-    'PLAN_ENTERPRISE_PRICE',
   ])
 
   const entries = Object.entries(updates).filter(([k, v]) => allowedKeys.has(k) && typeof v === 'string')

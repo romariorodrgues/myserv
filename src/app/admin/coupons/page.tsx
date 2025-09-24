@@ -11,7 +11,7 @@ type Coupon = {
   code: string
   discountType: 'PERCENT' | 'FIXED' | string
   value: number
-  appliesTo: 'FREE' | 'PREMIUM' | 'ENTERPRISE' | 'ANY' | string
+  appliesTo: 'FREE' | 'PREMIUM' | 'ANY' | string
   validFrom?: string
   validTo?: string
   isActive: boolean
@@ -106,7 +106,7 @@ export default function AdminCouponsPage() {
                     <SelectItem value="ANY">Qualquer</SelectItem>
                     <SelectItem value="FREE">Grátis</SelectItem>
                     <SelectItem value="PREMIUM">Premium</SelectItem>
-                    <SelectItem value="ENTERPRISE">Enterprise</SelectItem>
+                    
                   </SelectContent>
                 </Select>
               </div>
@@ -129,4 +129,3 @@ export default function AdminCouponsPage() {
     </div>
   )
 }
-

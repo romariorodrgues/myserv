@@ -18,6 +18,9 @@ model User {
   userType         String
   isActive         Boolean             @default(true)
   isApproved       Boolean             @default(false)
+  deactivatedAt    DateTime?
+  termsAcceptedAt  DateTime?
+  termsVersion     String?
   gender           String?
   maritalStatus    String?
   dateOfBirth      DateTime?
@@ -177,6 +180,7 @@ model ServiceProviderService {
   description       String?
   isActive          Boolean         @default(true)
   offersScheduling  Boolean         @default(false)
+  providesHomeService Boolean       @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   service           Service         @relation(fields: [serviceId], references: [id])
@@ -212,6 +216,9 @@ model ServiceRequest {
   updatedAt      DateTime  @updatedAt
   payments       Payment[]
   review         Review?
+  providerReviewRating     Int?
+  providerReviewComment    String?
+  providerReviewGivenAt    DateTime?
   service        Service   @relation(fields: [serviceId], references: [id])
   provider       User      @relation("ProviderRequests", fields: [providerId], references: [id])
   client         User      @relation("ClientRequests", fields: [clientId], references: [id])
@@ -423,7 +430,7 @@ model Coupon {
   code            String   @unique
   discountType    String   // PERCENT | FIXED
   value           Float
-  appliesTo       String   // FREE | PREMIUM | ENTERPRISE | ANY
+  appliesTo       String   // FREE | PREMIUM | ANY
   validFrom       DateTime?
   validTo         DateTime?
   maxRedemptions  Int?

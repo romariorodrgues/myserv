@@ -251,6 +251,7 @@ if (input.leafCategoryId) {
           basePrice: p.basePrice ?? 0,
           description: p.description,
           offersScheduling: p.offersScheduling,
+          providesHomeService: p.providesHomeService ?? false,
         }))
       }))
 
@@ -291,12 +292,13 @@ if (input.leafCategoryId) {
             category: svc.category.name,
             rating: 0,
             reviewCount: 0,
-            basePrice: p.basePrice ?? 0,
-            distance: dist,
-            serviceRadiusKm: providerRadius,
-            available: true,
-            offersScheduling: p.offersScheduling,
-            travel: {
+          basePrice: p.basePrice ?? 0,
+          distance: dist,
+          serviceRadiusKm: providerRadius,
+          available: true,
+          offersScheduling: p.offersScheduling,
+          providesHomeService: p.providesHomeService ?? false,
+          travel: {
               chargesTravel: p.serviceProvider.chargesTravel,
               travelRatePerKm: p.serviceProvider.travelRatePerKm,
               travelMinimumFee: p.serviceProvider.travelMinimumFee,
@@ -316,6 +318,9 @@ if (input.leafCategoryId) {
             entry.serviceRadiusKm = entry.serviceRadiusKm == null
               ? providerRadius
               : Math.min(entry.serviceRadiusKm, providerRadius)
+          }
+          if (p.providesHomeService) {
+            entry.providesHomeService = true
           }
           if (p.offersScheduling && !entry.offersScheduling) entry.offersScheduling = true
           if (!entry.travel) {

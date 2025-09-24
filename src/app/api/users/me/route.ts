@@ -47,6 +47,9 @@ export async function GET() {
       description: '',
       userType: session.user.userType,
       profileImage: session.user.image ?? '',
+      termsAcceptedAt: null,
+      termsVersion: null,
+      deactivatedAt: null,
       address: undefined,
       preferences: undefined,
       privacy: undefined,
@@ -76,6 +79,9 @@ export async function GET() {
     description: user.description ?? "",
     userType: user.userType,
     profileImage: user.profileImage,
+    termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
+    termsVersion: user.termsVersion ?? null,
+    deactivatedAt: user.deactivatedAt?.toISOString() ?? null,
     address: user.address
       ? {
           street: user.address.street,
@@ -89,7 +95,12 @@ export async function GET() {
       : undefined,
     preferences: user.clientProfile
       ?.preferences as ClientProfileData["preferences"],
-    privacy: user.clientProfile?.privacy as ClientProfileData["privacy"],
+    privacy: user.clientProfile?.privacy
+      ? {
+          ...(user.clientProfile.privacy as ClientProfileData['privacy']),
+          profileVisibility: 'PUBLIC',
+        }
+      : undefined,
     serviceProviderSettings: user.serviceProvider
       ? {
           chargesTravel: user.serviceProvider.chargesTravel,
@@ -128,6 +139,12 @@ export async function PUT(req: Request) {
 
   let geocodedAddress = null as Awaited<ReturnType<typeof GoogleMapsServerService.geocodeAddress>>;
   const providerSettings = body.serviceProviderSettings;
+  const sanitizedPrivacy = body.privacy
+    ? {
+        ...body.privacy,
+        profileVisibility: 'PUBLIC' as const,
+      }
+    : undefined
 
   if (body.address) {
     const parts = [
@@ -237,11 +254,11 @@ export async function PUT(req: Request) {
       }
 
       // Privacy
-      if (body.privacy) {
+      if (sanitizedPrivacy) {
         await tx.clientPrivacy.upsert({
           where: { clientProfileId: profile.id },
-          update: { ...body.privacy },
-          create: { clientProfileId: profile.id, ...body.privacy },
+          update: { ...sanitizedPrivacy },
+          create: { clientProfileId: profile.id, ...sanitizedPrivacy },
         });
       }
     });
@@ -286,6 +303,9 @@ export async function PUT(req: Request) {
       description: updatedUser!.description ?? "",
       userType: updatedUser!.userType,
       profileImage: updatedUser!.profileImage ?? "",
+      termsAcceptedAt: updatedUser!.termsAcceptedAt?.toISOString() ?? null,
+      termsVersion: updatedUser!.termsVersion ?? null,
+      deactivatedAt: updatedUser!.deactivatedAt?.toISOString() ?? null,
       address: updatedUser!.address
         ? {
             street: updatedUser!.address.street,
@@ -301,8 +321,12 @@ export async function PUT(req: Request) {
         : undefined,
       preferences: updatedUser!.clientProfile
         ?.preferences as ClientProfileData["preferences"],
-      privacy: updatedUser!.clientProfile
-        ?.privacy as ClientProfileData["privacy"],
+      privacy: updatedUser!.clientProfile?.privacy
+        ? {
+            ...(updatedUser!.clientProfile.privacy as ClientProfileData['privacy']),
+            profileVisibility: 'PUBLIC',
+          }
+        : undefined,
       serviceProviderSettings: updatedUser!.serviceProvider
         ? {
             chargesTravel: updatedUser!.serviceProvider.chargesTravel,

@@ -11,16 +11,31 @@ declare module "next-auth" {
     user: {
       id: string
       userType: UserType
+      isApproved: boolean
+      isActive: boolean
+      termsVersion: string | null
+      termsAcceptedAt: string | null
+      deactivatedAt: string | null
     } & DefaultSession["user"]
   }
 
   interface User {
     userType: UserType
+    isApproved: boolean
+    isActive: boolean
+    termsVersion: string | null
+    termsAcceptedAt: string | null
+    deactivatedAt: string | null
   }
 }
 
 declare module "next-auth/jwt" {
   interface JWT {
     userType: UserType
+    isApproved: boolean
+    isActive: boolean
+    termsVersion?: string | null
+    termsAcceptedAt?: string | null
+    deactivatedAt?: string | null
   }
 }

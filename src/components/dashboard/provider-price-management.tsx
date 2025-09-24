@@ -36,6 +36,7 @@ interface ServicePrice {
   promotionalPrice?: number
   promotionalEndDate?: string
   offersScheduling?: boolean
+  providesHomeService?: boolean
   allowScheduling?: boolean
   variations: Array<{
     id: string
@@ -109,6 +110,7 @@ const [newService, setNewService] = useState({
   isActive: true,
   isPromotional: false,
   offersScheduling: false,
+  providesHomeService: false,
   // customUnit: '',
   promotionalPrice: 0,
   promotionalEndDate: '',
@@ -152,6 +154,7 @@ type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
           isPromotional: s.isPromotional ?? false,
           offersScheduling: s.offersScheduling ?? false,
           allowScheduling: s.category?.allowScheduling ?? true,
+          providesHomeService: s.providesHomeService ?? false,
           promotionalPrice: s.promotionalPrice ?? null,
           promotionalEndDate: s.promotionalEndDate ?? null,
           variations: s.variations ?? [],
@@ -201,6 +204,7 @@ const handleUpdateService = async (service: ServicePrice) => {
       description: typeof service.description === 'string' ? service.description : undefined,
       isActive: service.isActive,
       offersScheduling: service.offersScheduling,
+      providesHomeService: !!service.providesHomeService,
     }
     if (service.categoryId && service.categoryId !== current?.categoryId) {
       body.leafCategoryId = service.categoryId
@@ -250,6 +254,7 @@ const handleUpdateService = async (service: ServicePrice) => {
         description: newService.description || undefined,
         isActive: newService.isActive, // opcional
         offersScheduling: newService.offersScheduling,
+        providesHomeService: newService.providesHomeService,
       }),
     });
 
@@ -259,7 +264,7 @@ const handleUpdateService = async (service: ServicePrice) => {
     await fetchServices();
     // limpa só os campos realmente usados
     setLeafCategoryId(null);
-    setNewService(prev => ({ ...prev, description: '', basePrice: 0, offersScheduling: false } as any));
+    setNewService(prev => ({ ...prev, description: '', basePrice: 0, offersScheduling: false, providesHomeService: false } as any));
     setShowAddService(false);
     toast.success('Serviço adicionado com sucesso!');
   } catch (error) {
@@ -329,6 +334,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       isActive: true,
       isPromotional: false,
       offersScheduling: false,
+      providesHomeService: false,
       // customUnit: '',
       promotionalPrice: 0,
       promotionalEndDate: '',
@@ -536,6 +542,17 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     {!selectedLeaf?.allowScheduling && (
                       <p className="text-xs text-gray-500">Esta categoria só aceita solicitações de orçamento.</p>
                     )}
+                  </div>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    checked={newService.providesHomeService || false}
+                    onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, providesHomeService: checked }))}
+                  />
+                  <div>
+                    <Label>Atendimento a domicílio</Label>
+                    <p className="text-xs text-gray-500">Mostra aos clientes que você atende no endereço deles.</p>
                   </div>
                 </div>
 
@@ -910,6 +927,19 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
             {!allowsScheduling && (
               <p className="text-xs text-gray-500">Esta categoria aceita apenas solicitações de orçamento.</p>
             )}
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Switch
+            checked={editedService.providesHomeService || false}
+            onCheckedChange={(checked: boolean) =>
+              setEditedService(prev => ({ ...prev, providesHomeService: checked }))
+            }
+          />
+          <div>
+            <Label>Atendimento a domicílio</Label>
+            <p className="text-xs text-gray-500">Mostra aos clientes que você atende no endereço deles.</p>
           </div>
         </div>
 

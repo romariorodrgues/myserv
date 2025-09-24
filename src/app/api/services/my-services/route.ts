@@ -69,6 +69,7 @@ export async function GET() {
         unit: s.unit,
         isActive: s.isActive,
         offersScheduling: s.offersScheduling,
+        providesHomeService: s.providesHomeService,
         category: s.service.category,
         categoryId: s.service.categoryId,
         allowScheduling: s.service.category?.allowScheduling ?? true,
@@ -90,6 +91,7 @@ const upsertSchema = z.object({
   description: z.string().max(2000).optional(),
   isActive: z.boolean().optional(),
   offersScheduling: z.boolean().optional(),
+  providesHomeService: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -192,6 +194,8 @@ export async function POST(req: NextRequest) {
         basePrice: link.basePrice,
         unit: link.unit,
         isActive: link.isActive,
+        offersScheduling: link.offersScheduling,
+        providesHomeService: link.providesHomeService,
         category: link.service.category,
         categoryId: service.categoryId,
         allowScheduling: link.service.category.allowScheduling,
@@ -277,9 +281,10 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling } = await req.json()
+    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService } = await req.json()
 
     const requestedScheduling = typeof offersScheduling === 'boolean' ? offersScheduling : undefined
+    const requestedHomeService = typeof providesHomeService === 'boolean' ? providesHomeService : undefined
 
     const sps = await prisma.serviceProviderService.findUnique({
       where: { id: serviceProviderServiceId },
@@ -311,6 +316,7 @@ export async function PATCH(req: NextRequest) {
       const schedulingData = {
         offersScheduling: cat.allowScheduling ? (requestedScheduling ?? false) : false,
       }
+      const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
 
       const selectSvc = { id: true, categoryId: true } as const
       let target = await prisma.service.findFirst({ where: { categoryId: cat.id }, select: selectSvc })
@@ -333,6 +339,7 @@ export async function PATCH(req: NextRequest) {
               ...(typeof description === 'string' ? { description } : {}),
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
               ...schedulingData,
+              ...homeServiceData,
             }
           })
           await prisma.serviceProviderService.delete({ where: { id: serviceProviderServiceId } })
@@ -346,11 +353,13 @@ export async function PATCH(req: NextRequest) {
               ...(typeof description === 'string' ? { description } : {}),
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
               ...schedulingData,
+              ...homeServiceData,
             }
           })
         }
       } else {
         // mesma folha — apenas atualiza campos
+        const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
         await prisma.serviceProviderService.update({
           where: { id: serviceProviderServiceId },
           data: {
@@ -359,6 +368,7 @@ export async function PATCH(req: NextRequest) {
             ...(typeof description === 'string' ? { description } : {}),
             ...(typeof isActive === 'boolean' ? { isActive } : {}),
             ...schedulingData,
+            ...homeServiceData,
           }
         })
       }
@@ -368,6 +378,7 @@ export async function PATCH(req: NextRequest) {
       const schedulingData: { offersScheduling?: boolean } = currentAllows
         ? (requestedScheduling !== undefined ? { offersScheduling: requestedScheduling } : {})
         : { offersScheduling: false }
+      const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
 
       await prisma.serviceProviderService.update({
         where: { id: serviceProviderServiceId },
@@ -377,6 +388,7 @@ export async function PATCH(req: NextRequest) {
           ...(typeof description === 'string' ? { description } : {}),
           ...(typeof isActive === 'boolean' ? { isActive } : {}),
           ...schedulingData,
+          ...homeServiceData,
         }
       })
     }

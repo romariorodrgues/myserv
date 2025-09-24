@@ -21,6 +21,8 @@ import { ClientProfileSettings } from '@/components/dashboard/client-profile-set
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
 import { ClientReviewModal } from '@/components/dashboard/client-review-modal'
 import { redirect } from 'next/navigation'
+import { TermsConsentPrompt } from '@/components/legal/terms-consent'
+import { SupportChatWidgetWrapper } from '@/components/chat/SupportChatWidgetWrapper'
 
 
 interface Booking {
@@ -179,6 +181,9 @@ if (!session) {
 
 
   return (
+    <>
+    <TermsConsentPrompt />
+    <SupportChatWidgetWrapper />
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between">
@@ -429,6 +434,7 @@ if (!session) {
         />
       )}
     </div>
+    </>
   )
 }
 

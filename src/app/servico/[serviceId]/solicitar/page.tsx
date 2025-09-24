@@ -819,9 +819,13 @@ export default function ServiceRequestPage() {
                             )}
                           </div>
                           {desc && <p className="text-sm text-gray-600 mt-2 line-clamp-3">{desc}</p>}
-                        {typeof price === 'number' && (
+                        {typeof price === 'number' && providerSupportsScheduling ? (
                           <p className="text-sm font-medium text-green-600 mt-2">
                             A partir de R$ {price.toFixed(2)}
+                          </p>
+                        ) : (
+                          <p className="text-sm font-medium text-gray-600 mt-2">
+                            Valor informado após o orçamento com o profissional.
                           </p>
                         )}
                         <p className="text-xs text-gray-500 mt-2">
@@ -839,7 +843,7 @@ export default function ServiceRequestPage() {
                         </div>
 
                         <div className="mt-3 space-y-2 text-sm text-gray-700">
-                          {typeof price === 'number' && (
+                          {typeof price === 'number' && providerSupportsScheduling && (
                             <div className="flex items-center justify-between">
                               <span>Serviço base</span>
                               <span>R$ {price.toFixed(2)}</span>

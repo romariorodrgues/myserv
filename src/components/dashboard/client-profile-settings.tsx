@@ -23,6 +23,7 @@ import { cdnImageUrl } from '@/lib/cdn'
 import { useEffect } from 'react'
 import { updateMyProfile } from '@/lib/api/update-my-profile'
 import type { ClientProfileData } from '@/types'
+import { signOut } from 'next-auth/react'
 
 
 // No props expected for this component
@@ -71,11 +72,14 @@ export function ClientProfileSettings() {
   //   }
   // })
 
-  const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  })
+const [passwordData, setPasswordData] = useState({
+  currentPassword: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false)
+  const [deactivateReason, setDeactivateReason] = useState('')
+  const [deactivating, setDeactivating] = useState(false)
 
   const handleSaveProfile = async () => {
     try {
@@ -110,7 +114,7 @@ export function ClientProfileSettings() {
       setSaving(false)
     }
   }
-
+  
   const handleChangePassword = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast.error('As senhas não coincidem')
@@ -135,6 +139,36 @@ export function ClientProfileSettings() {
       toast.error('Erro ao alterar senha. Verifique sua senha atual.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleDeactivateAccount = async () => {
+    if (!deactivateReason.trim()) {
+      toast.error('Informe um motivo para encerrar a conta.')
+      return
+    }
+
+    try {
+      setDeactivating(true)
+      const response = await fetch('/api/users/deactivate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: deactivateReason.trim() }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok || !result.success) {
+        throw new Error(result?.error || 'Erro ao desativar conta')
+      }
+
+      toast.success('Conta desativada. Sentiremos sua falta!')
+      setShowDeactivateModal(false)
+      setDeactivateReason('')
+      await signOut({ callbackUrl: '/' })
+    } catch (error) {
+      console.error('Error deactivating account:', error)
+      toast.error(error instanceof Error ? error.message : 'Erro ao desativar conta')
+    } finally {
+      setDeactivating(false)
     }
   }
 
@@ -197,6 +231,9 @@ useEffect(() => {
         userType: data.userType,
         description: data.description ?? '',
         cpfCnpj: data.cpfCnpj ?? '',
+        termsAcceptedAt: data.termsAcceptedAt ?? null,
+        termsVersion: data.termsVersion ?? null,
+        deactivatedAt: data.deactivatedAt ?? null,
         address: {
           street: data.address?.street ?? '',
           number: data.address?.number ?? '',
@@ -250,6 +287,7 @@ if (loading || !profileData) {
 }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Tab Navigation */}
       <Card>
@@ -866,56 +904,9 @@ if (loading || !profileData) {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Visibilidade do Perfil</Label>
-                <div className="space-y-2">
-                  <label className="flex items-center space-x-2">
-                    <input
-                        type="radio"
-                        value={ProfileVisibility.PUBLIC}
-                        checked={profileData?.privacy?.profileVisibility === ProfileVisibility.PUBLIC}
-                        onChange={() =>
-                          setProfileData(prev =>
-                            prev
-                              ? {
-                                  ...prev,
-                                  privacy: {
-                                    ...prev.privacy,
-                                    profileVisibility: ProfileVisibility.PUBLIC,
-                                    showPhone: prev.privacy?.showPhone ?? false,
-                                    showEmail: prev.privacy?.showEmail ?? false,
-                                    showLocation: prev.privacy?.showLocation ?? false,
-                                  }
-                                }
-                              : prev
-                          )
-                        }
-                      className="text-blue-600"
-                    />
-                    <span>Público - Qualquer pessoa pode ver seu perfil</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <input
-                      type="radio"
-                      value={ProfileVisibility.PRIVATE}
-                      checked={profileData?.privacy?.profileVisibility === ProfileVisibility.PRIVATE}
-                      onChange={() => setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              privacy: {
-                                ...prev.privacy,
-                                profileVisibility: ProfileVisibility.PRIVATE,
-                                showPhone: prev.privacy?.showPhone ?? false,
-                                showEmail: prev.privacy?.showEmail ?? false,
-                                showLocation: prev.privacy?.showLocation ?? false,
-                              }
-                            }
-                          : prev
-                      )}
-                      className="text-blue-600"
-                    />
-                    <span>Privado - Apenas profissionais podem ver</span>
-                  </label>
-                </div>
+                <p className="text-sm text-gray-600">
+                  Seu perfil permanece público para que clientes possam encontrar seus serviços.
+                </p>
               </div>
 
               <Separator />
@@ -1098,7 +1089,14 @@ if (loading || !profileData) {
                 <p className="text-sm text-red-700 mb-4">
                   Esta ação é irreversível. Todos os seus dados serão permanentemente removidos.
                 </p>
-                <Button variant="destructive" size="sm">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => {
+                    setDeactivateReason('')
+                    setShowDeactivateModal(true)
+                  }}
+                >
                   Solicitar Exclusão da Conta
                 </Button>
               </div>
@@ -1107,5 +1105,42 @@ if (loading || !profileData) {
         </Card>
       )}
     </div>
+
+    {showDeactivateModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader>
+            <CardTitle className="text-red-600">Deseja realmente desativar sua conta?</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Conte para nós o motivo da sua saída. Essa informação nos ajuda a melhorar a plataforma.
+            </p>
+            <Textarea
+              value={deactivateReason}
+              onChange={(event) => setDeactivateReason(event.target.value)}
+              placeholder="Motivo da desativação"
+              rows={4}
+            />
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (deactivating) return
+                  setShowDeactivateModal(false)
+                  setDeactivateReason('')
+                }}
+              >
+                Cancelar
+              </Button>
+              <Button variant="destructive" onClick={handleDeactivateAccount} disabled={deactivating}>
+                {deactivating ? 'Enviando...' : 'Confirmar desativação'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )}
+    </>
   )
 }

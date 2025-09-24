@@ -12,14 +12,13 @@ import { prisma } from '@/lib/prisma'
 
 async function getPlanSettings() {
   try {
-    const rows = await prisma.systemSettings.findMany({ where: { key: { in: ['PLAN_UNLOCK_PRICE','PLAN_MONTHLY_PRICE','PLAN_ENTERPRISE_PRICE'] } } })
+    const rows = await prisma.systemSettings.findMany({ where: { key: { in: ['PLAN_UNLOCK_PRICE','PLAN_MONTHLY_PRICE'] } } })
     const map = Object.fromEntries(rows.map(r => [r.key, r.value])) as Record<string, string>
     return {
       unlock: map.PLAN_UNLOCK_PRICE || '4.90',
       monthly: map.PLAN_MONTHLY_PRICE || '39.90',
-      enterprise: map.PLAN_ENTERPRISE_PRICE || '',
     }
-  } catch { return { unlock: '4.90', monthly: '39.90', enterprise: '' } }
+  } catch { return { unlock: '4.90', monthly: '39.90' } }
 }
 
 export default async function SejaProfissionalPage() {
@@ -138,9 +137,9 @@ export default async function SejaProfissionalPage() {
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
               Planos transparentes
             </h2>
-            <p className="text-xl text-gray-600">Escolha entre desbloqueio por solicitação, plano mensal ou empresarial</p>
+            <p className="text-xl text-gray-600">Escolha entre desbloqueio por solicitação ou o plano mensal profissional</p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
             <div className="rounded-lg shadow p-6 bg-white border">
               <h3 className="text-xl font-bold mb-1">Grátis • Por solicitação</h3>
               <p className="text-gray-600 mb-4">Desbloqueie cada solicitação por R$ {prices.unlock}</p>
@@ -165,19 +164,10 @@ export default async function SejaProfissionalPage() {
                 <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=PREMIUM">Assinar plano mensal</Link>
               </Button>
             </div>
-            <div className="rounded-lg shadow p-6 bg-white border">
-              <h3 className="text-xl font-bold mb-1">Empresarial</h3>
-              <p className="text-gray-600 mb-4">{prices.enterprise ? `R$ ${prices.enterprise}/mês` : 'Sob consulta'}</p>
-              <ul className="space-y-2 mb-6">
-                <li>Equipe multiusuário</li>
-                <li>Relatórios avançados</li>
-                <li>Suporte prioritário</li>
-              </ul>
-              <Button className="w-full" variant="secondary" asChild>
-                <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=ENTERPRISE">Assinar plano empresarial</Link>
-              </Button>
-            </div>
           </div>
+          <p className="text-center text-xs text-muted-foreground mt-6">
+            Prestadores pessoa jurídica precisam ativar o plano mensal profissional para acessar os contatos dos clientes.
+          </p>
         </div>
       </section>
 

@@ -14,6 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Eye, EyeOff, Mail, Lock, User, Phone, FileText, IdCard } from 'lucide-react'
 import { UserTypeValues } from '@/types'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { formatCPF, formatCNPJ, formatPhone } from '@/utils/index'
+import { toast } from 'sonner'
 
 type RegisterFormData = {
   name: string
@@ -62,9 +64,10 @@ function RegisterPageContent() {
   const searchParams = useSearchParams()
 
   const [step, setStep] = useState<1 | 2>(1)
-  const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM' | 'ENTERPRISE' | null>(null)
-  const [planPrices, setPlanPrices] = useState({ unlock: '4.90', monthly: '39.90', enterprise: '' })
-  const planFeatures: Record<'FREE' | 'PREMIUM' | 'ENTERPRISE', string[]> = {
+  const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM' | null>(null)
+  const [planPrices, setPlanPrices] = useState({ unlock: '4.90', monthly: '39.90' })
+  const [formError, setFormError] = useState<string | null>(null)
+  const planFeatures: Record<'FREE' | 'PREMIUM', string[]> = {
     FREE: [
       'Propostas ilimitadas',
       'Relatórios completos',
@@ -76,11 +79,6 @@ function RegisterPageContent() {
       'Contatos desbloqueados automaticamente',
       'Destaque na busca',
       'Relatórios básicos',
-    ],
-    ENTERPRISE: [
-      'Equipe multiusuário',
-      'Relatórios avançados',
-      'Suporte prioritário',
     ],
   }
 
@@ -94,7 +92,6 @@ function RegisterPageContent() {
         setPlanPrices({
           unlock: s.PLAN_UNLOCK_PRICE || '4.90',
           monthly: s.PLAN_MONTHLY_PRICE || '39.90',
-          enterprise: s.PLAN_ENTERPRISE_PRICE || '',
         })
       } catch (error) {
         console.warn('Falha ao carregar valores dos planos', error)
@@ -104,13 +101,13 @@ function RegisterPageContent() {
 
   useEffect(() => {
     const qsUserType = searchParams.get('userType')
-    const qsPlan = searchParams.get('plan')?.toUpperCase() as ('FREE' | 'PREMIUM' | 'ENTERPRISE' | undefined)
+    const qsPlan = searchParams.get('plan')?.toUpperCase() as ('FREE' | 'PREMIUM' | undefined)
 
     if (qsUserType === UserTypeValues.SERVICE_PROVIDER && step === 1) {
       setFormData((prev) => ({
         ...prev,
         userType: UserTypeValues.SERVICE_PROVIDER,
-        personType: qsPlan === 'ENTERPRISE' ? 'PJ' : prev.personType,
+        personType: prev.personType,
       }))
       if (qsPlan) {
         setSelectedPlan(qsPlan)
@@ -121,6 +118,7 @@ function RegisterPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault()
+  setFormError(null)
   setIsLoading(true)
 
   const passwordInput = document.getElementById('password') as HTMLInputElement
@@ -141,20 +139,29 @@ if (passwordInput.value !== confirmInput.value) {
       if (step === 1) {
         // Regras CPF/CNPJ conforme tipo de pessoa
         if (formData.personType === 'PF' && formData.cpfCnpj.replace(/\D/g,'').length < 11) {
-          alert('CPF obrigatório para pessoa física')
+          setFormError('CPF obrigatório para pessoa física')
+          toast.error('Informe um CPF válido para continuar')
           setIsLoading(false)
           return
         }
         if (formData.personType === 'PJ' && formData.cpfCnpj.replace(/\D/g,'').length < 14) {
-          alert('CNPJ obrigatório para pessoa jurídica')
+          setFormError('CNPJ obrigatório para pessoa jurídica')
+          toast.error('Informe um CNPJ válido para continuar')
           setIsLoading(false)
           return
         }
         setStep(2)
-        setSelectedPlan(formData.personType === 'PJ' ? 'ENTERPRISE' : 'FREE')
+        setSelectedPlan(formData.personType === 'PJ' ? 'PREMIUM' : 'FREE')
         setIsLoading(false)
         return
       }
+    }
+
+    const payload = {
+      ...formData,
+      phone: formData.phone.replace(/\D/g, ''),
+      cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
+      selectedPlan,
     }
 
     const response = await fetch('/api/auth/register', {
@@ -162,22 +169,23 @@ if (passwordInput.value !== confirmInput.value) {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ ...formData, selectedPlan }),
+      body: JSON.stringify(payload),
     })
 
     const data = await response.json()
 
     if (!response.ok) {
-      console.error('Erro ao registrar:', data)
-      alert(data.error || 'Erro ao registrar')
+      const message = data.error || 'Erro ao registrar'
+      setFormError(message)
+      toast.error(message)
     } else {
-      console.log('Registro concluído:', data)
-      alert(data.message)
+      toast.success(data.message || 'Conta criada com sucesso!')
       router.push('/entrar')
     }
   } catch (err) {
     console.error('Erro de rede:', err)
-    alert('Erro de rede ao registrar')
+    setFormError('Erro de rede ao registrar. Tente novamente.')
+    toast.error('Erro de rede ao registrar. Tente novamente.')
   } finally {
     setIsLoading(false)
   }
@@ -186,54 +194,100 @@ if (passwordInput.value !== confirmInput.value) {
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target
-    setFormData(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value
-    }))
+    const isCheckbox = type === 'checkbox'
+
+    setFormData((prev) => {
+      let nextValue: any = isCheckbox ? (e.target as HTMLInputElement).checked : value
+      const nextState = { ...prev }
+
+      if (name === 'phone' && !isCheckbox) {
+        const digits = value.replace(/\D/g, '').slice(0, 11)
+        nextValue = formatPhone(digits)
+      }
+
+      if (name === 'cpfCnpj' && !isCheckbox) {
+        const digits = value.replace(/\D/g, '').slice(0, prev.userType === UserTypeValues.SERVICE_PROVIDER && prev.personType === 'PJ' ? 14 : 11)
+        const isPJ = prev.userType === UserTypeValues.SERVICE_PROVIDER && prev.personType === 'PJ'
+        nextValue = isPJ ? formatCNPJ(digits) : formatCPF(digits)
+      }
+
+      nextState[name] = nextValue
+
+      if (name === 'userType') {
+        if (nextValue === UserTypeValues.CLIENT) {
+          nextState.personType = 'PF'
+          setStep(1)
+          setSelectedPlan(null)
+          nextState.cpfCnpj = formatCPF((nextState.cpfCnpj || '').replace(/\D/g, '').slice(0, 11))
+        } else {
+          setSelectedPlan((current) => current ?? 'FREE')
+        }
+      }
+
+      if (name === 'personType') {
+        if (nextValue === 'PJ') {
+          setSelectedPlan('PREMIUM')
+          nextState.cpfCnpj = formatCNPJ((nextState.cpfCnpj || '').replace(/\D/g, '').slice(0, 14))
+        } else {
+          setSelectedPlan((current) => (current === 'PREMIUM' ? 'FREE' : current ?? 'FREE'))
+          nextState.cpfCnpj = formatCPF((nextState.cpfCnpj || '').replace(/\D/g, '').slice(0, 11))
+        }
+      }
+
+      return nextState
+    })
   }
 
   const completeProviderRegistration = async () => {
     if (!selectedPlan) {
-      alert('Escolha um plano para continuar')
+      setFormError('Escolha um plano para continuar')
+      toast.error('Selecione um plano para concluir o cadastro')
       return
     }
-    if (formData.personType === 'PJ' && selectedPlan !== 'ENTERPRISE') {
-      alert('Pessoa jurídica deve escolher o plano Enterprise')
-      return
-    }
-    if (formData.personType === 'PF' && selectedPlan === 'ENTERPRISE') {
-      alert('Pessoa física não pode escolher o plano Enterprise')
+    if (formData.personType === 'PJ' && selectedPlan !== 'PREMIUM') {
+      setFormError('Pessoa jurídica deve escolher o plano profissional')
+      toast.error('Pessoa jurídica deve escolher o plano profissional')
       return
     }
 
     setIsLoading(true)
+    setFormError(null)
     try {
+      const payload = {
+        ...formData,
+        phone: formData.phone.replace(/\D/g, ''),
+        cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
+        selectedPlan,
+      }
+
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ ...formData, selectedPlan }),
+        body: JSON.stringify(payload),
       })
       const data = await response.json()
 
       if (!response.ok) {
-        console.error('Erro ao registrar:', data)
-        alert(data.error || 'Erro ao registrar')
+        const message = data.error || 'Erro ao registrar'
+        setFormError(message)
+        toast.error(message)
         return
       }
 
       if (data.requiresPayment) {
-        alert('Redirecionando para o pagamento seguro do Mercado Pago...')
+        toast.message('Redirecionando para o pagamento seguro do Mercado Pago...')
         window.location.href = data.initPoint
         return
       }
 
-      alert(data.message)
+      toast.success(data.message || 'Cadastro concluído com sucesso!')
       router.push('/entrar')
     } catch (err) {
       console.error('Erro de rede:', err)
-      alert('Erro de rede ao registrar')
+      setFormError('Erro de rede ao registrar. Tente novamente.')
+      toast.error('Erro de rede ao registrar. Tente novamente.')
     } finally {
       setIsLoading(false)
     }
@@ -242,7 +296,7 @@ if (passwordInput.value !== confirmInput.value) {
   const isProviderPlanStep = formData.userType === UserTypeValues.SERVICE_PROVIDER && step === 2
   const planOptions = formData.personType === 'PF'
     ? (['FREE', 'PREMIUM'] as const)
-    : (['ENTERPRISE'] as const)
+    : (['PREMIUM'] as const)
   const planGridClass = formData.personType === 'PJ' ? 'md:grid-cols-1' : 'md:grid-cols-2'
 
   return (
@@ -272,16 +326,18 @@ if (passwordInput.value !== confirmInput.value) {
               <div className="space-y-6">
                 <div className="text-center space-y-2">
                   <h3 className="text-2xl font-bold text-gray-900">Escolha o plano ideal para começar no MyServ</h3>
-                  <p className="text-gray-600">Você só concluirá seu cadastro após confirmar o plano. Pagamentos são processados com segurança pelo Mercado Pago.</p>
+                  <p className="text-gray-600">
+                    {formData.personType === 'PJ'
+                      ? 'Contas de pessoa jurídica precisam ativar o plano profissional para começar.'
+                      : 'Você só concluirá seu cadastro após confirmar o plano. Pagamentos são processados com segurança pelo Mercado Pago.'}
+                  </p>
                 </div>
                 <div className={`grid grid-cols-1 ${planGridClass} gap-4`}>
                   {planOptions.map((plan) => {
                     const isActive = selectedPlan === plan
-                    const baseClasses = plan === 'ENTERPRISE'
-                      ? 'from-brand-cyan to-brand-navy text-white'
-                      : plan === 'PREMIUM'
-                        ? 'from-emerald-50 to-green-100 text-brand-navy'
-                        : 'from-brand-bg to-brand-teal text-brand-navy'
+                    const baseClasses = plan === 'PREMIUM'
+                      ? 'from-emerald-50 to-green-100 text-brand-navy'
+                      : 'from-brand-bg to-brand-teal text-brand-navy'
 
                     return (
                       <button
@@ -292,18 +348,14 @@ if (passwordInput.value !== confirmInput.value) {
                       >
                         <div className="flex items-center justify-between">
                           <h4 className="text-xl font-semibold">
-                            {plan === 'FREE' ? 'Grátis • Por Solicitação' : plan === 'PREMIUM' ? 'Mensal • Profissional' : 'Empresarial'}
+                            {plan === 'FREE' ? 'Grátis • Por Solicitação' : 'Mensal • Profissional'}
                           </h4>
                           {isActive && <span className="rounded-full bg-white/30 px-3 py-1 text-sm font-semibold">Selecionado</span>}
                         </div>
                         <p className="mt-2 text-sm opacity-80">
                           {plan === 'FREE'
                             ? `Desbloqueie por R$ ${planPrices.unlock} por solicitação`
-                            : plan === 'PREMIUM'
-                              ? `R$ ${planPrices.monthly}/mês`
-                              : planPrices.enterprise
-                                ? `R$ ${planPrices.enterprise}/mês`
-                                : 'Sob consulta' }
+                            : `R$ ${planPrices.monthly}/mês`}
                         </p>
                         <ul className="mt-4 space-y-2 text-sm font-medium">
                           {planFeatures[plan].map((feature) => (
@@ -427,6 +479,7 @@ if (passwordInput.value !== confirmInput.value) {
                     className="pl-10"
                     placeholder="(11) 99999-9999"
                     value={formData.phone}
+                    maxLength={15}
                     onChange={handleInputChange}
                   />
                 </div>
@@ -446,6 +499,7 @@ if (passwordInput.value !== confirmInput.value) {
                     className="pl-10"
                     placeholder={formData.userType === UserTypeValues.SERVICE_PROVIDER && formData.personType === 'PJ' ? '00.000.000/0000-00' : '000.000.000-00'}
                     value={formData.cpfCnpj}
+                    maxLength={formData.userType === UserTypeValues.SERVICE_PROVIDER && formData.personType === 'PJ' ? 18 : 14}
                     onChange={handleInputChange}
                   />
                 </div>
@@ -612,6 +666,10 @@ if (passwordInput.value !== confirmInput.value) {
                 </Link>
               </label>
             </div>
+
+            {formError && (
+              <p className="text-sm text-red-600">{formError}</p>
+            )}
 
               <div>
                 <Button type="submit" className="w-full" disabled={isLoading || !formData.acceptTerms}>

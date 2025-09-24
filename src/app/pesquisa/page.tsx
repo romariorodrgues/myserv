@@ -14,8 +14,6 @@ import {
   MapPin,
   Star,
   Heart,
-  Phone,
-  MessageCircle,
   Loader2,
   Compass,
   Crosshair,
@@ -51,6 +49,7 @@ interface SearchResultProvider {
   distance?: number
   available: boolean
   offersScheduling: boolean
+  providesHomeService?: boolean
   travel?: {
     chargesTravel: boolean
     travelRatePerKm?: number | null
@@ -499,6 +498,15 @@ function PesquisaPage() {
           delete next[provider.id]
           return next
         })
+        if (travel.distanceKm != null) {
+          setProviders((prev) =>
+            prev.map((item) =>
+              item.id === provider.id
+                ? { ...item, distance: travel.distanceKm }
+                : item
+            )
+          )
+        }
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Erro ao calcular deslocamento'
@@ -711,6 +719,10 @@ function PesquisaPage() {
 
             {providers.map((provider) => {
               const favoriteActive = favorites.has(provider.id)
+              const travelQuote = travelQuotes[provider.id]
+              const displayDistanceValue = travelQuote?.distanceKm ?? provider.distance
+              const displayDistanceLabel = travelQuote?.distanceText
+              const showPrice = provider.offersScheduling
               return (
                 <Card key={provider.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="flex flex-col gap-4 p-6 md:flex-row">
@@ -766,12 +778,19 @@ function PesquisaPage() {
                           <MapPin className="h-4 w-4" />
                           <span>{provider.location || 'Localização não informada'}</span>
                         </div>
-                        {provider.distance != null && filters.latitude && (
-                          <Badge variant="secondary">{provider.distance.toFixed(1)} km de distância</Badge>
+                        {displayDistanceValue != null && (
+                          <Badge variant="secondary">
+                            {displayDistanceLabel ? displayDistanceLabel : `${displayDistanceValue.toFixed(1)} km`} de distância
+                          </Badge>
                         )}
                         {provider.offersScheduling && (
                           <Badge variant="outline" className="border-emerald-300 text-emerald-700">
                             Agendamento online
+                          </Badge>
+                        )}
+                        {provider.providesHomeService && (
+                          <Badge variant="outline" className="border-brand-cyan text-brand-cyan">
+                            Atendimento a domicílio
                           </Badge>
                         )}
                       </div>
@@ -779,17 +798,18 @@ function PesquisaPage() {
                       <div className="grid gap-3 rounded-lg border border-brand-cyan/20 bg-white/80 p-4 md:grid-cols-2">
                         <div className="space-y-2">
                           <p className="text-sm text-gray-500">Serviço a partir de</p>
-                          <p className="text-xl font-semibold text-brand-navy">
-                            {provider.basePrice > 0 ? formatCurrency(provider.basePrice) : 'Sob consulta'}
+                          {showPrice ? (
+                            <p className="text-xl font-semibold text-brand-navy">
+                              {provider.basePrice > 0 ? formatCurrency(provider.basePrice) : 'Sob consulta'}
+                            </p>
+                          ) : (
+                            <p className="text-sm font-medium text-gray-600">
+                              Valor informado após envio do orçamento.
+                            </p>
+                          )}
+                          <p className="text-xs text-gray-500">
+                            O contato telefônico é liberado quando o profissional aceita sua solicitação.
                           </p>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
-                              <Phone className="mr-2 h-4 w-4" /> Ligar
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <MessageCircle className="mr-2 h-4 w-4" /> WhatsApp
-                            </Button>
-                          </div>
                         </div>
                         <div className="rounded-md bg-brand-cyan/5 p-3">
                           <h4 className="text-sm font-medium text-brand-navy">Deslocamento</h4>

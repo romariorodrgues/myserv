@@ -45,7 +45,7 @@ export function useWhatsAppCommunication({ booking, userType, subscription }: Us
     return (
       (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') ||
       booking.status === 'COMPLETED' 
-      || subscription && subscription.plan.name === 'Enterprise'
+      || (subscription && subscription.plan.name === 'Premium')
     )
   }, [booking.status, booking.payment?.status, subscription])
 

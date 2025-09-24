@@ -81,61 +81,37 @@ export async function POST(request: Request) {
       );
 
     // Decide qual plano
-    let planType: 'enterprise' | 'monthly' = 'enterprise'
     try {
       const body = await request.json()
-      if (body?.planType === 'monthly') planType = 'monthly'
-      // Optional: coupon code
       ;(request as any)._couponCode = body?.couponCode ? String(body.couponCode).trim().toUpperCase() : undefined
     } catch {}
 
-    let itemId: string, title: string, unitPrice: number
-    let planRecord: { id: string; name: string } | null = null
-    // Enforce PF/PJ rule at checkout time (safe inference by document length)
-    const dbUser = await prisma.user.findUnique({ where: { id: session.user.id }, select: { cpfCnpj: true } })
-    const isPJ = !!dbUser?.cpfCnpj && dbUser.cpfCnpj.replace(/\D/g,'').length > 11
-    if (isPJ && planType !== 'enterprise') {
-      return NextResponse.json({ error: 'Pessoa jurídica deve escolher Enterprise' }, { status: 400 })
-    }
-    if (!isPJ && planType === 'enterprise') {
-      // PF pode escolher enterprise? Pela sua regra, não. Bloqueia.
-      return NextResponse.json({ error: 'Pessoa física não pode escolher Enterprise' }, { status: 400 })
-    }
-    if (planType === 'enterprise') {
-      const enterprisePlan = await prisma.plan.findFirst({ where: { name: 'Enterprise', isActive: true } })
-      if (!enterprisePlan) return NextResponse.json({ message: 'Invalid Plan' }, { status: 400 })
-      itemId = enterprisePlan.id
-      title = 'MyServ Enterprise Plan'
-      const s = await prisma.systemSettings.findUnique({ where: { key: 'PLAN_ENTERPRISE_PRICE' } })
-      unitPrice = Number(s?.value || enterprisePlan.price || 0) || enterprisePlan.price
-      planRecord = { id: enterprisePlan.id, name: enterprisePlan.name }
-    } else {
-      const s = await prisma.systemSettings.findUnique({ where: { key: 'PLAN_MONTHLY_PRICE' } })
-      const monthlyPrice = Number(s?.value || '39.9') || 39.9
-      const premiumPlan = await prisma.plan.upsert({
-        where: { name: 'Premium' },
-        update: {
-          price: monthlyPrice,
-          isActive: true,
-        },
-        create: {
-          name: 'Premium',
-          description: 'Plano mensal para profissionais MyServ',
-          price: monthlyPrice,
-          billingCycle: 'MONTHLY',
-          features: JSON.stringify([
-            'Propostas ilimitadas',
-            'Agenda personalizada',
-            'Gestão de clientes e pagamentos',
-          ]),
-          isActive: true,
-        },
-      })
-      itemId = premiumPlan.id
-      title = 'MyServ Plano Mensal Profissional'
-      unitPrice = monthlyPrice
-      planRecord = { id: premiumPlan.id, name: premiumPlan.name }
-    }
+    const s = await prisma.systemSettings.findUnique({ where: { key: 'PLAN_MONTHLY_PRICE' } })
+    const monthlyPrice = Number(s?.value || '39.9') || 39.9
+    const premiumPlan = await prisma.plan.upsert({
+      where: { name: 'Premium' },
+      update: {
+        price: monthlyPrice,
+        isActive: true,
+      },
+      create: {
+        name: 'Premium',
+        description: 'Plano mensal para profissionais MyServ',
+        price: monthlyPrice,
+        billingCycle: 'MONTHLY',
+        features: JSON.stringify([
+          'Propostas ilimitadas',
+          'Agenda personalizada',
+          'Gestão de clientes e pagamentos',
+        ]),
+        isActive: true,
+      },
+    })
+
+    const itemId = premiumPlan.id
+    const title = 'MyServ Plano Mensal Profissional'
+    let unitPrice = monthlyPrice
+    const planRecord: { id: string; name: string } = { id: premiumPlan.id, name: premiumPlan.name }
 
     const preference = new Preference(mercadoPagoConfig);
 
@@ -146,7 +122,7 @@ export async function POST(request: Request) {
       if (couponCode) {
         const c = await prisma.coupon.findFirst({ where: { code: couponCode, isActive: true } })
         const now = new Date()
-        const appliesTo = planType === 'monthly' ? 'PREMIUM' : 'ENTERPRISE'
+        const appliesTo = 'PREMIUM'
         if (!c) throw new Error('Cupom inválido')
         if (c.validFrom && c.validFrom > now) throw new Error('Cupom não começou ainda')
         if (c.validTo && c.validTo < now) throw new Error('Cupom expirado')
@@ -197,7 +173,7 @@ export async function POST(request: Request) {
             ? {
                 planId: planRecord.id,
                 planName: planRecord.name,
-                planType: planType === 'enterprise' ? 'ENTERPRISE' : 'PREMIUM',
+                planType: 'PREMIUM',
               }
             : undefined,
         },
@@ -208,7 +184,7 @@ export async function POST(request: Request) {
     await prisma.notification.create({
       data: {
         message:
-          "A sua inscrição para o plano Enterprise está pendente. Faça o pagamento para aproveitar todos os benefícios.",
+          "A sua assinatura do plano profissional está pendente. Conclua o pagamento para aproveitar todos os benefícios.",
         title: "Pagamento Pendente",
         userId: session.user.id,
         type: "PAYMENT",

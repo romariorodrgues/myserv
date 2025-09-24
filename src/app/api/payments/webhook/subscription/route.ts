@@ -179,11 +179,7 @@ export async function POST(request: NextRequest) {
 
         const planNameCandidates = [
           metadataPlan?.planName,
-          metadataPlan?.planType === 'ENTERPRISE'
-            ? 'Enterprise'
-            : metadataPlan?.planType === 'PREMIUM'
-              ? 'Premium'
-              : undefined,
+          metadataPlan?.planType === 'PREMIUM' ? 'Premium' : undefined,
           externalReference === 'monthly' ? 'Premium' : undefined,
           externalReference && externalReference.length !== 36 ? externalReference : undefined,
         ].filter((value): value is string => Boolean(value))
@@ -208,7 +204,7 @@ export async function POST(request: NextRequest) {
         }
 
         if (!targetPlan) {
-          targetPlan = await prisma.plan.findFirst({ where: { name: 'Enterprise', isActive: true } })
+          targetPlan = await prisma.plan.findFirst({ where: { name: 'Premium', isActive: true } })
         }
 
         if (!targetPlan) {
@@ -287,7 +283,7 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      return NextResponse.json({ message: 'successful subscription to the Enterprise plan' }, { status: 200 });
+      return NextResponse.json({ message: 'successful subscription to the Premium plan' }, { status: 200 });
     }
 
     return NextResponse.json(

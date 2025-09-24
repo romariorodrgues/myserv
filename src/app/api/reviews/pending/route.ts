@@ -13,8 +13,52 @@ export async function GET(request: NextRequest) {
     const session = await getServerSession(authOptions)
     const { searchParams } = new URL(request.url)
     const clientIdParam = searchParams.get('clientId')
+    const providerIdParam = searchParams.get('providerId')
 
     const clientId = clientIdParam || session?.user?.id
+    const providerId = providerIdParam || (session?.user?.userType === 'SERVICE_PROVIDER' ? session.user.id : null)
+
+    // Provider pending reviews
+    if (providerId && (providerIdParam || session?.user?.userType === 'SERVICE_PROVIDER' && !clientIdParam)) {
+      const pending = await prisma.serviceRequest.findMany({
+        where: {
+          providerId,
+          status: 'COMPLETED',
+          providerReviewGivenAt: null,
+        },
+        include: {
+          service: { select: { id: true, name: true } },
+          client: { select: { id: true, name: true, profileImage: true } },
+        },
+        orderBy: { updatedAt: 'desc' },
+        take: 20,
+      })
+
+      const count = await prisma.serviceRequest.count({
+        where: {
+          providerId,
+          status: 'COMPLETED',
+          providerReviewGivenAt: null,
+        },
+      })
+
+      return NextResponse.json({
+        success: true,
+        data: {
+          count,
+          items: pending.map((p) => ({
+            id: p.id,
+            serviceName: p.service.name,
+            client: {
+              id: p.client.id,
+              name: p.client.name,
+              profileImage: p.client.profileImage,
+            },
+          })),
+        },
+      })
+    }
+
     if (!clientId) {
       return NextResponse.json({ success: true, data: { count: 0, items: [] } })
     }
@@ -51,4 +95,3 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Erro ao buscar avaliações pendentes' }, { status: 500 })
   }
 }
-

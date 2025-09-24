@@ -87,7 +87,9 @@ export async function GET(request: NextRequest) {
         (p) => p.status === 'APPROVED' || p.status === 'COMPLETED' || p.status === 'PAID'
       )
       const unlocked = !!activeSub || !!unlockedByPayment
-      const client = unlocked ? booking.client : { name: 'Dados bloqueados', phone: undefined }
+      const client = unlocked
+        ? { ...booking.client, id: booking.clientId }
+        : { name: 'Dados bloqueados', phone: undefined, id: undefined }
       return ({
       id: booking.id,
       status: booking.status,
@@ -109,6 +111,9 @@ export async function GET(request: NextRequest) {
       serviceProvider: {
         user: booking.provider,
       },
+      providerReviewRating: booking.providerReviewRating ?? null,
+      providerReviewComment: booking.providerReviewComment ?? null,
+      providerReviewGivenAt: booking.providerReviewGivenAt?.toISOString?.() ?? null,
       payment:
         booking.payments.length > 0 ?
           {

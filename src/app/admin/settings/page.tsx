@@ -28,7 +28,6 @@ export default function AdminSettingsPage() {
     // Planos
     planUnlockPrice: '4.90',
     planMonthlyPrice: '39.90',
-    planEnterprisePrice: '',
   })
 
   useEffect(() => {
@@ -47,7 +46,6 @@ export default function AdminSettingsPage() {
           socialInstagram: s.SOCIAL_INSTAGRAM_URL || prev.socialInstagram,
           planUnlockPrice: s.PLAN_UNLOCK_PRICE || prev.planUnlockPrice,
           planMonthlyPrice: s.PLAN_MONTHLY_PRICE || prev.planMonthlyPrice,
-          planEnterprisePrice: s.PLAN_ENTERPRISE_PRICE || prev.planEnterprisePrice,
         }))
       } catch { /* noop */ }
     }
@@ -69,7 +67,6 @@ export default function AdminSettingsPage() {
             SOCIAL_INSTAGRAM_URL: settings.socialInstagram,
             PLAN_UNLOCK_PRICE: settings.planUnlockPrice,
             PLAN_MONTHLY_PRICE: settings.planMonthlyPrice,
-            PLAN_ENTERPRISE_PRICE: settings.planEnterprisePrice,
           }
         })
       })
@@ -132,16 +129,10 @@ export default function AdminSettingsPage() {
                   👥 Usuários
                 </Link>
                 <Link 
-                  href="/admin/services"
-                  className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100"
-                >
-                  🛠️ Serviços
-                </Link>
-                <Link 
                   href="/admin/categories"
                   className="block px-3 py-2 rounded-md text-sm hover:bg-gray-100"
                 >
-                  🧭 Categorias
+                  🛠️ Serviços
                 </Link>
                 <div className="border-t pt-2 mt-4">
                   <span className="block px-3 py-2 text-sm font-medium bg-blue-50 text-blue-700 rounded-md">
@@ -329,7 +320,7 @@ export default function AdminSettingsPage() {
               <CardDescription>Valores exibidos em toda a plataforma</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Desbloqueio por solicitação (R$)</label>
                   <Input value={settings.planUnlockPrice} onChange={(e) => setSettings(p => ({...p, planUnlockPrice: e.target.value}))} />
@@ -337,10 +328,6 @@ export default function AdminSettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Plano Mensal Profissional (R$)</label>
                   <Input value={settings.planMonthlyPrice} onChange={(e) => setSettings(p => ({...p, planMonthlyPrice: e.target.value}))} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">Plano Empresarial (R$) — opcional</label>
-                  <Input value={settings.planEnterprisePrice} onChange={(e) => setSettings(p => ({...p, planEnterprisePrice: e.target.value}))} />
                 </div>
               </div>
             </CardContent>

@@ -45,48 +45,28 @@ export default function MetricsPage() {
 
   useEffect(() => {
     fetchMetrics()
-    
-    // Auto refresh every 30 seconds
+
     const interval = setInterval(fetchMetrics, 30000)
     return () => clearInterval(interval)
   }, [])
 
   const fetchMetrics = async () => {
     try {
-      // Mock data for now - would fetch from actual API
-      const mockMetrics: Metrics = {
-        payments: {
-          total: 156,
-          successful: 142,
-          failed: 8,
-          pending: 6,
-          totalAmount: 12450.50
-        },
-        notifications: {
-          sent: 324,
-          delivered: 298,
-          failed: 26,
-          whatsappSent: 189,
-          emailSent: 135
-        },
-        geocoding: {
-          requests: 89,
-          cached: 34,
-          errors: 3,
-          cacheHitRate: 38.2
-        },
-        apiRequests: {
-          total: 1247,
-          rateLimited: 12,
-          errors: 23,
-          averageResponseTime: 245
-        }
+      setLoading(true)
+      const response = await fetch('/api/admin/metrics/summary', { cache: 'no-store' })
+      if (!response.ok) {
+        throw new Error('Falha ao carregar métricas')
       }
-      
-      setMetrics(mockMetrics)
-      setLastUpdated(new Date())
+      const data = await response.json() as { success?: boolean; metrics?: Metrics & { updatedAt?: string } }
+      if (!data.success || !data.metrics) {
+        throw new Error('Resposta inválida do servidor')
+      }
+      const updatedAt = data.metrics.updatedAt ? new Date(data.metrics.updatedAt) : new Date()
+      setMetrics(data.metrics)
+      setLastUpdated(updatedAt)
     } catch (error) {
       console.error('Erro ao carregar métricas:', error)
+      setMetrics(null)
     } finally {
       setLoading(false)
     }
