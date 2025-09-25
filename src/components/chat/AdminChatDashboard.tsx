@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { useSearchParams } from 'next/navigation'
 
 interface AdminChatDashboardProps {
   className?: string
@@ -36,6 +37,8 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const searchParams = useSearchParams()
+  const targetChatId = searchParams?.get('chatId') ?? null
 
   // Socket event listeners
   useEffect(() => {
@@ -306,6 +309,32 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
       loadMessages(selectedChat.id)
     }
   }, [selectedChat])
+
+  useEffect(() => {
+    if (!targetChatId) return
+    if (selectedChat?.id === targetChatId) return
+
+    const existing = chats.find((chat) => chat.id === targetChatId)
+    if (existing) {
+      setSelectedChat(existing)
+      return
+    }
+
+    const fetchAndSelect = async () => {
+      try {
+        const response = await fetch(`/api/chat/${targetChatId}`)
+        if (!response.ok) return
+        const data = await response.json()
+        if (data.chat) {
+          setSelectedChat(data.chat)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar chat da URL:', error)
+      }
+    }
+
+    fetchAndSelect()
+  }, [chats, selectedChat, targetChatId])
 
   const getStatusColor = (status: string) => {
     switch (status) {

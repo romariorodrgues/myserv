@@ -15,12 +15,14 @@ import { Menu, X, Search, User, LogOut, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { NotificationDropdown } from '@/components/notifications/real-time-notifications'
+import { cdnImageUrl } from '@/lib/cdn'
 
 export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const { data: session } = useSession()
-  const profileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
+  const rawProfileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
+  const profileImage = rawProfileImage ? cdnImageUrl(rawProfileImage) : null
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/' })

@@ -32,6 +32,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { cdnImageUrl } from '@/lib/cdn'
 
 interface MobileNavItemProps {
   href: string
@@ -82,7 +83,8 @@ export function Header() {
   const isAuthenticated = status === 'authenticated'
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
-  const profileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
+  const rawProfileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
+  const profileImage = rawProfileImage ? cdnImageUrl(rawProfileImage) : null
   
   // Handle scroll effect
   useEffect(() => {

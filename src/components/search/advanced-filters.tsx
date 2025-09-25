@@ -206,6 +206,34 @@ export function AdvancedSearchFilters({
           </div>
         </div>
 
+        <div>
+          <label className="mb-3 block text-sm font-medium text-gray-700">Atendimento</label>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <button
+              type="button"
+              onClick={() => onUpdate({ homeService: filters.homeService ? undefined : true })}
+              className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                filters.homeService
+                  ? 'border-brand-cyan bg-brand-cyan/10 text-brand-navy'
+                  : 'border-gray-300 bg-white hover:bg-gray-50'
+              }`}
+            >
+              Atendimento a domicílio
+            </button>
+            <button
+              type="button"
+              onClick={() => onUpdate({ freeTravel: filters.freeTravel ? undefined : true })}
+              className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                filters.freeTravel
+                  ? 'border-emerald-400 bg-emerald-50 text-emerald-700'
+                  : 'border-gray-300 bg-white hover:bg-gray-50'
+              }`}
+            >
+              Deslocamento gratuito
+            </button>
+          </div>
+        </div>
+
         {expanded && (
           <div className="space-y-6 border-t pt-6">
             <div>
@@ -288,24 +316,6 @@ export function AdvancedSearchFilters({
                   onChange={(event) => onUpdate({ isHighlighted: event.target.checked ? true : undefined })}
                 />
                 Profissionais em destaque
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-brand-cyan focus:ring-brand-cyan"
-                  checked={!!filters.homeService}
-                  onChange={(event) => onUpdate({ homeService: event.target.checked ? true : undefined })}
-                />
-                Atendimento a domicílio
-              </label>
-              <label className="flex items-center gap-2 text-sm text-gray-700">
-                <input
-                  type="checkbox"
-                  className="rounded border-gray-300 text-brand-cyan focus:ring-brand-cyan"
-                  checked={!!filters.freeTravel}
-                  onChange={(event) => onUpdate({ freeTravel: event.target.checked ? true : undefined })}
-                />
-                Deslocamento gratuito
               </label>
             </div>
 

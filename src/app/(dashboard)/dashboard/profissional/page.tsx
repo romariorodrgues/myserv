@@ -132,6 +132,8 @@ function ProviderDashboardContent() {
     }
   }, [session?.user?.id])
 
+  const hasProfileImage = Boolean((session?.user as any)?.profileImage || (session?.user as any)?.image)
+
   useEffect(() => {
     if (status === 'loading') return; // Sessão ainda está carregando
     
@@ -358,6 +360,22 @@ function ProviderDashboardContent() {
           </p>
         </div>
       </div>
+
+      {!hasProfileImage && (
+        <Card className="border border-dashed border-orange-200 bg-orange-50/70">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-orange-800">Adicione uma foto de perfil</p>
+              <p className="text-xs text-orange-700">
+                Fotos de perfil aceleram a aprovação e aumentam a confiança dos clientes na sua página profissional.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setActiveTab('settings')}>
+              Atualizar foto
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Navigation Tabs */}
       <div className="border-b">

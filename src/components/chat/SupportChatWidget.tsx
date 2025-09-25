@@ -46,10 +46,12 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     createChat,
     sendMessage,
     loadChats,
+    loadChat,
     setCurrentChat,
     startTyping,
     typingUsers,
-    socket // Para debug
+    socket, // Para debug
+    getChatById,
   } = useSupportChat()
 
   // Debug do socket
@@ -180,15 +182,34 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     currentChat && user.chatId === currentChat.id && user.userId !== session?.user?.id
   )
 
+  const openChatById = useCallback(async (chatId: string) => {
+    if (!chatId) return
+    setShowNewChatForm(false)
+    try {
+      const existing = getChatById(chatId)
+      if (!existing) {
+        await loadChats()
+      }
+      await loadChat(chatId)
+    } catch (error) {
+      console.error('Erro ao abrir chat de suporte:', error)
+    }
+  }, [getChatById, loadChat, loadChats])
+
   const handleExternalOpen = useCallback((event: Event) => {
     if (status !== 'authenticated' || !session?.user?.id) {
       return
     }
 
-    const detail = (event as CustomEvent<{ initialMessage?: string; initialTitle?: string; forceNewChat?: boolean }>).detail || {}
+    const detail = (event as CustomEvent<{ initialMessage?: string; initialTitle?: string; forceNewChat?: boolean; chatId?: string }>).detail || {}
 
     setIsOpen(true)
     setIsMinimized(false)
+
+    if (detail.chatId) {
+      openChatById(detail.chatId)
+      return
+    }
 
     if (!currentChat || detail.forceNewChat) {
       if (detail.forceNewChat) {
@@ -202,7 +223,7 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
         setChatDescription(detail.initialMessage)
       }
     }
-  }, [currentChat, session?.user?.id, setCurrentChat, status])
+  }, [currentChat, openChatById, session?.user?.id, setCurrentChat, status])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -211,6 +232,18 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
       window.removeEventListener('support-chat:open', handleExternalOpen)
     }
   }, [handleExternalOpen])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (status !== 'authenticated' || !session?.user?.id) return
+    const storedChatId = window.sessionStorage.getItem('support-chat:target')
+    if (storedChatId) {
+      window.sessionStorage.removeItem('support-chat:target')
+      setIsOpen(true)
+      setIsMinimized(false)
+      openChatById(storedChatId)
+    }
+  }, [openChatById, session?.user?.id, status])
 
   // Se não estiver autenticado, não renderizar
   if (status !== 'authenticated' || !session?.user?.id) {

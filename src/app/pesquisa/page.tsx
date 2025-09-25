@@ -35,7 +35,7 @@ import { cdnImageUrl } from '@/lib/cdn'
 interface SearchResultProvider {
   id: string
   name: string
-  profileImage?: string
+  profileImage?: string | null
   primaryServiceId?: string
   location: string
   city: string | null

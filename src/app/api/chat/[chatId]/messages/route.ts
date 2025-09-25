@@ -118,19 +118,38 @@ export async function POST(
         id: chatId,
         OR: [
           { userId: session.user.id },
-          { 
+          {
             assignments: {
               some: {
                 adminId: session.user.id,
-                isActive: true
-              }
-            }
-          }
-        ]
+                isActive: true,
+              },
+            },
+          },
+        ],
       },
       include: {
-        user: true
-      }
+        user: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            profileImage: true,
+          },
+        },
+        assignments: {
+          where: { isActive: true },
+          include: {
+            admin: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+        },
+      },
     })
 
     if (!chat) {
@@ -188,6 +207,56 @@ export async function POST(
     // Se o status mudou, emitir também
     if (chatUpdateData.status) {
       socketService.emitStatusUpdate(chatId, chatUpdateData.status)
+    }
+
+    const recipients = new Set<string>()
+
+    if (isFromAdmin) {
+      recipients.add(chat.userId)
+    } else {
+      if (chat.assignments?.length) {
+        chat.assignments.forEach((assignment) => {
+          if (assignment.adminId) recipients.add(assignment.adminId)
+        })
+      }
+
+      if (recipients.size === 0) {
+        const admins = await prisma.user.findMany({
+          where: { userType: 'ADMIN', isActive: true },
+          select: { id: true },
+        })
+        admins.forEach((admin) => recipients.add(admin.id))
+      }
+    }
+
+    recipients.delete(session.user.id)
+
+    if (recipients.size > 0) {
+      const preview = validatedData.content.slice(0, 150)
+      const senderName = user?.name || (isFromAdmin ? 'Administrador' : chat.user.name)
+
+      await Promise.all(
+        Array.from(recipients).map((targetId) =>
+          prisma.notification.create({
+            data: {
+              userId: targetId,
+              type: 'MESSAGE_RECEIVED',
+              title: isFromAdmin
+                ? 'Nova mensagem do suporte'
+                : `Nova mensagem de ${senderName}`,
+              message: preview || 'Você recebeu uma nova mensagem no suporte.',
+              isRead: false,
+              data: {
+                kind: 'SUPPORT_CHAT_MESSAGE',
+                chatId,
+                senderId: session.user.id,
+                senderName,
+                isFromAdmin,
+              },
+            },
+          }),
+        ),
+      )
     }
 
     return NextResponse.json({ message }, { status: 201 })

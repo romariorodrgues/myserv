@@ -24,6 +24,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { cdnImageUrl } from '@/lib/cdn'
 import { Card } from '@/components/ui/card'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface ServiceProvider {
   id: string
@@ -73,6 +74,14 @@ export default function AdminProvidersPage() {
   const [selectedProvider, setSelectedProvider] = useState<ServiceProvider | null>(null)
   const [toggleTarget, setToggleTarget] = useState<ServiceProvider | null>(null)
   const [toggleReason, setToggleReason] = useState('')
+
+  const getInitials = (name?: string | null) => {
+    if (!name) return '??'
+    const parts = name.trim().split(' ').filter(Boolean)
+    if (parts.length === 0) return '??'
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
+  }
 
   useEffect(() => {
     if (status === 'loading') return
@@ -235,11 +244,13 @@ export default function AdminProvidersPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3">
-                        {provider.profileImage ? (
-                          <img src={cdnImageUrl(provider.profileImage)} alt={provider.name} className="w-10 h-10 rounded-full object-cover" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-gray-200" />
-                        )}
+                        <Avatar className="h-10 w-10">
+                          <AvatarImage
+                            src={provider.profileImage ? cdnImageUrl(provider.profileImage) : undefined}
+                            alt={provider.name}
+                          />
+                          <AvatarFallback>{getInitials(provider.name)}</AvatarFallback>
+                        </Avatar>
                         <h3 className="font-semibold text-gray-900">{provider.name}</h3>
                       </div>
                       <div className="text-sm text-gray-500 space-y-1 mt-2">
@@ -343,11 +354,17 @@ export default function AdminProvidersPage() {
                   </div>
                   
                   <div className="space-y-4">
-                    {selectedProvider.profileImage && (
-                      <div className="flex justify-center">
-                        <img src={cdnImageUrl(selectedProvider.profileImage)} alt={selectedProvider.name} className="w-24 h-24 rounded-full object-cover" />
-                      </div>
-                    )}
+                    <div className="flex justify-center">
+                      <Avatar className="h-24 w-24">
+                        <AvatarImage
+                          src={selectedProvider.profileImage ? cdnImageUrl(selectedProvider.profileImage) : undefined}
+                          alt={selectedProvider.name}
+                        />
+                        <AvatarFallback className="text-lg font-semibold">
+                          {getInitials(selectedProvider.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
                     <div>
                       <h4 className="font-medium text-gray-900">Informações Pessoais</h4>
                       <div className="mt-2 space-y-2">

@@ -530,49 +530,53 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                 />
               </div>
               
-              <div className="flex flex-col gap-4 md:flex-row md:flex-wrap">
-                <div className="flex items-start gap-3 md:items-center">
+              <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
                     checked={selectedLeaf?.allowScheduling ? newService.offersScheduling : false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, offersScheduling: checked }))}
                     disabled={!selectedLeaf?.allowScheduling}
+                    className="shrink-0"
                   />
-                  <div>
-                    <Label>Oferecer agendamento</Label>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Oferecer agendamento</Label>
                     {!selectedLeaf?.allowScheduling && (
                       <p className="text-xs text-gray-500">Esta categoria só aceita solicitações de orçamento.</p>
                     )}
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 md:items-center">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
                     checked={newService.providesHomeService || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, providesHomeService: checked }))}
+                    className="shrink-0"
                   />
-                  <div>
-                    <Label>Atendimento a domicílio</Label>
-                    <p className="text-xs text-gray-500">Mostra aos clientes que você atende no endereço deles.</p>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Atendimento a domicílio</Label>
+                    <p className="text-xs text-gray-500 leading-relaxed">Mostra aos clientes que você atende no endereço deles.</p>
                   </div>
                 </div>
 
-                <div className="flex items-start gap-3 md:items-center">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
                     checked={newService.isActive || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, isActive: checked }))}
+                    className="shrink-0"
                   />
-                  <div className="pt-0.5">
-                    <Label>Serviço ativo</Label>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Serviço ativo</Label>
                   </div>
                 </div>
                 
-                <div className="flex items-start gap-3 md:items-center">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
                     checked={newService.isPromotional || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, isPromotional: checked }))}
+                    className="shrink-0"
                   />
-                  <div className="pt-0.5">
-                    <Label>Preço promocional</Label>
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Preço promocional</Label>
                   </div>
                 </div>
               </div>
@@ -611,30 +615,32 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     {/* Header */}
                     <div className="flex flex-col lg:flex-row lg:items-start justify-between space-y-3 lg:space-y-0">
                       <div className="flex-1">
-                    <div className="mb-3 flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-medium">{service.name}</h3>
-                      <Badge variant="outline">{service.category}</Badge>
-                      {service.isActive ? (
-                            <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                    <div className="mb-3 space-y-2">
+                      <h3 className="text-lg font-medium leading-snug break-words">{service.name}</h3>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="outline">{service.category}</Badge>
+                        {service.isActive ? (
+                          <Badge className="bg-green-100 text-green-800">Ativo</Badge>
+                        ) : (
+                          <Badge className="bg-gray-100 text-gray-800">Inativo</Badge>
+                        )}
+                        {service.isPromotional && (
+                          <Badge className="bg-red-100 text-red-800">Promoção</Badge>
+                        )}
+                        {service.allowScheduling ? (
+                          service.offersScheduling ? (
+                            <Badge className="bg-blue-100 text-blue-800">Agendamento ativo</Badge>
                           ) : (
-                            <Badge className="bg-gray-100 text-gray-800">Inativo</Badge>
-                          )}
-                          {service.isPromotional && (
-                            <Badge className="bg-red-100 text-red-800">Promoção</Badge>
-                          )}
-                          {service.allowScheduling ? (
-                            service.offersScheduling ? (
-                              <Badge className="bg-blue-100 text-blue-800">Agendamento ativo</Badge>
-                            ) : (
-                              <Badge className="bg-amber-100 text-amber-800">Só orçamento</Badge>
-                            )
-                          ) : (
-                            <Badge className="bg-amber-100 text-amber-800">Somente orçamento</Badge>
-                          )}
-                          {service.providesHomeService && (
-                            <Badge className="bg-brand-cyan/10 text-brand-cyan">Atende a domicílio</Badge>
-                          )}
-                        </div>
+                            <Badge className="bg-amber-100 text-amber-800">Só orçamento</Badge>
+                          )
+                        ) : (
+                          <Badge className="bg-amber-100 text-amber-800">Somente orçamento</Badge>
+                        )}
+                        {service.providesHomeService && (
+                          <Badge className="bg-brand-cyan/10 text-brand-cyan">Atende a domicílio</Badge>
+                        )}
+                      </div>
+                    </div>
                         
                         {service.description && (
                           <p className="text-gray-600 text-sm mb-3">{service.description}</p>

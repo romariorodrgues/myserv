@@ -5,6 +5,8 @@
 import Link from 'next/link'
 import { SupportChatWidgetWrapper } from '@/components/chat/SupportChatWidgetWrapper'
 import { SupportChatCTA } from '@/components/chat/SupportChatCTA'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 
 const faqs = [
   {
@@ -21,7 +23,9 @@ const faqs = [
   },
 ]
 
-export default function AjudaPage() {
+export default async function AjudaPage() {
+  const session = await getServerSession(authOptions)
+  const isAdmin = session?.user?.userType === 'ADMIN'
   return (
     <div className="py-16">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -43,12 +47,14 @@ export default function AjudaPage() {
           <p className="text-sm text-gray-600 text-center">
             Ainda precisa de ajuda? Converse com nossa equipe pelo chat em tempo real.
           </p>
-          <SupportChatCTA
-            label="Falar com o suporte"
-            initialTitle="Preciso de ajuda com a plataforma"
-            initialMessage="Olá equipe MyServ, preciso de apoio com..."
-            forceNewChat
-          />
+          {!isAdmin && (
+            <SupportChatCTA
+              label="Falar com o suporte"
+              initialTitle="Preciso de ajuda com a plataforma"
+              initialMessage="Olá equipe MyServ, preciso de apoio com..."
+              forceNewChat
+            />
+          )}
           <p className="text-xs text-gray-500">
             Preferir e-mail? Escreva para{' '}
             <a href="mailto:contato@myserv.com.br" className="text-blue-600">contato@myserv.com.br</a>
@@ -57,7 +63,7 @@ export default function AjudaPage() {
           </p>
         </div>
       </div>
-      <SupportChatWidgetWrapper />
+      {!isAdmin && <SupportChatWidgetWrapper />}
     </div>
   )
 }

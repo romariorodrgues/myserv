@@ -3,7 +3,21 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import GoogleMapsServerService from '@/lib/maps-server'
-import { cdnImageUrl } from '@/lib/cdn'
+function normalizeDecimal(value: number | string | Prisma.Decimal | null | undefined) {
+  if (value == null) return null
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null
+  }
+  if (typeof value === 'string') {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  if (typeof (value as Prisma.Decimal).toNumber === 'function') {
+    const parsed = (value as Prisma.Decimal).toNumber()
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
+}
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
@@ -253,7 +267,7 @@ if (input.leafCategoryId) {
           userId: p.serviceProvider.user.id,
           name: p.serviceProvider.user.name,
           profileImage: p.serviceProvider.user.profileImage,
-          basePrice: p.basePrice ?? 0,
+          basePrice: normalizeDecimal(p.basePrice) ?? 0,
           description: p.description,
           offersScheduling: p.offersScheduling,
           providesHomeService: p.providesHomeService ?? false,
@@ -282,13 +296,12 @@ if (input.leafCategoryId) {
     ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
     : undefined
 
+        const basePriceNumber = normalizeDecimal(p.basePrice)
         if (!providerMap.has(pid)) {
           providerMap.set(pid, {
             id: pid,
             name: p.serviceProvider.user.name,
-            profileImage: p.serviceProvider.user.profileImage
-              ? cdnImageUrl(p.serviceProvider.user.profileImage)
-              : undefined,
+            profileImage: p.serviceProvider.user.profileImage || undefined,
             primaryServiceId: p.serviceId,
             location: loc,
             city: addr?.city ?? null,
@@ -299,7 +312,7 @@ if (input.leafCategoryId) {
             category: svc.category.name,
             rating: 0,
             reviewCount: 0,
-          basePrice: p.basePrice ?? Number.POSITIVE_INFINITY,
+          basePrice: basePriceNumber,
           distance: dist,
           serviceRadiusKm: providerRadius,
           available: true,
@@ -307,9 +320,9 @@ if (input.leafCategoryId) {
           providesHomeService: p.providesHomeService ?? false,
           travel: {
               chargesTravel: p.serviceProvider.chargesTravel,
-              travelRatePerKm: p.serviceProvider.travelRatePerKm,
-              travelMinimumFee: p.serviceProvider.travelMinimumFee,
-              travelFixedFee: p.serviceProvider.travelCost,
+              travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
+              travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
+              travelFixedFee: normalizeDecimal(p.serviceProvider.travelCost),
               waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
             },
           })
@@ -317,8 +330,11 @@ if (input.leafCategoryId) {
           const entry = providerMap.get(pid)
           if (!entry.services.includes(svc.name)) entry.services.push(svc.name)
           if (!entry.primaryServiceId) entry.primaryServiceId = p.serviceId
-          const candidatePrice = typeof p.basePrice === 'number' ? p.basePrice : Number.POSITIVE_INFINITY
-          entry.basePrice = Math.min(entry.basePrice ?? Number.POSITIVE_INFINITY, candidatePrice)
+          if (basePriceNumber != null) {
+            entry.basePrice = entry.basePrice == null
+              ? basePriceNumber
+              : Math.min(entry.basePrice, basePriceNumber)
+          }
           if (dist != null && (entry.distance == null || dist < entry.distance)) {
             entry.distance = dist
           }
@@ -334,9 +350,9 @@ if (input.leafCategoryId) {
           if (!entry.travel) {
             entry.travel = {
               chargesTravel: p.serviceProvider.chargesTravel,
-              travelRatePerKm: p.serviceProvider.travelRatePerKm,
-              travelMinimumFee: p.serviceProvider.travelMinimumFee,
-              travelFixedFee: p.serviceProvider.travelCost,
+              travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
+              travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
+              travelFixedFee: normalizeDecimal(p.serviceProvider.travelCost),
               waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
             }
           }
@@ -346,7 +362,7 @@ if (input.leafCategoryId) {
 
  let results = Array.from(providerMap.values()).map((entry) => ({
   ...entry,
-  basePrice: entry.basePrice === Number.POSITIVE_INFINITY ? null : entry.basePrice,
+  basePrice: entry.basePrice ?? null,
 }))
 
 // ordenação por preço quando solicitado (fallback)

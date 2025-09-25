@@ -327,6 +327,19 @@ export async function POST(request: NextRequest) {
               : null,
         },
       });
+
+      await prisma.notification.create({
+        data: {
+          userId: user.id,
+          type: 'SYSTEM',
+          title: 'Adicione uma foto de perfil',
+          message: 'Adicionar uma foto aumenta suas chances de aprovação e gera mais confiança nos clientes.',
+          isRead: false,
+          data: {
+            kind: 'COMPLETE_PROFILE_PHOTO',
+          },
+        },
+      })
     }
 
     const { password: _password, ...userWithoutSensitiveData } = user;

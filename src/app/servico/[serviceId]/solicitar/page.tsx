@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { ArrowLeft, Calendar, Clock, MapPin, Phone, Mail, User, LogIn, Loader2 } from 'lucide-react'
+import { cdnImageUrl } from '@/lib/cdn'
 
 interface Service {
   id: string
@@ -769,7 +770,8 @@ export default function ServiceRequestPage() {
                 (() => {
                   const chosen = service?.providers?.find((p: any) => p.id === selectedProvider) || service?.providers?.[0]
                   const name = providerProfile?.name || chosen?.serviceProvider?.user?.name || 'Profissional'
-                  const photo = providerProfile?.profileImage || chosen?.serviceProvider?.user?.profileImage || ''
+                  const photoKey = providerProfile?.profileImage || chosen?.serviceProvider?.user?.profileImage || ''
+                  const photoUrl = photoKey ? cdnImageUrl(photoKey) : ''
                   const city = providerProfile?.city || chosen?.serviceProvider?.user?.address?.city
                   const state = providerProfile?.state || chosen?.serviceProvider?.user?.address?.state
                   const price = (providerProfile?.basePrice ?? chosen?.basePrice)
@@ -793,8 +795,8 @@ export default function ServiceRequestPage() {
                       <div className="flex items-start gap-4">
                         {/* Avatar */}
                         <div className="flex-shrink-0">
-                          {photo ? (
-                            <Image src={photo} alt={name} width={64} height={64} className="w-16 h-16 rounded-full object-cover" />
+                          {photoUrl ? (
+                            <Image src={photoUrl} alt={name} width={64} height={64} className="w-16 h-16 rounded-full object-cover" />
                           ) : (
                             <div className="w-16 h-16 rounded-full bg-brand-cyan/10 flex items-center justify-center">
                               <User className="h-8 w-8 text-brand-cyan" />

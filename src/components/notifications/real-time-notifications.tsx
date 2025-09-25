@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { 
   Bell, 
   BellDot, 
@@ -208,6 +208,43 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
   } = useNotifications({ limit: 10 }, { auto: false })
   const { count } = useNotificationCount()
 
+  const handleNotificationClick = useCallback((notification: Notification) => {
+    const dataAny: any = notification as any
+    const kind = dataAny?.data?.kind
+    if (notification.type === 'MESSAGE_RECEIVED' && kind === 'SUPPORT_CHAT_MESSAGE') {
+      const chatId = dataAny?.data?.chatId as string | undefined
+      if (session?.user?.userType === 'ADMIN') {
+        router.push(chatId ? `/admin/chat?chatId=${chatId}` : '/admin/chat')
+      } else {
+        if (typeof window !== 'undefined' && chatId) {
+          window.sessionStorage.setItem('support-chat:target', chatId)
+          window.dispatchEvent(new CustomEvent('support-chat:open', { detail: { chatId } }))
+        }
+        router.push('/ajuda')
+      }
+      setIsOpen(false)
+      return
+    }
+
+    const isProvider = session?.user?.userType === 'SERVICE_PROVIDER'
+    const bookingId = dataAny?.data?.bookingId as string | undefined
+    const date = dataAny?.data?.date as string | undefined
+    const title = (notification.title || '').toLowerCase()
+
+    if (isProvider) {
+      const dateQuery = date ? `&date=${new Date(date).toISOString().split('T')[0]}` : ''
+      router.push(`/dashboard/profissional?tab=schedule&sub=appointments${dateQuery}`)
+    } else {
+      if (bookingId && title.includes('conclu')) {
+        router.push(`/dashboard/cliente?tab=history&reviewBookingId=${bookingId}`)
+      } else {
+        router.push('/dashboard/cliente?tab=history')
+      }
+    }
+
+    setIsOpen(false)
+  }, [router, session?.user?.userType, setIsOpen])
+
   // Close dropdown when clicking outside
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -324,23 +361,7 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
                     notification={notification}
                     onMarkAsRead={markAsRead}
                     onDelete={deleteNotification}
-                    onClick={() => {
-                      const isProvider = session?.user?.userType === 'SERVICE_PROVIDER'
-                      const dataAny: any = notification as any
-                      const bookingId = dataAny?.data?.bookingId
-                      const title = (notification.title || '').toLowerCase()
-                      if (isProvider) {
-                        router.push('/dashboard/profissional?tab=schedule&sub=appointments' + (dataAny?.data?.date ? `&date=${new Date(dataAny.data.date).toISOString().split('T')[0]}` : ''))
-                      } else {
-                        // Se for concluído, abre review modal via query
-                        if (bookingId && (title.includes('conclu'))) {
-                          router.push(`/dashboard/cliente?tab=history&reviewBookingId=${bookingId}`)
-                        } else {
-                          router.push('/dashboard/cliente?tab=history')
-                        }
-                      }
-                      setIsOpen(false)
-                    }}
+                    onClick={handleNotificationClick}
                   />
                 ))}
               
