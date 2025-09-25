@@ -30,6 +30,7 @@ import type { CascCat } from '@/components/categories/cascading-category-picker'
 import { formatCurrency } from '@/lib/utils'
 import type { TravelCalculationResult } from '@/lib/travel-calculator'
 import ServiceSuggestInput from '@/components/services/service-suggest-input'
+import { cdnImageUrl } from '@/lib/cdn'
 
 interface SearchResultProvider {
   id: string
@@ -45,7 +46,7 @@ interface SearchResultProvider {
   category: string
   rating: number
   reviewCount: number
-  basePrice: number
+  basePrice: number | null
   distance?: number
   available: boolean
   offersScheduling: boolean
@@ -162,6 +163,8 @@ function PesquisaPage() {
       if (activeFilters.hasScheduling) params.set('hasScheduling', 'true')
       if (activeFilters.hasQuoting) params.set('hasQuoting', 'true')
       if (activeFilters.isHighlighted) params.set('isHighlighted', 'true')
+      if (activeFilters.homeService) params.set('homeService', 'true')
+      if (activeFilters.freeTravel) params.set('freeTravel', 'true')
       if (activeFilters.sortBy && activeFilters.sortBy !== 'RELEVANCE') {
         params.set('sortBy', activeFilters.sortBy)
       }
@@ -342,6 +345,8 @@ function PesquisaPage() {
     const hasScheduling = searchParams.get('hasScheduling') === 'true' ? true : undefined
     const hasQuoting = searchParams.get('hasQuoting') === 'true' ? true : undefined
     const isHighlighted = searchParams.get('isHighlighted') === 'true' ? true : undefined
+    const homeService = searchParams.get('homeService') === 'true' ? true : undefined
+    const freeTravel = searchParams.get('freeTravel') === 'true' ? true : undefined
     const sortBy = (searchParams.get('sortBy') as SearchFilters['sortBy']) || 'RELEVANCE'
     const radiusParam = searchParams.get('radiusKm') || searchParams.get('radius')
     const latParam = searchParams.get('lat')
@@ -359,6 +364,8 @@ function PesquisaPage() {
       hasScheduling,
       hasQuoting,
       isHighlighted,
+      homeService,
+      freeTravel,
       sortBy,
       radius: radiusParam ? Number(radiusParam) : DEFAULT_RADIUS_KM,
       latitude: latParam ? Number(latParam) : undefined,
@@ -722,15 +729,19 @@ function PesquisaPage() {
               const travelQuote = travelQuotes[provider.id]
               const displayDistanceValue = travelQuote?.distanceKm ?? provider.distance
               const displayDistanceLabel = travelQuote?.distanceText
-              const showPrice = provider.offersScheduling
+              const profileImageUrl = provider.profileImage ? cdnImageUrl(provider.profileImage) : null
+              const basePriceValue = provider.basePrice != null && Number.isFinite(provider.basePrice)
+                ? provider.basePrice
+                : null
+              const showPrice = provider.offersScheduling && basePriceValue != null
               return (
                 <Card key={provider.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="flex flex-col gap-4 p-6 md:flex-row">
                     <div className="flex justify-center md:block">
                       <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-brand-cyan/20 bg-brand-cyan/10">
-                        {provider.profileImage ? (
+                        {profileImageUrl ? (
                           <Image
-                            src={provider.profileImage}
+                            src={profileImageUrl}
                             alt={provider.name}
                             fill
                             sizes="80px"
@@ -793,6 +804,11 @@ function PesquisaPage() {
                             Atendimento a domicílio
                           </Badge>
                         )}
+                        {provider.travel?.waivesTravelOnHire && (
+                          <Badge variant="outline" className="border-emerald-200 text-emerald-700">
+                            Não cobra deslocamento
+                          </Badge>
+                        )}
                       </div>
 
                       <div className="grid gap-3 rounded-lg border border-brand-cyan/20 bg-white/80 p-4 md:grid-cols-2">
@@ -800,7 +816,7 @@ function PesquisaPage() {
                           <p className="text-sm text-gray-500">Serviço a partir de</p>
                           {showPrice ? (
                             <p className="text-xl font-semibold text-brand-navy">
-                              {provider.basePrice > 0 ? formatCurrency(provider.basePrice) : 'Sob consulta'}
+                              {basePriceValue != null ? formatCurrency(basePriceValue) : 'Sob consulta'}
                             </p>
                           ) : (
                             <p className="text-sm font-medium text-gray-600">

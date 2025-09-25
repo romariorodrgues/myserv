@@ -399,14 +399,14 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       {/* Header with Actions */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <CardTitle className="flex items-center space-x-2">
               <DollarSign className="w-5 h-5" />
               <span>Meus Serviços</span>
               <Badge variant="secondary">{services.length}</Badge>
             </CardTitle>
             
-            <div className="flex space-x-2">
+        <div className="flex flex-wrap gap-2">
               <Button 
                 variant="outline" 
                 onClick={() => setShowTemplates(true)}
@@ -436,7 +436,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="service-name">Nome do Serviço *</Label>
                   {/* <Input
@@ -530,8 +530,8 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                 />
               </div>
               
-              <div className="flex items-center space-x-6">
-                <div className="flex items-center space-x-2">
+              <div className="flex flex-col gap-4 md:flex-row md:flex-wrap">
+                <div className="flex items-start gap-3 md:items-center">
                   <Switch
                     checked={selectedLeaf?.allowScheduling ? newService.offersScheduling : false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, offersScheduling: checked }))}
@@ -545,7 +545,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start gap-3 md:items-center">
                   <Switch
                     checked={newService.providesHomeService || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, providesHomeService: checked }))}
@@ -556,24 +556,28 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                   </div>
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start gap-3 md:items-center">
                   <Switch
                     checked={newService.isActive || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, isActive: checked }))}
                   />
-                  <Label>Serviço ativo</Label>
+                  <div className="pt-0.5">
+                    <Label>Serviço ativo</Label>
+                  </div>
                 </div>
                 
-                <div className="flex items-center space-x-2">
+                <div className="flex items-start gap-3 md:items-center">
                   <Switch
                     checked={newService.isPromotional || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, isPromotional: checked }))}
                   />
-                  <Label>Preço promocional</Label>
+                  <div className="pt-0.5">
+                    <Label>Preço promocional</Label>
+                  </div>
                 </div>
               </div>
-              
-              <div className="flex justify-end space-x-2">
+
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button variant="outline" onClick={() => setShowAddService(false)}>
                   Cancelar
                 </Button>
@@ -607,10 +611,10 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     {/* Header */}
                     <div className="flex flex-col lg:flex-row lg:items-start justify-between space-y-3 lg:space-y-0">
                       <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="text-lg font-medium">{service.name}</h3>
-                          <Badge variant="outline">{service.category}</Badge>
-                          {service.isActive ? (
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-medium">{service.name}</h3>
+                      <Badge variant="outline">{service.category}</Badge>
+                      {service.isActive ? (
                             <Badge className="bg-green-100 text-green-800">Ativo</Badge>
                           ) : (
                             <Badge className="bg-gray-100 text-gray-800">Inativo</Badge>
@@ -626,6 +630,9 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                             )
                           ) : (
                             <Badge className="bg-amber-100 text-amber-800">Somente orçamento</Badge>
+                          )}
+                          {service.providesHomeService && (
+                            <Badge className="bg-brand-cyan/10 text-brand-cyan">Atende a domicílio</Badge>
                           )}
                         </div>
                         
@@ -673,7 +680,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center space-x-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Switch
                           checked={service.isActive}
                           onCheckedChange={() => toggleServiceStatus(service.serviceProviderServiceId)}

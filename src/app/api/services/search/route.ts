@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 import GoogleMapsServerService from '@/lib/maps-server'
+import { cdnImageUrl } from '@/lib/cdn'
 
 function haversine(lat1: number, lon1: number, lat2: number, lon2: number) {
   const R = 6371; // km
@@ -73,7 +74,9 @@ const advancedSearchSchema = z.object({
   hasScheduling: z.boolean().optional(),
   sortBy: z.enum(['RELEVANCE', 'DISTANCE', 'PRICE_LOW', 'PRICE_HIGH', 'NEWEST']).default('RELEVANCE'),
   page: z.number().default(1),
-  limit: z.number().default(20)
+  limit: z.number().default(20),
+  homeService: z.boolean().optional(),
+  freeTravel: z.boolean().optional(),
 })
 
 
@@ -107,6 +110,8 @@ const input = advancedSearchSchema.parse({
   lng: searchParams.get('lng') ? Number(searchParams.get('lng')) : undefined,
   radiusKm: searchParams.get('radiusKm') ? Number(searchParams.get('radiusKm')) : undefined,
   hasScheduling: searchParams.get('hasScheduling') === 'true' ? true : undefined,
+  homeService: searchParams.get('homeService') === 'true' ? true : undefined,
+  freeTravel: searchParams.get('freeTravel') === 'true' ? true : undefined,
 })
 
 let resolvedLat = typeof input.lat === 'number' && Number.isFinite(input.lat) ? input.lat : null
@@ -281,7 +286,9 @@ if (input.leafCategoryId) {
           providerMap.set(pid, {
             id: pid,
             name: p.serviceProvider.user.name,
-            profileImage: p.serviceProvider.user.profileImage ?? undefined,
+            profileImage: p.serviceProvider.user.profileImage
+              ? cdnImageUrl(p.serviceProvider.user.profileImage)
+              : undefined,
             primaryServiceId: p.serviceId,
             location: loc,
             city: addr?.city ?? null,
@@ -292,7 +299,7 @@ if (input.leafCategoryId) {
             category: svc.category.name,
             rating: 0,
             reviewCount: 0,
-          basePrice: p.basePrice ?? 0,
+          basePrice: p.basePrice ?? Number.POSITIVE_INFINITY,
           distance: dist,
           serviceRadiusKm: providerRadius,
           available: true,
@@ -310,7 +317,8 @@ if (input.leafCategoryId) {
           const entry = providerMap.get(pid)
           if (!entry.services.includes(svc.name)) entry.services.push(svc.name)
           if (!entry.primaryServiceId) entry.primaryServiceId = p.serviceId
-          entry.basePrice = Math.min(entry.basePrice, p.basePrice ?? entry.basePrice)
+          const candidatePrice = typeof p.basePrice === 'number' ? p.basePrice : Number.POSITIVE_INFINITY
+          entry.basePrice = Math.min(entry.basePrice ?? Number.POSITIVE_INFINITY, candidatePrice)
           if (dist != null && (entry.distance == null || dist < entry.distance)) {
             entry.distance = dist
           }
@@ -336,11 +344,27 @@ if (input.leafCategoryId) {
       }
     }
 
- let results = Array.from(providerMap.values())
+ let results = Array.from(providerMap.values()).map((entry) => ({
+  ...entry,
+  basePrice: entry.basePrice === Number.POSITIVE_INFINITY ? null : entry.basePrice,
+}))
 
 // ordenação por preço quando solicitado (fallback)
-if (input.sortBy === 'PRICE_LOW') results.sort((a, b) => (a.basePrice ?? 0) - (b.basePrice ?? 0))
-if (input.sortBy === 'PRICE_HIGH') results.sort((a, b) => (b.basePrice ?? 0) - (a.basePrice ?? 0))
+if (input.sortBy === 'PRICE_LOW') {
+  results.sort((a, b) => {
+    const pa = a.basePrice ?? Number.POSITIVE_INFINITY
+    const pb = b.basePrice ?? Number.POSITIVE_INFINITY
+    return pa - pb
+  })
+}
+
+if (input.sortBy === 'PRICE_HIGH') {
+  results.sort((a, b) => {
+    const pa = a.basePrice ?? Number.NEGATIVE_INFINITY
+    const pb = b.basePrice ?? Number.NEGATIVE_INFINITY
+    return pb - pa
+  })
+}
 
 // se vieram coordenadas, filtra por raio e, se solicitado, ordena por distância
 if (resolvedLat != null && resolvedLng != null) {
@@ -380,6 +404,14 @@ if (resolvedLat != null && resolvedLng != null) {
 
 if (input.availability) {
   results = results.filter((r) => r.offersScheduling)
+}
+
+if (input.homeService) {
+  results = results.filter((r) => r.providesHomeService)
+}
+
+if (input.freeTravel) {
+  results = results.filter((r) => r.travel?.waivesTravelOnHire)
 }
 // --- Paginação dos providers "results" (lista achatada)
 const resultsTotal = results.length

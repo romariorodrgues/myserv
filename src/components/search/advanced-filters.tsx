@@ -21,6 +21,8 @@ export interface SearchFilters {
   hasScheduling?: boolean
   hasQuoting?: boolean
   isHighlighted?: boolean
+  homeService?: boolean
+  freeTravel?: boolean
   radius?: number
   latitude?: number
   longitude?: number
@@ -286,6 +288,24 @@ export function AdvancedSearchFilters({
                   onChange={(event) => onUpdate({ isHighlighted: event.target.checked ? true : undefined })}
                 />
                 Profissionais em destaque
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-brand-cyan focus:ring-brand-cyan"
+                  checked={!!filters.homeService}
+                  onChange={(event) => onUpdate({ homeService: event.target.checked ? true : undefined })}
+                />
+                Atendimento a domicílio
+              </label>
+              <label className="flex items-center gap-2 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  className="rounded border-gray-300 text-brand-cyan focus:ring-brand-cyan"
+                  checked={!!filters.freeTravel}
+                  onChange={(event) => onUpdate({ freeTravel: event.target.checked ? true : undefined })}
+                />
+                Deslocamento gratuito
               </label>
             </div>
 

@@ -19,7 +19,7 @@ export function SupportChatCTA({
   forceNewChat = false,
   className,
 }: SupportChatCTAProps) {
-  const { status } = useSession()
+  const { data: session, status } = useSession()
   const router = useRouter()
 
   const handleClick = () => {
@@ -39,6 +39,9 @@ export function SupportChatCTA({
       })
     )
   }
+
+  if (status === 'loading') return null
+  if (session?.user?.userType === 'ADMIN') return null
 
   return (
     <Button onClick={handleClick} className={className}>
