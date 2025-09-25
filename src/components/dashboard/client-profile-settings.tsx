@@ -23,11 +23,12 @@ import { cdnImageUrl } from '@/lib/cdn'
 import { useEffect } from 'react'
 import { updateMyProfile } from '@/lib/api/update-my-profile'
 import type { ClientProfileData } from '@/types'
-import { signOut } from 'next-auth/react'
+import { signOut, useSession } from 'next-auth/react'
 
 
 // No props expected for this component
 export function ClientProfileSettings() {
+  const { data: session, update } = useSession()
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [activeTab, setActiveTab] = useState<'profile' | 'preferences' | 'privacy' | 'security'>('profile')
@@ -180,6 +181,18 @@ const [passwordData, setPasswordData] = useState({
         profileImage: imagePath
       }
     })
+
+    if (update && session?.user) {
+      update({
+        user: {
+          ...session.user,
+          profileImage: imagePath,
+        },
+      }).catch((error) => {
+        console.error('Erro ao atualizar sessão após trocar foto de perfil:', error)
+      })
+    }
+
     toast.success('Foto de perfil atualizada!')
   }
 

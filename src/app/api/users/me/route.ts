@@ -46,7 +46,7 @@ export async function GET() {
       cpfCnpj: '',
       description: '',
       userType: session.user.userType,
-      profileImage: session.user.image ?? '',
+      profileImage: (session.user as any).profileImage ?? (session.user as any).image ?? '',
       termsAcceptedAt: null,
       termsVersion: null,
       deactivatedAt: null,

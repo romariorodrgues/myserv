@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Preference } from "mercadopago";
 import { prisma } from "@/lib/prisma";
-import mercadoPagoConfig from "@/lib/mercadopago";
+import { getMercadoPagoConfig } from "@/lib/mercadopago";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Plan } from "@/types";
@@ -112,6 +112,16 @@ export async function POST(request: Request) {
     const title = 'MyServ Plano Mensal Profissional'
     let unitPrice = monthlyPrice
     const planRecord: { id: string; name: string } = { id: premiumPlan.id, name: premiumPlan.name }
+
+    const mercadoPagoConfig = getMercadoPagoConfig();
+
+    if (!mercadoPagoConfig) {
+      console.error("[PAYMENTS_SUBSCRIBE] MERCADOPAGO_ACCESS_TOKEN não está configurado");
+      return NextResponse.json(
+        { error: "Configuração de pagamento indisponível" },
+        { status: 503 }
+      );
+    }
 
     const preference = new Preference(mercadoPagoConfig);
 

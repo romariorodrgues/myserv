@@ -82,6 +82,7 @@ export function Header() {
   const isAuthenticated = status === 'authenticated'
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
+  const profileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
   
   // Handle scroll effect
   useEffect(() => {
@@ -240,8 +241,14 @@ export function Header() {
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="gap-2 hidden md:flex hover:bg-brand-cyan/10 transition-colors duration-200">
                     <Avatar className="h-8 w-8 shadow-md">
-                      <AvatarImage src={session.user.image ?? ''} alt={session.user.name || 'User'} size={32} />
-                      <AvatarFallback className="bg-primary text-xs">
+                      {profileImage ? (
+                        <AvatarImage
+                          src={profileImage}
+                          alt={session.user.name || 'Usuário'}
+                          className="object-cover"
+                        />
+                      ) : null}
+                      <AvatarFallback className="bg-primary/80 text-xs text-white">
                         {getUserInitials()}
                       </AvatarFallback>
                     </Avatar>

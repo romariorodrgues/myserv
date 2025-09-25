@@ -1,17 +1,54 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { UserTypeValues, type UserType } from "@/types";
 import { isValidCPF, isValidCNPJ } from "@/utils";
 import { Preference } from "mercadopago";
-import mercadoPagoConfig from "@/lib/mercadopago";
+import { getMercadoPagoConfig } from "@/lib/mercadopago";
 import { CURRENT_TERMS_VERSION } from '@/constants/legal'
 
 const UserTypeArray = Object.values(UserTypeValues) as [
   UserType,
   ...UserType[]
 ];
+
+let ensuredUserTermsColumns = false;
+
+async function ensureUserTermsColumns() {
+  if (ensuredUserTermsColumns) return;
+
+  const dbUrl = process.env.DATABASE_URL ?? '';
+  const isSQLite = dbUrl.startsWith('file:') || dbUrl.startsWith('sqlite:') || dbUrl.includes('mode=memory');
+
+  if (!isSQLite) {
+    ensuredUserTermsColumns = true;
+    return;
+  }
+
+  try {
+    const columns = (await prisma.$queryRawUnsafe<any[]>("PRAGMA table_info('users')")) ?? [];
+    const columnNames = new Set(columns.map((col) => String(col.name)));
+    const pendingStatements: string[] = [];
+
+    if (!columnNames.has("termsAcceptedAt")) {
+      pendingStatements.push("ALTER TABLE users ADD COLUMN termsAcceptedAt DATETIME");
+    }
+
+    if (!columnNames.has("termsVersion")) {
+      pendingStatements.push("ALTER TABLE users ADD COLUMN termsVersion TEXT");
+    }
+
+    for (const statement of pendingStatements) {
+      await prisma.$executeRawUnsafe(statement);
+    }
+
+    ensuredUserTermsColumns = true;
+  } catch (error) {
+    console.error("Failed to ensure user terms columns", error);
+  }
+}
 
 const registerSchema = z.object({
   name: z.string().min(2, "Nome deve ter pelo menos 2 caracteres"),
@@ -103,6 +140,18 @@ export async function POST(request: NextRequest) {
 
     // Fluxo específico para prestador com plano pago: criar registro pendente + preferência Mercado Pago
     if (validatedData.userType === UserTypeValues.SERVICE_PROVIDER && fullData.selectedPlan && fullData.selectedPlan !== 'FREE') {
+      const mercadoPagoConfig = getMercadoPagoConfig();
+
+      if (!mercadoPagoConfig) {
+        console.error("Mercado Pago configuration missing while trying to create a paid provider registration preference");
+        return NextResponse.json(
+          {
+            error: "Configuração de pagamento indisponível. Entre em contato com o suporte.",
+          },
+          { status: 503 }
+        )
+      }
+
       const personType =
         fullData.personType ||
         (fullData.cpfCnpj.replace(/\D/g, "").length > 11 ? "PJ" : "PF");
@@ -163,54 +212,74 @@ export async function POST(request: NextRequest) {
       const itemId = premiumPlan.id;
       const title = "MyServ Plano Mensal Profissional";
 
-      const { id, init_point } = await preference.create({
-        body: {
-          items: [
-            {
-              id: itemId,
-              title,
-              quantity: 1,
-              currency_id: "BRL",
-              unit_price: unitPrice,
+      try {
+        const { id, init_point } = await preference.create({
+          body: {
+            items: [
+              {
+                id: itemId,
+                title,
+                quantity: 1,
+                currency_id: "BRL",
+                unit_price: unitPrice,
+              },
+            ],
+            payer: {
+              name: validatedData.name,
+              email: validatedData.email,
             },
-          ],
-          payer: {
-            name: validatedData.name,
-            email: validatedData.email,
-          },
-          notification_url: `${process.env.BASE_URL}/api/payments/webhook/subscription`,
-          back_urls: {
-            success: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}`,
-            failure: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}&status=failure`,
-            pending: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}&status=pending`,
-          },
-          auto_return: "approved",
-          metadata: {
-            pendingRegistrationId: pending.id,
-            plan: {
-              planId: itemId,
-              planName: title,
-              planType: 'PREMIUM',
+            notification_url: `${process.env.BASE_URL}/api/payments/webhook/subscription`,
+            back_urls: {
+              success: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}`,
+              failure: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}&status=failure`,
+              pending: `${process.env.BASE_URL}/cadastrar/obrigado?pending=${pending.id}&status=pending`,
             },
+            auto_return: "approved",
+            metadata: {
+              pendingRegistrationId: pending.id,
+              plan: {
+                planId: itemId,
+                planName: title,
+                planType: 'PREMIUM',
+              },
+            },
+            external_reference: `pending-registration:${pending.id}`,
           },
-          external_reference: `pending-registration:${pending.id}`,
-        },
-      });
+        });
 
-      return NextResponse.json(
-        {
-          success: true,
-          requiresPayment: true,
-          preferenceId: id,
-          initPoint: init_point,
-          pendingId: pending.id,
-        },
-        { status: 200 }
-      );
+        return NextResponse.json(
+          {
+            success: true,
+            requiresPayment: true,
+            preferenceId: id,
+            initPoint: init_point,
+            pendingId: pending.id,
+          },
+          { status: 200 }
+        );
+      } catch (mpError) {
+        console.error("Mercado Pago preference creation failed:", mpError);
+        await prisma.pendingProviderRegistration.delete({ where: { id: pending.id } }).catch(() => {
+          console.warn("Unable to cleanup pending provider registration", pending.id);
+        });
+
+        return NextResponse.json(
+          {
+            error: "Não foi possível iniciar o pagamento. Verifique as credenciais do Mercado Pago.",
+            details:
+              mpError && typeof mpError === "object" && "message" in mpError
+                ? (mpError as { message?: string }).message
+                : undefined,
+          },
+          { status: 502 }
+        );
+      }
     }
 
     // Criação do usuário imediato (cliente ou prestador plano grátis)
     let user;
+
+    await ensureUserTermsColumns();
 
     try {
       user = await prisma.user.create({
@@ -283,8 +352,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    let details: string | undefined
+    let hint: string | undefined
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      details = `${error.code}: ${error.message}`
+      if (error.code === 'P2021' || error.code === 'P2022') {
+        hint = 'Banco desatualizado. Rode as migrations mais recentes (prisma migrate deploy).'
+      }
+    } else if (error instanceof Error) {
+      details = error.message
+    } else if (typeof error === 'string') {
+      details = error
+    }
+
     return NextResponse.json(
-      { error: "Erro interno do servidor" },
+      { error: "Erro interno do servidor", details, hint },
       { status: 500 }
     );
   }

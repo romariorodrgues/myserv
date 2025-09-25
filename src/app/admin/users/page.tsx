@@ -10,17 +10,18 @@
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { 
-  Users, 
-  UserCheck, 
-  UserX, 
-  Search, 
+import {
+  Users,
+  UserCheck,
+  UserX,
+  Search,
   CheckCircle,
   XCircle,
   Clock,
   Mail,
   Phone,
-  MapPin
+  MapPin,
+  History
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -54,6 +55,18 @@ interface User {
   }
 }
 
+interface ModerationEntry {
+  id: string
+  action: string
+  reason: string | null
+  createdAt: string
+  admin: {
+    id: string
+    name: string | null
+    email: string | null
+  } | null
+}
+
 export default function AdminUsersPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
@@ -65,6 +78,10 @@ export default function AdminUsersPage() {
   const [toggleTarget, setToggleTarget] = useState<{ id: string; isActive: boolean; name: string } | null>(null)
   const [toggleReason, setToggleReason] = useState('')
   const [toggling, setToggling] = useState(false)
+  const [historyTarget, setHistoryTarget] = useState<User | null>(null)
+  const [historyItems, setHistoryItems] = useState<ModerationEntry[]>([])
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyError, setHistoryError] = useState<string | null>(null)
 
   useEffect(() => {
     if (status === 'loading') return
@@ -98,6 +115,34 @@ export default function AdminUsersPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const openHistory = async (user: User) => {
+    setHistoryTarget(user)
+    setHistoryItems([])
+    setHistoryError(null)
+    setHistoryLoading(true)
+
+    try {
+      const response = await fetch(`/api/admin/users/${user.id}/moderations`)
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data?.error || 'Não foi possível carregar o histórico')
+      }
+
+      setHistoryItems(Array.isArray(data.moderations) ? data.moderations : [])
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : 'Erro ao carregar histórico')
+    } finally {
+      setHistoryLoading(false)
+    }
+  }
+
+  const closeHistory = () => {
+    setHistoryTarget(null)
+    setHistoryItems([])
+    setHistoryError(null)
   }
 
   const handleApproveUser = async (userId: string) => {
@@ -145,7 +190,10 @@ export default function AdminUsersPage() {
 
   const confirmToggle = async () => {
     if (!toggleTarget) return
-    if (!toggleTarget.isActive && !toggleReason.trim()) {
+    const nextActive = !toggleTarget.isActive
+    const trimmedReason = toggleReason.trim()
+
+    if (!nextActive && !trimmedReason) {
       alert('Informe um motivo para desativar o usuário.')
       return
     }
@@ -157,8 +205,8 @@ export default function AdminUsersPage() {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          active: !toggleTarget.isActive,
-          reason: toggleTarget.isActive ? undefined : toggleReason.trim(),
+          active: nextActive,
+          reason: nextActive ? undefined : trimmedReason,
         })
       })
 
@@ -193,6 +241,35 @@ export default function AdminUsersPage() {
     
     return matchesSearch && matchesType && matchesStatus
   })
+
+  const getActionLabel = (action: string) => {
+    switch (action) {
+      case 'DEACTIVATE':
+        return 'Conta desativada'
+      case 'ACTIVATE':
+        return 'Conta reativada'
+      case 'APPROVE':
+        return 'Conta aprovada'
+      case 'REJECT':
+        return 'Conta rejeitada'
+      default:
+        return action
+    }
+  }
+
+  const formatDateTime = (value: string) => {
+    try {
+      return new Date(value).toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch {
+      return value
+    }
+  }
 
   const getStatusBadge = (user: User) => {
     if (!user.isActive) {
@@ -400,37 +477,49 @@ export default function AdminUsersPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {new Date(user.createdAt).toLocaleDateString('pt-BR')}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      {user.userType === 'SERVICE_PROVIDER' && !user.isApproved && (
-                        <>
-                          <Button
-                            size="sm"
-                            onClick={() => handleApproveUser(user.id)}
-                            className="bg-green-600 hover:bg-green-700"
-                          >
-                            <CheckCircle className="w-4 h-4 mr-1" />
-                            Aprovar
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleRejectUser(user.id)}
-                            className="text-red-600 border-red-600 hover:bg-red-50"
-                          >
-                            <XCircle className="w-4 h-4 mr-1" />
-                            Rejeitar
-                          </Button>
-                        </>
-                      )}
-                      
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleToggleActive(user)}
-                        className={user.isActive ? 'text-red-600 border-red-600 hover:bg-red-50' : 'text-green-600 border-green-600 hover:bg-green-50'}
-                      >
-                        {user.isActive ? 'Desativar' : 'Ativar'}
-                      </Button>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {user.userType === 'SERVICE_PROVIDER' && !user.isApproved && (
+                          <>
+                            <Button
+                              size="sm"
+                              onClick={() => handleApproveUser(user.id)}
+                              className="bg-green-600 hover:bg-green-700"
+                            >
+                              <CheckCircle className="w-4 h-4 mr-1" />
+                              Aprovar
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleRejectUser(user.id)}
+                              className="text-red-600 border-red-600 hover:bg-red-50"
+                            >
+                              <XCircle className="w-4 h-4 mr-1" />
+                              Rejeitar
+                            </Button>
+                          </>
+                        )}
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleToggleActive(user)}
+                          className={user.isActive ? 'text-red-600 border-red-600 hover:bg-red-50' : 'text-green-600 border-green-600 hover:bg-green-50'}
+                        >
+                          {user.isActive ? 'Desativar' : 'Ativar'}
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openHistory(user)}
+                          className="text-slate-600 border-slate-300 hover:bg-slate-50"
+                        >
+                          <History className="w-4 h-4 mr-1" />
+                          Histórico
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -480,6 +569,60 @@ export default function AdminUsersPage() {
               {toggling ? 'Confirmando...' : 'Confirmar'}
             </Button>
           </div>
+        </Card>
+      </div>
+    )}
+
+    {historyTarget && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4 py-8">
+        <Card className="w-full max-w-2xl max-h-[80vh] p-6 flex flex-col">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">Histórico de moderação</h3>
+              <p className="text-sm text-gray-500">{historyTarget.name}</p>
+            </div>
+            <Button variant="outline" size="sm" onClick={closeHistory}>
+              Fechar
+            </Button>
+          </div>
+
+          {historyLoading ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-gray-500">
+              Carregando...
+            </div>
+          ) : historyError ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-red-600 text-center">
+              {historyError}
+            </div>
+          ) : historyItems.length === 0 ? (
+            <div className="flex-1 flex items-center justify-center text-sm text-gray-500 text-center">
+              Nenhum registro de moderação encontrado para este usuário.
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto space-y-4 pr-1">
+              {historyItems.map((entry) => (
+                <div key={entry.id} className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                        <History className="w-4 h-4 text-blue-600" />
+                        {getActionLabel(entry.action)}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {formatDateTime(entry.createdAt)}
+                      </p>
+                    </div>
+                    <div className="text-xs text-gray-500 text-right">
+                      {entry.admin?.name || entry.admin?.email || 'Sistema'}
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-700 mt-3 whitespace-pre-line">
+                    {entry.reason || 'Sem motivo informado'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     )}

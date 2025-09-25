@@ -23,16 +23,16 @@ export function useSocket() {
 
     // Conectar socket se ainda não conectado
     if (!socketRef.current) {
-      console.log('Inicializando conexão Socket.io...')
-      
       const socketInstance = io({
-        path: '/api/socket',
+        path: '/api/socketio',
         addTrailingSlash: false,
         autoConnect: true,
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionAttempts: 5,
-        timeout: 10000
+        timeout: 10000,
+        transports: ['polling'],
+        upgrade: false,
       })
 
       socketRef.current = socketInstance
@@ -40,23 +40,22 @@ export function useSocket() {
 
       // Event listeners
       socketInstance.on('connect', () => {
-        console.log('Socket connected:', socketInstance.id)
         setIsConnected(true)
-        
+
         // Autenticar com user ID
-        console.log('Enviando autenticação para userId:', session.user.id)
         socketInstance.emit('authenticate', {
           userId: session.user.id
         })
       })
 
       socketInstance.on('disconnect', () => {
-        console.log('Socket disconnected')
         setIsConnected(false)
       })
 
       socketInstance.on('connect_error', (error) => {
-        console.error('Socket connection error:', error)
+        if (process.env.NODE_ENV !== 'production') {
+          console.error('Socket connection error:', error)
+        }
         setIsConnected(false)
       })
     }

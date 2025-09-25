@@ -29,6 +29,7 @@ export async function GET(
     }
 
     const { chatId } = await params
+    const isAdmin = session.user.userType === 'ADMIN'
     const { searchParams } = new URL(request.url)
     const page = parseInt(searchParams.get('page') || '1')
     const limit = parseInt(searchParams.get('limit') || '50')
@@ -36,20 +37,22 @@ export async function GET(
 
     // Verificar se o usuário tem acesso ao chat
     const chat = await prisma.supportChat.findFirst({
-      where: {
-        id: chatId,
-        OR: [
-          { userId: session.user.id },
-          { 
-            assignments: {
-              some: {
-                adminId: session.user.id,
-                isActive: true
-              }
-            }
-          }
-        ]
-      }
+      where: isAdmin
+        ? { id: chatId }
+        : {
+            id: chatId,
+            OR: [
+              { userId: session.user.id },
+              {
+                assignments: {
+                  some: {
+                    adminId: session.user.id,
+                    isActive: true,
+                  },
+                },
+              },
+            ],
+          },
     })
 
     if (!chat) {

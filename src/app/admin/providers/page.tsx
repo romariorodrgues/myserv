@@ -464,10 +464,22 @@ export default function AdminProvidersPage() {
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" onClick={() => setToggleTarget(null)}>Cancelar</Button>
                     <Button onClick={async () => {
+                      const nextActive = !toggleTarget.isActive
+                      const trimmedReason = toggleReason.trim()
+
+                      if (!nextActive && !trimmedReason) {
+                        alert('Informe um motivo para desativar o usuário.')
+                        return
+                      }
+
                       try {
                         const res = await fetch(`/api/admin/users/${toggleTarget.id}/toggle-active`, {
-                          method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ active: !toggleTarget.isActive, reason: toggleReason })
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            active: nextActive,
+                            reason: nextActive ? undefined : trimmedReason,
+                          }),
                         })
                         const d = await res.json()
                         if (!res.ok || !d.success) throw new Error(d?.error || 'Falha ao atualizar')

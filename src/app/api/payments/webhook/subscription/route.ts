@@ -1,4 +1,4 @@
-import mercadoPagoConfig from "@/lib/mercadopago";
+import { getMercadoPagoConfig } from "@/lib/mercadopago";
 import { prisma } from "@/lib/prisma";
 import { PaymentMethod, PaymentStatus, UserTypeValues } from "@/types";
 import { Plan } from "@prisma/client";
@@ -59,6 +59,16 @@ export async function POST(request: NextRequest) {
       (await request.json()) as MercadoPagoWebhookNotification;
 
     if (type === "payment") {
+      const mercadoPagoConfig = getMercadoPagoConfig();
+
+      if (!mercadoPagoConfig) {
+        console.error("[PAYMENTS_WEBHOOK_SUBSCRIPTION] MERCADOPAGO_ACCESS_TOKEN não está configurado");
+        return NextResponse.json(
+          { error: "Configuração de pagamento indisponível" },
+          { status: 503 }
+        );
+      }
+
       const payment = new Payment(mercadoPagoConfig);
       const paymentData = await payment.get({ id: data.id });
 

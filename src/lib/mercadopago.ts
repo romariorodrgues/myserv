@@ -1,11 +1,44 @@
 import MercadoPagoConfig from "mercadopago";
 
-const TOKEN = process.env.MERCADOPAGO_ACCESS_TOKEN;
+let cachedConfig: MercadoPagoConfig | null = null;
+let warnedMissingToken = false;
 
-if (!TOKEN) throw new Error("MP Error: Token not found!");
+export function getMercadoPagoConfig(): MercadoPagoConfig | null {
+  if (cachedConfig) {
+    return cachedConfig;
+  }
 
-const mercadoPagoConfig = new MercadoPagoConfig({
-  accessToken: TOKEN,
-});
+  const token = process.env.MERCADOPAGO_ACCESS_TOKEN;
 
-export default mercadoPagoConfig;
+  if (!token) {
+    if (!warnedMissingToken) {
+      console.warn(
+        "[MercadoPago] MERCADOPAGO_ACCESS_TOKEN não está configurado. Fluxos pagos ficarão indisponíveis."
+      );
+      warnedMissingToken = true;
+    }
+
+    return null;
+  }
+
+  cachedConfig = new MercadoPagoConfig({ accessToken: token });
+  return cachedConfig;
+}
+
+export function isMercadoPagoConfigured(): boolean {
+  return getMercadoPagoConfig() !== null;
+}
+
+export function ensureMercadoPagoConfig(): MercadoPagoConfig {
+  const config = getMercadoPagoConfig();
+
+  if (!config) {
+    throw new Error(
+      "Mercado Pago não configurado. Defina MERCADOPAGO_ACCESS_TOKEN para habilitar pagamentos."
+    );
+  }
+
+  return config;
+}
+
+export default getMercadoPagoConfig;

@@ -19,7 +19,7 @@ O sistema de chat de suporte do MyServ é uma solução completa de comunicaçã
 │   ├── /api/chat/admin/list       # Lista todos os chats (admin)
 │   ├── /api/chat/[chatId]         # Operações específicas do chat
 │   ├── /api/chat/[chatId]/messages # Gerenciamento de mensagens
-│   └── /api/socket                # Socket.io para tempo real
+│   └── /api/socketio              # Socket.io para tempo real
 ├── 🗃️ Dados
 │   ├── SupportChat               # Modelo principal do chat
 │   ├── SupportMessage           # Mensagens do chat

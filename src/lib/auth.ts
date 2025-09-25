@@ -69,7 +69,7 @@ export const authOptions: NextAuthOptions = {
     maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.userType = user.userType
         token.isApproved = user.isApproved
@@ -79,6 +79,26 @@ export const authOptions: NextAuthOptions = {
         ;(token as any).termsVersion = (user as any).termsVersion
         ;(token as any).termsAcceptedAt = (user as any).termsAcceptedAt
         ;(token as any).deactivatedAt = (user as any).deactivatedAt
+      }
+
+      if (trigger === 'update' && session?.user) {
+        const updatedUser = session.user as typeof session.user & {
+          isActive?: boolean
+          termsVersion?: string | null
+          termsAcceptedAt?: string | null
+          deactivatedAt?: string | null
+          profileImage?: string | null
+          address?: unknown
+        }
+
+        if (updatedUser.userType) token.userType = updatedUser.userType
+        if (typeof updatedUser.isApproved === 'boolean') token.isApproved = updatedUser.isApproved
+        if (typeof updatedUser.isActive === 'boolean') token.isActive = updatedUser.isActive
+        if (updatedUser.profileImage !== undefined) token.profileImage = updatedUser.profileImage
+        if (updatedUser.address !== undefined) token.address = updatedUser.address
+        ;(token as any).termsVersion = updatedUser.termsVersion ?? (token as any).termsVersion ?? null
+        ;(token as any).termsAcceptedAt = updatedUser.termsAcceptedAt ?? (token as any).termsAcceptedAt ?? null
+        ;(token as any).deactivatedAt = updatedUser.deactivatedAt ?? (token as any).deactivatedAt ?? null
       }
       return token
     },

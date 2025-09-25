@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import mercadoPagoConfig from '@/lib/mercadopago'
+import { getMercadoPagoConfig } from '@/lib/mercadopago'
 import { Preference } from 'mercadopago'
 
 export async function POST(req: NextRequest) {
@@ -23,6 +23,13 @@ export async function POST(req: NextRequest) {
     // preço dinâmico via SystemSettings
     const s = await prisma.systemSettings.findUnique({ where: { key: 'PLAN_UNLOCK_PRICE' } })
     const price = Number(s?.value || '4.9') || 4.9
+
+    const mercadoPagoConfig = getMercadoPagoConfig()
+
+    if (!mercadoPagoConfig) {
+      console.error('[UNLOCK_REQUEST] MERCADOPAGO_ACCESS_TOKEN não está configurado')
+      return NextResponse.json({ error: 'Configuração de pagamento indisponível' }, { status: 503 })
+    }
 
     const preference = new Preference(mercadoPagoConfig)
     const { id, init_point } = await preference.create({

@@ -20,6 +20,7 @@ export function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const { data: session } = useSession()
+  const profileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/' })
@@ -93,9 +94,9 @@ export function Header() {
                     onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
                     className="flex items-center space-x-2 text-gray-700 hover:text-blue-600"
                   >
-                    {session.user?.image ? (
+                    {profileImage ? (
                       <Image
-                        src={session.user.image}
+                        src={profileImage}
                         alt={session.user.name || 'Usuário'}
                         width={32}
                         height={32}

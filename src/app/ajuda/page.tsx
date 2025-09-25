@@ -3,6 +3,8 @@
  */
 
 import Link from 'next/link'
+import { SupportChatWidgetWrapper } from '@/components/chat/SupportChatWidgetWrapper'
+import { SupportChatCTA } from '@/components/chat/SupportChatCTA'
 
 const faqs = [
   {
@@ -37,14 +39,25 @@ export default function AjudaPage() {
           ))}
         </div>
 
-        <div className="text-center text-sm text-gray-600 mt-8">
-          Precisa de suporte? Envie um e-mail para{' '}
-          <a href="mailto:contato@myserv.com.br" className="text-blue-600">contato@myserv.com.br</a>
-          {' '}ou acesse{' '}
-          <Link href="/seja-profissional" className="text-blue-600">Seja um profissional</Link>.
+        <div className="mt-10 flex flex-col items-center gap-3">
+          <p className="text-sm text-gray-600 text-center">
+            Ainda precisa de ajuda? Converse com nossa equipe pelo chat em tempo real.
+          </p>
+          <SupportChatCTA
+            label="Falar com o suporte"
+            initialTitle="Preciso de ajuda com a plataforma"
+            initialMessage="Olá equipe MyServ, preciso de apoio com..."
+            forceNewChat
+          />
+          <p className="text-xs text-gray-500">
+            Preferir e-mail? Escreva para{' '}
+            <a href="mailto:contato@myserv.com.br" className="text-blue-600">contato@myserv.com.br</a>
+            {' '}ou visite{' '}
+            <Link href="/seja-profissional" className="text-blue-600">Seja um profissional</Link>.
+          </p>
         </div>
       </div>
+      <SupportChatWidgetWrapper />
     </div>
   )
 }
-

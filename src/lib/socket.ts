@@ -12,10 +12,19 @@ export function getSocketServer(): Server | null {
 
 export function initializeSocketServer(httpServer: any) {
   if (!io) {
+    const allowedOrigins = new Set<string>()
+    const envOrigins = [process.env.NEXTAUTH_URL, process.env.BASE_URL]
+    for (const origin of envOrigins) {
+      if (origin) allowedOrigins.add(origin.replace(/\/$/, ''))
+    }
+    allowedOrigins.add('http://localhost:3000')
+    allowedOrigins.add('https://localhost:3000')
+
     io = new Server(httpServer, {
-      path: '/api/socket',
+      path: '/api/socketio',
+      transports: ['polling'],
       cors: {
-        origin: process.env.NEXTAUTH_URL || 'http://localhost:3000',
+        origin: Array.from(allowedOrigins),
         methods: ['GET', 'POST'],
         credentials: true
       }

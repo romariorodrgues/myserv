@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,9 +54,8 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
 
   // Debug do socket
   useEffect(() => {
-    console.log('SupportChatWidget - Socket status:', socket ? 'connected' : 'not connected')
-    if (socket) {
-      console.log('Socket ID:', socket.id)
+    if (process.env.NODE_ENV !== 'production' && socket) {
+      console.debug('SupportChatWidget socket conectado:', socket.id)
     }
   }, [socket])
 
@@ -76,7 +75,9 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
         const response = await fetch(`/api/chat/${currentChat.id}/messages`)
         if (response.ok) {
           const data = await response.json()
-          console.log('Loaded messages for chat:', currentChat.id, data.messages?.length)
+          if (process.env.NODE_ENV !== 'production') {
+            console.debug('Loaded messages for chat', currentChat.id, data.messages?.length ?? 0)
+          }
         }
       } catch (error) {
         console.error('Error loading chat messages:', error)
@@ -178,6 +179,38 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
   const currentTypingUsers = typingUsers.filter((user: any) => 
     currentChat && user.chatId === currentChat.id && user.userId !== session?.user?.id
   )
+
+  const handleExternalOpen = useCallback((event: Event) => {
+    if (status !== 'authenticated' || !session?.user?.id) {
+      return
+    }
+
+    const detail = (event as CustomEvent<{ initialMessage?: string; initialTitle?: string; forceNewChat?: boolean }>).detail || {}
+
+    setIsOpen(true)
+    setIsMinimized(false)
+
+    if (!currentChat || detail.forceNewChat) {
+      if (detail.forceNewChat) {
+        setCurrentChat(null)
+      }
+      setShowNewChatForm(true)
+      if (typeof detail.initialTitle === 'string') {
+        setChatTitle(detail.initialTitle)
+      }
+      if (typeof detail.initialMessage === 'string') {
+        setChatDescription(detail.initialMessage)
+      }
+    }
+  }, [currentChat, session?.user?.id, setCurrentChat, status])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    window.addEventListener('support-chat:open', handleExternalOpen)
+    return () => {
+      window.removeEventListener('support-chat:open', handleExternalOpen)
+    }
+  }, [handleExternalOpen])
 
   // Se não estiver autenticado, não renderizar
   if (status !== 'authenticated' || !session?.user?.id) {
