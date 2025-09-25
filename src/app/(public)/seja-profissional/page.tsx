@@ -35,10 +35,11 @@ export default async function SejaProfissionalPage() {
                 <span className="text-green-600"> renda extra</span>
               </h1>
               <p className="text-xl text-gray-600 mb-8">
-                É profissional autônomo ou tem empresa de serviços? Cadastre-se gratuitamente e receba solicitações de clientes da sua região.
+                Voce é um prestador de serviço, tem uma empresa de prestação de serviço ou até mesmo faz serviço de free lancer?
               </p>
               <p className="text-xl text-gray-600 mb-8">
-                Para visualizar os contatos de quem te procurou e negociar diretamente, assine o plano mensal para profissionais.
+                Se você é uma pessoa física cadastre-se gratuitamente na Myserv e comece a receber solicitações de serviço na região em que atende. Pague somente quando fechar negocio.
+Se você é uma pessoa jurídica cadastre-se com plano mensal e aceite serviços ILIMITADOS o mês inteiro.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button size="lg" asChild>
