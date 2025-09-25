@@ -1,0 +1,170 @@
+POLÍTICA DE PRIVACIDADE DA PLATAFORMA MYSERV
+A Myserv Ltda, na qualidade de controladora de dados pessoais, reconhece a importância da privacidade, da proteção de dados e da transparência no tratamento de informações pessoais dos usuários de sua plataforma digital, acessível por meio do endereço eletrônico www.myserv.com.br.
+Esta Política de Privacidade tem por finalidade informar, de forma clara, objetiva e acessível, como os dados pessoais de prestadores de serviços e clientes são coletados, utilizados, armazenados, compartilhados e protegidos, nos termos da Lei nº 13.709/2018 (Lei Geral de Proteção de Dados Pessoais – LGPD), do Marco Civil da Internet (Lei nº 12.965/2014) e demais normas aplicáveis.
+Ao acessar, utilizar ou se cadastrar na plataforma, o usuário declara que leu, compreendeu e concorda expressamente com os termos desta Política, ciente de que o fornecimento de seus dados pessoais é condição necessária para acesso integral às funcionalidades do sistema.
+A Myserv reforça seu compromisso com a segurança da informação, com a privacidade dos usuários e com a adoção das melhores práticas técnicas e organizacionais para garantir que o tratamento de dados pessoais ocorra de forma lícita, transparente, segura e limitada às finalidades legítimas da atividade.
+Esta Política aplica-se a todos os usuários da plataforma, sejam pessoas físicas ou jurídicas, na qualidade de clientes ou prestadores, e poderá ser atualizada periodicamente, sempre que necessário, com aviso prévio aos usuários por meio de notificação no próprio site ou aplicativo.
+1. DOS DADOS COLETADOS E DAS FORMAS DE COLETA
+1.1. 	A Myserv Ltda realiza a coleta de dados pessoais estritamente necessários ao funcionamento e à segurança da plataforma, de forma transparente e em conformidade com os princípios da finalidade, adequação e necessidade previstos na LGPD.
+1.2. 	Os dados são coletados de duas formas:
+a) Fornecimento direto pelo usuário:
+No momento do cadastro ou da atualização de perfil, o USUÁRIO fornece voluntariamente os seguintes dados:
+    • Dados de identificação pessoal:
+        ◦ Nome completo;
+        ◦ CPF ou CNPJ;
+        ◦ Documento de identidade (RG);
+        ◦ Endereço completo;
+        ◦ E-mail;
+        ◦ Telefone celular/WhatsApp; e
+        ◦ Foto de perfil.
+
+    • Dados de localização:
+        ◦ Endereço residencial ou comercial; e
+        ◦ Coordenadas geográficas (quando o recurso de geolocalização estiver habilitado).
+
+    • Dados de comunicação e interação:
+        ◦ Histórico de mensagens trocadas entre usuários na plataforma;
+        ◦ Avaliações feitas e recebidas por clientes e prestadores; e
+        ◦ Preferências de visibilidade e notificações.
+b) Coleta automática por meio de tecnologias:
+Durante o uso da plataforma, alguns dados podem ser coletados automaticamente, por meio de cookies, APIs ou tokens de sessão:
+    • Dados de sessão e autenticação:
+        ◦ Cookies (NextAuth) e tokens JWT com duração padrão de 30 dias; e
+        ◦ IP do dispositivo, tipo de navegador, horário de acesso.
+
+    • Dados de login via terceiros:
+        ◦ Caso o USUÁRIO opte por se conectar com contas de terceiros (como Google ou Facebook), poderão ser coletadas informações básicas como nome, e-mail e foto, conforme autorização concedida no momento da integração.
+1.3. 	Todas as informações são tratadas de forma segura, com uso de criptografia, hash de senhas com bcrypt, validação e sanitização dos dados via bibliotecas específicas, além de controle de acesso por tipo de usuário e proteção de rotas sensíveis.
+2. DAS FINALIDADES E BASES LEGAIS DO TRATAMENTO DE DADOS
+2.1. 	Os dados pessoais coletados pela Myserv Ltda são tratados para finalidades legítimas e específicas, com respaldo nas bases legais previstas na Lei nº 13.709/2018 (LGPD), em especial os artigos 7º e 11º.
+2.2. 	A seguir, estão descritas as principais finalidades do tratamento e suas respectivas bases legais:
+a) Identificação e comunicação com o usuário
+    • Dados tratados: nome, e-mail, telefone, CPF/CNPJ;
+    • Finalidade: criar e manter a conta de usuário, validar identidade e permitir o acesso às funcionalidades da plataforma; e
+    • Base legal: execução de contrato (art. 7º, V, LGPD)
+
+b) Busca por prestadores por geolocalização
+    • Dados tratados: endereço, coordenadas GPS; 
+    • Finalidade: apresentar resultados com base na proximidade geográfica entre cliente e prestador; e
+    • Base legal: execução de contrato (art. 7º, V, LGPD)
+
+c) Processamento de pagamentos (quando aplicável)
+    • Dados tratados: nome, CPF/CNPJ, e-mail, telefone, valor da transação;
+    • Compartilhamento: com o MercadoPago, responsável pelo processamento dos pagamentos;
+    • Finalidade: viabilizar a cobrança de taxas pela aceitação de serviços/orçamentos ou planos mensais; e
+    • Base legal: execução de contrato (art. 7º, V, LGPD)
+
+d) Gestão da qualidade e experiência do usuário
+    • Dados tratados: histórico de mensagens, avaliações de usuários, registros de atendimento;
+    • Finalidade: promover a segurança da comunidade, garantir a integridade das interações e permitir eventual análise interna para resolução de conflitos; e
+    • Base legal: interesse legítimo do controlador (art. 7º, IX, LGPD).
+
+e) Envio de notificações e alertas via WhatsApp
+    • Dados tratados: nome, telefone, mensagens de alerta;
+    • Compartilhamento: com a ferramenta ChatPro API;
+    • Finalidade: facilitar a comunicação entre a plataforma e o usuário com alertas operacionais; e
+    • Base legal: consentimento do titular (art. 7º, I, LGPD).
+
+2.3. 	A Myserv Ltda não realiza tratamento de dados sensíveis, nos termos do art. 5º, II da LGPD, nem coleta dados pessoais de menores de idade, salvo sob responsabilidade e consentimento de seus responsáveis legais.
+2.4. 	Os dados não serão utilizados para fins de marketing direto, remarketing ou envio de comunicações promocionais, salvo se o usuário fornecer consentimento específico para tal finalidade em momento oportuno.
+3. 	DO COMPARTILHAMENTO DE DADOS COM TERCEIROS
+3.1. 	A Myserv Ltda poderá compartilhar os dados pessoais dos usuários com terceiros apenas quando necessário para a operação regular da plataforma e estritamente dentro dos limites das finalidades previstas nesta Política, não realizando qualquer venda, cessão comercial ou repasse indevido de dados a terceiros.
+3.2. 	Os dados compartilhados são protegidos por cláusulas contratuais de confidencialidade e segurança, sempre que possível, e são limitados ao mínimo necessário para viabilizar o serviço ou obrigação contratual.
+3.3. 	Os principais terceiros com os quais poderá haver compartilhamento são:
+a) MercadoPago (Processamento de Pagamentos)
+    • Dados compartilhados: nome, e-mail, telefone, CPF/CNPJ, valor da transação;
+    • Finalidade: intermediar pagamentos de taxas avulsas e planos mensais da plataforma;
+    • Base legal: execução de contrato; e
+    • Localização do servidor: Brasil e Argentina.
+
+b) Google Maps API (Geolocalização e navegação)
+    • Dados compartilhados: endereços e coordenadas geográficas dos usuários;
+    • Finalidade: identificar prestadores próximos à localização do cliente e permitir navegação integrada;
+    • Base legal: interesse legítimo; e
+    • Localização do servidor: Estados Unidos.
+
+c) ChatPro API (Notificações por WhatsApp)
+    • Dados compartilhados: nome, telefone e mensagens de alerta;
+    • Finalidade: envio de notificações automatizadas aos usuários sobre status de serviços, propostas e comunicações operacionais;
+    • Base legal: consentimento; e
+    • Localização do servidor: A ser verificada (não especificado no código).
+3.4. 	A Myserv se compromete a não transferir dados a países que não ofereçam grau de proteção adequado, salvo nos casos em que haja cláusulas contratuais padrão, consentimento expresso do titular ou outra hipótese autorizada pela LGPD (art. 33 e seguintes).
+3.5. 	O usuário declara estar ciente e de acordo com esse compartilhamento essencial ao funcionamento da plataforma, compreendendo que sem ele certos serviços não poderão ser prestados de forma adequada.
+4. DO ARMAZENAMENTO, SEGURANÇA E RETENÇÃO DOS DADOS PESSOAIS
+4.1. 	Os dados pessoais coletados pela Myserv Ltda são armazenados em infraestrutura tecnológica segura, com aplicação de medidas técnicas e organizacionais voltadas à proteção contra acessos não autorizados, perda, alteração, divulgação ou destruição indevida.
+a) Armazenamento de dados
+    • Ambiente de desenvolvimento: SQLite (dados de teste e validação);
+    • Ambiente de produção: PostgreSQL; e
+    • Servidor: em fase de definição, sendo obrigatoriamente hospedado em ambiente que atenda aos requisitos de segurança e conformidade legal da LGPD.
+
+b) Dados de sessão
+    • Tecnologia: Cookies próprios e tokens JWT (JSON Web Token);
+    • Finalidade: autenticação, manutenção de sessões e segurança de acesso;
+    • Duração padrão: 30 dias; e
+    • Essencialidade: sim, para funcionamento da plataforma.
+
+4.2. 	As seguintes práticas de segurança estão implementadas:
+    • Criptografia:
+        ◦ Comunicação protegida por protocolo HTTPS;
+        ◦ Tokens JWT com assinatura digital; e
+        ◦ Senhas armazenadas com hash criptográfico bcrypt.
+
+    • Validação de dados:
+        ◦ Uso da biblioteca Zod para validação de entradas; e
+        ◦ Sanitização de dados para prevenir injeção de código malicioso.
+    • Controle de acesso:
+        ◦ Autenticação via middleware dedicado; e
+        ◦ Restrição de acesso a rotas sensíveis com verificação de permissões por tipo de usuário.
+
+4.3. 	Os dados pessoais serão armazenados pelo tempo necessário ao cumprimento das finalidades para as quais foram coletados, respeitando:
+    • As exigências legais e regulatórias aplicáveis;
+    • O período contratual de permanência do usuário na plataforma; e
+    • A conservação mínima para fins de exercício regular de direitos da Myserv em processos administrativos, judiciais ou arbitrais.
+
+4.4. 	Encerrado o relacionamento com o usuário ou havendo solicitação expressa de exclusão, os dados serão eliminados, salvo nas hipóteses legais que autorizem ou exijam sua conservação por período adicional.
+5. DOS DIREITOS DOS TITULARES
+5.1. 	Em conformidade com a Lei Geral de Proteção de Dados Pessoais (Lei nº 13.709/2018), os USUÁRIOS da plataforma Myserv têm assegurado o exercício dos seguintes direitos, enquanto titulares de dados pessoais:
+a) 	Confirmação da existência de tratamento: O usuário pode solicitar à Myserv a confirmação sobre a existência de tratamento de seus dados pessoais.
+b) 	Acesso aos dados: O usuário pode requerer acesso aos dados que lhe digam respeito, tratados e armazenados pela plataforma.
+c) 	Correção de dados incompletos, inexatos ou desatualizados: O usuário pode atualizar ou complementar seus dados pessoais por meio da área de configurações da conta ou por solicitação direta ao canal de suporte.
+d) 	Exclusão e anonimização de dados: O usuário pode solicitar a exclusão definitiva de seus dados pessoais, utilizando a funcionalidade “Solicitar Exclusão da Conta”, sendo informado de que tal exclusão é irreversível.
+e) 	Portabilidade de dados: O usuário poderá solicitar a portabilidade de seus dados pessoais a outro fornecedor de serviço, mediante requisição formal, desde que tecnicamente viável e em conformidade com as normas da Autoridade Nacional de Proteção de Dados (ANPD). A Myserv reserva-se o direito de atender tal pedido dentro dos limites da LGPD e das obrigações técnicas razoáveis.
+f) Visibilidade do perfil e controle de informações
+    • Prestadores de serviços: terão perfil público obrigatório, com foto e avaliações visíveis a todos os usuários da plataforma. A conversa por chat e o compartilhamento de dados pessoais adicionais (como telefone ou e-mail) só serão permitidos após a aceitação formal de um orçamento ou serviço.
+    • Clientes: terão seus dados sensíveis (como endereço e foto) acessíveis apenas ao prestador após a aceitação do orçamento ou serviço, momento em que será liberada também a funcionalidade de chat para comunicação entre as partes.
+5.2. 	Cada usuário poderá, por meio do seu perfil, configurar o canal preferencial para recebimento de notificações (WhatsApp, e-mail, ou outro canal disponível), bem como indicar se deseja receber ou não comunicações promocionais, atualizações de funcionalidades ou mensagens institucionais da plataforma.
+5.3. 	As solicitações referentes aos direitos do titular deverão ser encaminhadas ao e-mail suportemyserv@gmail.com. A Myserv poderá requerer comprovação de identidade para garantir a segurança e integridade do atendimento.
+5.4. 	A Myserv compromete-se a responder às solicitações dos titulares de forma adequada, clara e dentro dos prazos legais, podendo indeferir pedidos manifestamente infundados ou que violem obrigações legais, direitos de terceiros ou o legítimo interesse da empresa.
+6. DO USO DE COOKIES E TECNOLOGIAS DE RASTREAMENTO
+6.1. 	A plataforma Myserv utiliza cookies e tecnologias similares para garantir a funcionalidade adequada do sistema, melhorar a experiência do usuário e viabilizar o controle seguro de sessões.
+6.2. 	Os cookies são pequenos arquivos armazenados no navegador do usuário, que permitem o reconhecimento de dispositivos, autenticação de acessos e manutenção de preferências durante a navegação.
+6.3. 	A seguir, descrevemos os principais tipos de cookies utilizados na plataforma:
+a) Cookies essenciais (próprios)
+    • Nome: NextAuth Session Cookies;
+    • Finalidade: Autenticação e gerenciamento de sessões de usuários logados;
+    • Duração: 30 dias (configurável); e
+    • Necessidade de consentimento: Não, por serem estritamente necessários ao funcionamento da plataforma;
+
+b) Cookies de terceiros (não essenciais)
+    • Nome: Google Fonts;
+    • Finalidade: Carregamento de fontes tipográficas para melhoria da experiência visual;
+    • Origem: fonts.googleapis.com; e
+    • Necessidade de consentimento: Sim, por não serem essenciais ao funcionamento da plataforma.
+
+6.4. 	O USUÁRIO pode, a qualquer momento, gerenciar ou desativar cookies não essenciais por meio das configurações de seu navegador. No entanto, a desativação de cookies essenciais poderá comprometer o funcionamento da plataforma e limitar o acesso a funcionalidades importantes.
+6.5. 	A Myserv não utiliza cookies para fins de publicidade comportamental, remarketing ou rastreamento fora da plataforma, respeitando os limites da finalidade e minimização no uso de dados.
+7. DA ATUALIZAÇÃO DESTA POLÍTICA E COMUNICAÇÃO COM OS USUÁRIOS
+7.1. 	A Myserv Ltda reserva-se o direito de, a qualquer tempo, modificar ou atualizar esta Política de Privacidade, especialmente para refletir eventuais alterações legais, regulatórias, tecnológicas ou operacionais relevantes.
+7.2. 	Sempre que houver atualização material das disposições aqui previstas, a PLATAFORMA compromete-se a comunicar os usuários de forma clara e destacada, por meio de aviso no próprio site ou aplicativo, com antecedência razoável, salvo em casos de exigência legal imediata.
+7.3. 	Recomenda-se ao USUÁRIO que consulte esta Política periodicamente, a fim de se manter informado quanto às práticas adotadas pela plataforma e eventuais modificações implementadas.
+7.4. 	A continuidade do uso da PLATAFORMA após a publicação das atualizações será interpretada como aceitação tácita das novas condições. Caso o usuário não concorde com os termos atualizados, poderá exercer seu direito de exclusão da conta conforme previsto na cláusula específica desta Política.
+8. DISPOSIÇÕES FINAIS E FORO APLICÁVEL
+8.1. 	Esta Política de Privacidade integra e complementa os Termos de Uso da plataforma Myserv, aplicando-se a todos os usuários cadastrados, sejam pessoas físicas ou jurídicas, clientes ou prestadores de serviço, no que tange ao tratamento de seus dados pessoais.
+8.2. 	Em caso de dúvidas, solicitações ou comunicações relacionadas a esta Política, o titular de dados poderá entrar em contato com o Encarregado pelo Tratamento de Dados Pessoais (DPO) da Myserv Ltda, por meio do e-mail: suportemyserv@gmail.com.
+8.3. 	Esta Política será interpretada segundo a legislação da República Federativa do Brasil, especialmente a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), o Marco Civil da Internet (Lei nº 12.965/2014) e demais normas de proteção ao consumidor e regulação digital.
+8.4. 	Para dirimir eventuais dúvidas, controvérsias ou conflitos oriundos da presente Política, fica eleito o Foro da Comarca de Itupeva/SP, com renúncia expressa de qualquer outro, por mais privilegiado que seja ou venha a ser.
+Última atualização: [inserir data do início das atividades]
+Controladora: Myserv Ltda
+CNPJ: 61.376.362/0001-76
+Endereço: Rua Anambé, 619 – Parque Residencial Paraíso, Itupeva/SP
+E-mail para contato: suportemyserv@gmail.com.
