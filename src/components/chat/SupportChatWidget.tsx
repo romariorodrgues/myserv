@@ -35,6 +35,7 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
   const [chatDescription, setChatDescription] = useState('')
   const [showNewChatForm, setShowNewChatForm] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [isDesktop, setIsDesktop] = useState(false)
 
   // SEMPRE chamar o hook (sem condições)
   const {
@@ -60,6 +61,16 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
       console.debug('SupportChatWidget socket conectado:', socket.id)
     }
   }, [socket])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const handleResize = () => {
+      setIsDesktop(window.innerWidth >= 768)
+    }
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
 
   // Carregar chats quando abrir
   useEffect(() => {
@@ -247,6 +258,10 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
 
   // Se não estiver autenticado, não renderizar
   if (status !== 'authenticated' || !session?.user?.id) {
+    return null
+  }
+
+  if (!isDesktop) {
     return null
   }
 
