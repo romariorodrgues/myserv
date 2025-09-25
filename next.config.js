@@ -7,6 +7,7 @@ const cdnHost = (process.env.SPACES_PUBLIC_CDN_HOST || '').replace(/^https?:\/\/
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  output: 'standalone',
   images: {
     remotePatterns: [
       ...(cdnHost ? [{ protocol: 'https', hostname: cdnHost }] : []),
