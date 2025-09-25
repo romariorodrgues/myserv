@@ -181,6 +181,7 @@ model ServiceProviderService {
   isActive          Boolean         @default(true)
   offersScheduling  Boolean         @default(false)
   providesHomeService Boolean       @default(false)
+  providesLocalService Boolean      @default(true)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   service           Service         @relation(fields: [serviceId], references: [id])

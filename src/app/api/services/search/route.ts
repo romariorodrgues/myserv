@@ -91,6 +91,7 @@ const advancedSearchSchema = z.object({
   limit: z.number().default(20),
   homeService: z.boolean().optional(),
   freeTravel: z.boolean().optional(),
+  localService: z.boolean().optional(),
 })
 
 
@@ -126,6 +127,7 @@ const input = advancedSearchSchema.parse({
   hasScheduling: searchParams.get('hasScheduling') === 'true' ? true : undefined,
   homeService: searchParams.get('homeService') === 'true' ? true : undefined,
   freeTravel: searchParams.get('freeTravel') === 'true' ? true : undefined,
+  localService: searchParams.get('localService') === 'true' ? true : undefined,
 })
 
 let resolvedLat = typeof input.lat === 'number' && Number.isFinite(input.lat) ? input.lat : null
@@ -197,6 +199,7 @@ if (input.leafCategoryId) {
     if (input.minPrice != null) whereProvider.basePrice = { ...(whereProvider.basePrice as any || {}), gte: input.minPrice }
     if (input.maxPrice != null) whereProvider.basePrice = { ...(whereProvider.basePrice as any || {}), lte: input.maxPrice }
     if (input.hasScheduling) whereProvider.offersScheduling = true
+    if (input.localService) whereProvider.providesLocalService = true
 
     if (resolvedCity || resolvedState) {
   const cityVariants = resolvedCity
@@ -271,6 +274,7 @@ if (input.leafCategoryId) {
           description: p.description,
           offersScheduling: p.offersScheduling,
           providesHomeService: p.providesHomeService ?? false,
+          providesLocalService: p.providesLocalService ?? true,
         }))
       }))
 
@@ -318,6 +322,7 @@ if (input.leafCategoryId) {
           available: true,
           offersScheduling: p.offersScheduling,
           providesHomeService: p.providesHomeService ?? false,
+          providesLocalService: p.providesLocalService ?? true,
           travel: {
               chargesTravel: p.serviceProvider.chargesTravel,
               travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
@@ -345,6 +350,11 @@ if (input.leafCategoryId) {
           }
           if (p.providesHomeService) {
             entry.providesHomeService = true
+          }
+          if (p.providesLocalService === true) {
+            entry.providesLocalService = true
+          } else if (p.providesLocalService === false && entry.providesLocalService !== true) {
+            entry.providesLocalService = false
           }
           if (p.offersScheduling && !entry.offersScheduling) entry.offersScheduling = true
           if (!entry.travel) {
@@ -428,6 +438,10 @@ if (input.homeService) {
 
 if (input.freeTravel) {
   results = results.filter((r) => r.travel?.waivesTravelOnHire)
+}
+
+if (input.localService) {
+  results = results.filter((r) => r.providesLocalService !== false)
 }
 // --- Paginação dos providers "results" (lista achatada)
 const resultsTotal = results.length

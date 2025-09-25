@@ -269,6 +269,7 @@ export interface ServiceProviderService {
   isActive: boolean
   offersScheduling?: boolean
   providesHomeService?: boolean
+  providesLocalService?: boolean
   service: Service
 }
 

@@ -51,6 +51,7 @@ interface SearchResultProvider {
   available: boolean
   offersScheduling: boolean
   providesHomeService?: boolean
+  providesLocalService?: boolean
   travel?: {
     chargesTravel: boolean
     travelRatePerKm?: number | null
@@ -165,6 +166,7 @@ function PesquisaPage() {
       if (activeFilters.isHighlighted) params.set('isHighlighted', 'true')
       if (activeFilters.homeService) params.set('homeService', 'true')
       if (activeFilters.freeTravel) params.set('freeTravel', 'true')
+      if (activeFilters.localService) params.set('localService', 'true')
       if (activeFilters.sortBy && activeFilters.sortBy !== 'RELEVANCE') {
         params.set('sortBy', activeFilters.sortBy)
       }
@@ -802,6 +804,11 @@ function PesquisaPage() {
                         {provider.providesHomeService && (
                           <Badge variant="outline" className="border-brand-cyan text-brand-cyan">
                             Atendimento a domicílio
+                          </Badge>
+                        )}
+                        {provider.providesLocalService !== false && (
+                          <Badge variant="outline" className="border-blue-200 text-blue-700">
+                            Atendimento no local
                           </Badge>
                         )}
                         {provider.travel?.waivesTravelOnHire && (

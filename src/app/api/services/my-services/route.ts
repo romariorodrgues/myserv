@@ -70,6 +70,7 @@ export async function GET() {
         isActive: s.isActive,
         offersScheduling: s.offersScheduling,
         providesHomeService: s.providesHomeService,
+        providesLocalService: s.providesLocalService,
         category: s.service.category,
         categoryId: s.service.categoryId,
         allowScheduling: s.service.category?.allowScheduling ?? true,
@@ -92,6 +93,7 @@ const upsertSchema = z.object({
   isActive: z.boolean().optional(),
   offersScheduling: z.boolean().optional(),
   providesHomeService: z.boolean().optional(),
+  providesLocalService: z.boolean().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -153,6 +155,12 @@ export async function POST(req: NextRequest) {
     }
 
     // upsert do vínculo prestador x serviço (único por [serviceProviderId, serviceId])
+    const requestedHomeService = typeof input.providesHomeService === 'boolean' ? input.providesHomeService : undefined
+    const requestedLocalService = typeof input.providesLocalService === 'boolean' ? input.providesLocalService : undefined
+
+    const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
+    const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
+
     const link = await prisma.serviceProviderService.upsert({
       where: {
         serviceProviderId_serviceId: {
@@ -166,6 +174,8 @@ export async function POST(req: NextRequest) {
         description: input.description ?? null,
         isActive: input.isActive ?? true,
         offersScheduling: cat.allowScheduling && !!input.offersScheduling,
+        ...homeServiceData,
+        ...localServiceData,
       },
       create: {
         serviceProviderId: sp.id,
@@ -175,6 +185,8 @@ export async function POST(req: NextRequest) {
         description: input.description ?? null,
         isActive: input.isActive ?? true,
         offersScheduling: cat.allowScheduling && !!input.offersScheduling,
+        providesHomeService: requestedHomeService ?? false,
+        providesLocalService: requestedLocalService ?? true,
       },
       include: {
         service: { include: { category: { select: { id: true, name: true, icon: true, allowScheduling: true } } } }
@@ -196,6 +208,7 @@ export async function POST(req: NextRequest) {
         isActive: link.isActive,
         offersScheduling: link.offersScheduling,
         providesHomeService: link.providesHomeService,
+        providesLocalService: link.providesLocalService,
         category: link.service.category,
         categoryId: service.categoryId,
         allowScheduling: link.service.category.allowScheduling,
@@ -281,10 +294,11 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService } = await req.json()
+    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService, providesLocalService } = await req.json()
 
     const requestedScheduling = typeof offersScheduling === 'boolean' ? offersScheduling : undefined
     const requestedHomeService = typeof providesHomeService === 'boolean' ? providesHomeService : undefined
+    const requestedLocalService = typeof providesLocalService === 'boolean' ? providesLocalService : undefined
 
     const sps = await prisma.serviceProviderService.findUnique({
       where: { id: serviceProviderServiceId },
@@ -317,6 +331,7 @@ export async function PATCH(req: NextRequest) {
         offersScheduling: cat.allowScheduling ? (requestedScheduling ?? false) : false,
       }
       const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
+      const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
 
       const selectSvc = { id: true, categoryId: true } as const
       let target = await prisma.service.findFirst({ where: { categoryId: cat.id }, select: selectSvc })
@@ -340,6 +355,7 @@ export async function PATCH(req: NextRequest) {
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
               ...schedulingData,
               ...homeServiceData,
+              ...localServiceData,
             }
           })
           await prisma.serviceProviderService.delete({ where: { id: serviceProviderServiceId } })
@@ -354,12 +370,14 @@ export async function PATCH(req: NextRequest) {
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
               ...schedulingData,
               ...homeServiceData,
+              ...localServiceData,
             }
           })
         }
       } else {
         // mesma folha — apenas atualiza campos
         const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
+        const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
         await prisma.serviceProviderService.update({
           where: { id: serviceProviderServiceId },
           data: {
@@ -369,6 +387,7 @@ export async function PATCH(req: NextRequest) {
             ...(typeof isActive === 'boolean' ? { isActive } : {}),
             ...schedulingData,
             ...homeServiceData,
+            ...localServiceData,
           }
         })
       }
@@ -379,6 +398,7 @@ export async function PATCH(req: NextRequest) {
         ? (requestedScheduling !== undefined ? { offersScheduling: requestedScheduling } : {})
         : { offersScheduling: false }
       const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
+      const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
 
       await prisma.serviceProviderService.update({
         where: { id: serviceProviderServiceId },
@@ -389,6 +409,7 @@ export async function PATCH(req: NextRequest) {
           ...(typeof isActive === 'boolean' ? { isActive } : {}),
           ...schedulingData,
           ...homeServiceData,
+          ...localServiceData,
         }
       })
     }

@@ -37,6 +37,7 @@ interface ServicePrice {
   promotionalEndDate?: string
   offersScheduling?: boolean
   providesHomeService?: boolean
+  providesLocalService?: boolean
   allowScheduling?: boolean
   variations: Array<{
     id: string
@@ -111,6 +112,7 @@ const [newService, setNewService] = useState({
   isPromotional: false,
   offersScheduling: false,
   providesHomeService: false,
+  providesLocalService: true,
   // customUnit: '',
   promotionalPrice: 0,
   promotionalEndDate: '',
@@ -155,6 +157,7 @@ type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
           offersScheduling: s.offersScheduling ?? false,
           allowScheduling: s.category?.allowScheduling ?? true,
           providesHomeService: s.providesHomeService ?? false,
+          providesLocalService: s.providesLocalService ?? true,
           promotionalPrice: s.promotionalPrice ?? null,
           promotionalEndDate: s.promotionalEndDate ?? null,
           variations: s.variations ?? [],
@@ -205,6 +208,7 @@ const handleUpdateService = async (service: ServicePrice) => {
       isActive: service.isActive,
       offersScheduling: service.offersScheduling,
       providesHomeService: !!service.providesHomeService,
+      providesLocalService: service.providesLocalService,
     }
     if (service.categoryId && service.categoryId !== current?.categoryId) {
       body.leafCategoryId = service.categoryId
@@ -255,6 +259,7 @@ const handleUpdateService = async (service: ServicePrice) => {
         isActive: newService.isActive, // opcional
         offersScheduling: newService.offersScheduling,
         providesHomeService: newService.providesHomeService,
+        providesLocalService: newService.providesLocalService,
       }),
     });
 
@@ -264,7 +269,14 @@ const handleUpdateService = async (service: ServicePrice) => {
     await fetchServices();
     // limpa só os campos realmente usados
     setLeafCategoryId(null);
-    setNewService(prev => ({ ...prev, description: '', basePrice: 0, offersScheduling: false, providesHomeService: false } as any));
+    setNewService(prev => ({
+      ...prev,
+      description: '',
+      basePrice: 0,
+      offersScheduling: false,
+      providesHomeService: false,
+      providesLocalService: true,
+    } as any));
     setShowAddService(false);
     toast.success('Serviço adicionado com sucesso!');
   } catch (error) {
@@ -335,6 +347,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       isPromotional: false,
       offersScheduling: false,
       providesHomeService: false,
+      providesLocalService: true,
       // customUnit: '',
       promotionalPrice: 0,
       promotionalEndDate: '',
@@ -560,6 +573,18 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
 
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
+                    checked={newService.providesLocalService !== false}
+                    onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, providesLocalService: checked }))}
+                    className="shrink-0"
+                  />
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Atendimento no seu local</Label>
+                    <p className="text-xs text-gray-500 leading-relaxed">Indica que o cliente pode ir até o seu endereço ou estabelecimento.</p>
+                  </div>
+                </div>
+
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                  <Switch
                     checked={newService.isActive || false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, isActive: checked }))}
                     className="shrink-0"
@@ -638,6 +663,9 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                         )}
                         {service.providesHomeService && (
                           <Badge className="bg-brand-cyan/10 text-brand-cyan">Atende a domicílio</Badge>
+                        )}
+                        {service.providesLocalService !== false && (
+                          <Badge className="bg-blue-50 text-blue-800">Atendimento no local</Badge>
                         )}
                       </div>
                     </div>
@@ -953,6 +981,19 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
           <div>
             <Label>Atendimento a domicílio</Label>
             <p className="text-xs text-gray-500">Mostra aos clientes que você atende no endereço deles.</p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Switch
+            checked={editedService.providesLocalService !== false}
+            onCheckedChange={(checked: boolean) =>
+              setEditedService(prev => ({ ...prev, providesLocalService: checked }))
+            }
+          />
+          <div>
+            <Label>Atendimento no seu local</Label>
+            <p className="text-xs text-gray-500">O cliente pode ir até você para receber o serviço.</p>
           </div>
         </div>
 

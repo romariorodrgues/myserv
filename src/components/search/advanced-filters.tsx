@@ -23,6 +23,7 @@ export interface SearchFilters {
   isHighlighted?: boolean
   homeService?: boolean
   freeTravel?: boolean
+  localService?: boolean
   radius?: number
   latitude?: number
   longitude?: number
@@ -208,7 +209,18 @@ export function AdvancedSearchFilters({
 
         <div>
           <label className="mb-3 block text-sm font-medium text-gray-700">Atendimento</label>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <button
+              type="button"
+              onClick={() => onUpdate({ localService: filters.localService ? undefined : true })}
+              className={`rounded-md border px-3 py-2 text-sm transition-colors ${
+                filters.localService
+                  ? 'border-blue-400 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 bg-white hover:bg-gray-50'
+              }`}
+            >
+              Atendimento no local
+            </button>
             <button
               type="button"
               onClick={() => onUpdate({ homeService: filters.homeService ? undefined : true })}
