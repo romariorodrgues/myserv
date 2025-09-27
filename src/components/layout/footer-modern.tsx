@@ -143,7 +143,8 @@ export async function FooterModern() {
             <ul className="space-y-2 text-sm">
               <FooterLink href="/seja-profissional">Seja um profissional</FooterLink>
               <FooterLink href="/planos">Planos e taxas</FooterLink>
-              <FooterLink href="/termos-profissionais">Termos de uso</FooterLink>
+              <FooterLink href="/termos">Termos de uso</FooterLink>
+              <FooterLink href="/privacidade">Política de privacidade</FooterLink>
               <FooterLink href="/central-ajuda">Central de ajuda</FooterLink>
             </ul>
           </FooterSection>
