@@ -1,5 +1,6 @@
 import { getMercadoPagoConfig } from "@/lib/mercadopago";
 import { prisma } from "@/lib/prisma";
+import { getCurrentTermsVersion } from "@/lib/legal"
 import { PaymentMethod, PaymentStatus, UserTypeValues } from "@/types";
 import { Plan } from "@prisma/client";
 import { Payment } from "mercadopago";
@@ -96,6 +97,14 @@ export async function POST(request: NextRequest) {
         const pending = await prisma.pendingProviderRegistration.findUnique({ where: { id: pendingRegistrationId } })
 
         if (pending) {
+          const pendingExtras = (pending.extraData ?? {}) as Record<string, unknown>
+          const pendingTermsVersion = typeof pendingExtras.termsVersion === 'string' && pendingExtras.termsVersion.trim().length > 0
+            ? pendingExtras.termsVersion.trim()
+            : await getCurrentTermsVersion()
+          const pendingProfileImage = typeof pendingExtras.profileImagePath === 'string' && pendingExtras.profileImagePath.length > 0
+            ? pendingExtras.profileImagePath
+            : null
+
           const existingUser = await prisma.user.findFirst({
             where: {
               OR: [
@@ -109,6 +118,16 @@ export async function POST(request: NextRequest) {
           if (existingUser) {
             resolvedUserId = existingUser.id
             resolvedProviderId = existingUser.serviceProvider?.id
+
+            const updateData: Record<string, unknown> = {
+              termsAcceptedAt: new Date(),
+              termsVersion: pendingTermsVersion,
+            }
+            if (!existingUser.profileImage && pendingProfileImage) {
+              updateData.profileImage = pendingProfileImage
+            }
+
+            await prisma.user.update({ where: { id: existingUser.id }, data: updateData })
             await prisma.pendingProviderRegistration.delete({ where: { id: pending.id } })
           } else {
             const createdUser = await prisma.user.create({
@@ -123,6 +142,9 @@ export async function POST(request: NextRequest) {
                 gender: pending.gender,
                 maritalStatus: pending.maritalStatus,
                 dateOfBirth: pending.dateOfBirth,
+                profileImage: pendingProfileImage,
+                termsAcceptedAt: new Date(),
+                termsVersion: pendingTermsVersion,
               },
             })
 

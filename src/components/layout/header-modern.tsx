@@ -114,7 +114,7 @@ export function Header() {
     { href: '/pesquisa', label: 'Pesquisar' },
     { href: '/como-funciona', label: 'Como Funciona' },
     { href: '/seja-profissional', label: 'Seja um Profissional' },
-    { href: dashboardUrl, label: 'Dashboard' }
+    ...(isAuthenticated ? [{ href: dashboardUrl, label: 'Dashboard' }] : [])
   ]
 
   // Get user initials for avatar fallback
@@ -166,7 +166,9 @@ export function Header() {
               <MobileNavItem href="/pesquisa" icon={SearchIcon} onClick={() => setMobileOpen(false)}>Pesquisar</MobileNavItem>
               <MobileNavItem href="/como-funciona" icon={HelpCircle} onClick={() => setMobileOpen(false)}>Como Funciona</MobileNavItem>
               <MobileNavItem href="/seja-profissional" icon={Briefcase} onClick={() => setMobileOpen(false)}>Seja um Profissional</MobileNavItem>
-              <MobileNavItem href={dashboardUrl} icon={LayoutDashboard} onClick={() => setMobileOpen(false)}>Dashboard</MobileNavItem>
+              {isAuthenticated && (
+                <MobileNavItem href={dashboardUrl} icon={LayoutDashboard} onClick={() => setMobileOpen(false)}>Dashboard</MobileNavItem>
+              )}
               <div className="border-t border-gray-200 my-2"></div>
               {isAuthenticated ? (
                 <>

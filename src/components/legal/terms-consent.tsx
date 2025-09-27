@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
-import { CURRENT_TERMS_VERSION } from '@/constants/legal'
+import { DEFAULT_TERMS_VERSION } from '@/constants/legal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -12,14 +12,43 @@ export function TermsConsentPrompt() {
   const { data: session, update } = useSession()
   const [open, setOpen] = useState(false)
   const [accepting, setAccepting] = useState(false)
+  const [currentVersion, setCurrentVersion] = useState(DEFAULT_TERMS_VERSION)
+  const [versionLoaded, setVersionLoaded] = useState(false)
 
   useEffect(() => {
-    if (!session?.user?.id) return
-    const currentVersion = session.user.termsVersion || null
-    if (!currentVersion || currentVersion !== CURRENT_TERMS_VERSION) {
-      setOpen(true)
+    let isMounted = true
+    const loadVersion = async () => {
+      try {
+        const response = await fetch('/api/legal/summary', { cache: 'no-store' })
+        const payload = await response.json().catch(() => ({}))
+        if (isMounted && typeof payload.version === 'string' && payload.version.trim().length > 0) {
+          setCurrentVersion(payload.version)
+        }
+      } catch (error) {
+        console.error('[TermsConsentPrompt] failed to load current version', error)
+      } finally {
+        if (isMounted) {
+          setVersionLoaded(true)
+        }
+      }
     }
-  }, [session?.user?.termsVersion, session?.user?.id])
+
+    loadVersion()
+
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!versionLoaded || !session?.user?.id) return
+    const acceptedVersion = session.user.termsVersion || null
+    if (!acceptedVersion || acceptedVersion !== currentVersion) {
+      setOpen(true)
+    } else {
+      setOpen(false)
+    }
+  }, [currentVersion, session?.user?.termsVersion, session?.user?.id, versionLoaded])
 
   const handleAccept = async () => {
     try {
@@ -27,7 +56,7 @@ export function TermsConsentPrompt() {
       const response = await fetch('/api/users/accept-terms', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ version: CURRENT_TERMS_VERSION })
+        body: JSON.stringify({ version: currentVersion })
       })
       const result = await response.json().catch(() => ({}))
       if (!response.ok || !result.success) {
@@ -36,7 +65,7 @@ export function TermsConsentPrompt() {
       await update?.({
         user: {
           ...session?.user,
-          termsVersion: CURRENT_TERMS_VERSION,
+          termsVersion: currentVersion,
           termsAcceptedAt: new Date().toISOString(),
         },
       })
@@ -50,7 +79,7 @@ export function TermsConsentPrompt() {
     }
   }
 
-  if (!open) {
+  if (!open || !versionLoaded) {
     return null
   }
 

@@ -10,6 +10,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
@@ -29,6 +30,16 @@ export default function AdminSettingsPage() {
     planUnlockPrice: '4.90',
     planMonthlyPrice: '39.90',
   })
+  const [legalContent, setLegalContent] = useState({
+    terms: '',
+    privacy: '',
+    version: '',
+    termsUpdatedAt: '',
+    privacyUpdatedAt: '',
+  })
+  const [initialLegal, setInitialLegal] = useState({ terms: '', privacy: '' })
+  const [legalLoading, setLegalLoading] = useState(true)
+  const [savingLegal, setSavingLegal] = useState(false)
 
   useEffect(() => {
     // Carrega system settings para contatos
@@ -52,6 +63,34 @@ export default function AdminSettingsPage() {
     load()
   }, [])
 
+  useEffect(() => {
+    const loadLegal = async () => {
+      try {
+        setLegalLoading(true)
+        const res = await fetch('/api/admin/legal', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        setLegalContent({
+          terms: data.terms ?? '',
+          privacy: data.privacy ?? '',
+          version: data.version ?? '',
+          termsUpdatedAt: data.termsUpdatedAt ?? '',
+          privacyUpdatedAt: data.privacyUpdatedAt ?? '',
+        })
+        setInitialLegal({
+          terms: data.terms ?? '',
+          privacy: data.privacy ?? '',
+        })
+      } catch (error) {
+        console.error('Erro ao carregar textos legais', error)
+      } finally {
+        setLegalLoading(false)
+      }
+    }
+
+    loadLegal()
+  }, [])
+
   const handleSave = async () => {
     // Salva apenas contatos no endpoint de system-settings
     try {
@@ -71,9 +110,55 @@ export default function AdminSettingsPage() {
         })
       })
       alert('Configurações salvas com sucesso!')
-    } catch (e) {
+    } catch (error) {
       alert('Erro ao salvar configurações')
     }
+  }
+
+  const handleSaveLegal = async () => {
+    try {
+      setSavingLegal(true)
+      const response = await fetch('/api/admin/legal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          terms: legalContent.terms,
+          privacy: legalContent.privacy,
+        })
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        throw new Error(data?.error || 'Erro ao atualizar textos legais')
+      }
+
+      setLegalContent(prev => ({
+        ...prev,
+        version: data.version ?? prev.version,
+        termsUpdatedAt: data.termsUpdatedAt ?? prev.termsUpdatedAt,
+        privacyUpdatedAt: data.privacyUpdatedAt ?? prev.privacyUpdatedAt,
+      }))
+      setInitialLegal({
+        terms: legalContent.terms,
+        privacy: legalContent.privacy,
+      })
+      alert('Textos legais atualizados com sucesso!')
+    } catch (error) {
+      console.error('Erro ao atualizar textos legais', error)
+      alert('Erro ao atualizar textos legais')
+    } finally {
+      setSavingLegal(false)
+    }
+  }
+
+  const legalHasChanges =
+    legalContent.terms !== initialLegal.terms || legalContent.privacy !== initialLegal.privacy
+
+  const formatTimestamp = (value: string) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return date.toLocaleString('pt-BR')
   }
 
   return (
@@ -328,6 +413,63 @@ export default function AdminSettingsPage() {
                 <div>
                   <label className="block text-sm font-medium mb-1">Plano Mensal Profissional (R$)</label>
                   <Input value={settings.planMonthlyPrice} onChange={(e) => setSettings(p => ({...p, planMonthlyPrice: e.target.value}))} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Legal Documents */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Textos Legais</CardTitle>
+              <CardDescription>
+                Atualize os Termos de Uso e a Política de Privacidade exibidos na plataforma
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Termos de Uso</label>
+                    <span className="text-xs text-gray-500">
+                      {legalLoading ? 'Carregando...' : `Atualizado: ${formatTimestamp(legalContent.termsUpdatedAt)}`}
+                    </span>
+                  </div>
+                  <Textarea
+                    rows={10}
+                    value={legalContent.terms}
+                    onChange={(e) => setLegalContent(prev => ({ ...prev, terms: e.target.value }))}
+                    disabled={legalLoading || savingLegal}
+                    placeholder="Cole aqui os termos de uso vigentes"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">Política de Privacidade</label>
+                    <span className="text-xs text-gray-500">
+                      {legalLoading ? 'Carregando...' : `Atualizado: ${formatTimestamp(legalContent.privacyUpdatedAt)}`}
+                    </span>
+                  </div>
+                  <Textarea
+                    rows={10}
+                    value={legalContent.privacy}
+                    onChange={(e) => setLegalContent(prev => ({ ...prev, privacy: e.target.value }))}
+                    disabled={legalLoading || savingLegal}
+                    placeholder="Cole aqui a política de privacidade vigente"
+                  />
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  <span className="text-xs text-gray-500">
+                    {legalContent.version ? `Versão atual: ${legalContent.version}` : 'Versão atual: —'}
+                  </span>
+                  <Button
+                    onClick={handleSaveLegal}
+                    disabled={legalLoading || savingLegal || !legalHasChanges}
+                  >
+                    {savingLegal ? 'Salvando...' : 'Salvar textos legais'}
+                  </Button>
                 </div>
               </div>
             </CardContent>

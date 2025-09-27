@@ -5,10 +5,10 @@
 
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
-import { Calendar, Clock, MapPin, User, CheckCircle, XCircle, AlertCircle, Loader2, Phone, MessageCircle } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Calendar, Clock, User, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
@@ -39,16 +39,7 @@ export default function AgendaPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'pending' | 'completed'>('upcoming')
 
-  // Fetch appointments on component mount
-  useEffect(() => {
-    if (session?.user) {
-      fetchAppointments()
-    } else {
-      setLoading(false)
-    }
-  }, [session, filter])
-
-  const fetchAppointments = async () => {
+  const fetchAppointments = useCallback(async () => {
     try {
       const params = new URLSearchParams()
       if (filter === 'upcoming') {
@@ -73,7 +64,15 @@ export default function AgendaPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [filter])
+
+  useEffect(() => {
+    if (session?.user) {
+      fetchAppointments()
+    } else {
+      setLoading(false)
+    }
+  }, [session?.user, fetchAppointments])
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {

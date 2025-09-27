@@ -7,6 +7,7 @@
 
 import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
+import { promises as fs } from 'fs'
 
 const prisma = new PrismaClient()
 
@@ -15,7 +16,7 @@ async function main() {
 
   // Create admin user
   const adminPassword = await bcrypt.hash('admin123', 12)
-  const admin = await prisma.user.upsert({
+  await prisma.user.upsert({
     where: { email: 'admin@myserv.com' },
     update: {},
     create: {
@@ -203,8 +204,25 @@ await prisma.clientPrivacy.upsert({
     },
   })
 
+  const [termsContentRaw, privacyContentRaw] = await Promise.all([
+    fs.readFile('termodeuso', 'utf8').catch(() => ''),
+    fs.readFile('politicas', 'utf8').catch(() => ''),
+  ])
 
+  const legalEntries = [
+    { key: 'LEGAL_TERMS_OF_USE', value: termsContentRaw.trim() },
+    { key: 'LEGAL_PRIVACY_POLICY', value: privacyContentRaw.trim() },
+    { key: 'LEGAL_TERMS_VERSION', value: new Date().toISOString() },
+  ]
 
+  for (const entry of legalEntries) {
+    if (!entry.value) continue
+    await prisma.systemSettings.upsert({
+      where: { key: entry.key },
+      update: { value: entry.value },
+      create: { key: entry.key, value: entry.value },
+    })
+  }
 
   console.log('✅ Database seeding completed!')
   console.log('\n📧 Test users created:')

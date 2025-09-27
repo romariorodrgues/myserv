@@ -7,7 +7,8 @@ import { UserTypeValues, type UserType } from "@/types";
 import { isValidCPF, isValidCNPJ } from "@/utils";
 import { Preference } from "mercadopago";
 import { getMercadoPagoConfig } from "@/lib/mercadopago";
-import { CURRENT_TERMS_VERSION } from '@/constants/legal'
+import { getCurrentTermsVersion } from '@/lib/legal'
+import { parseImageDataUrl, saveProfileImage } from '@/lib/profile-image'
 
 const UserTypeArray = Object.values(UserTypeValues) as [
   UserType,
@@ -61,6 +62,7 @@ const registerSchema = z.object({
   acceptTerms: z.literal(true, {
     errorMap: () => ({ message: "Deve aceitar os termos" }),
   }),
+  profileImage: z.string().min(10, 'Foto de perfil obrigatória'),
   // Campos opcionais adicionais (principalmente para prestador)
   personType: z.enum(["PF","PJ"]).optional(),
   selectedPlan: z.enum(["FREE","PREMIUM"]).optional(),
@@ -86,7 +88,18 @@ export async function POST(request: NextRequest) {
 
     // Extração sem confirmPassword
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { confirmPassword: _, acceptTerms: __, ...validatedData } = fullData;
+    const { confirmPassword: _, acceptTerms: __, profileImage, ...validatedData } = fullData;
+
+    let profileImageBuffer: Buffer
+    try {
+      const parsedImage = parseImageDataUrl(profileImage)
+      profileImageBuffer = parsedImage.buffer
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Imagem de perfil inválida'
+      return NextResponse.json({ error: message }, { status: 400 })
+    }
+
+    let profileImagePath: string | null = null
 
     // Validação de CPF/CNPJ
     const isValidDocument =
@@ -117,6 +130,7 @@ export async function POST(request: NextRequest) {
 
     // Hash da senha
     const hashedPassword = await bcrypt.hash(validatedData.password, 12);
+    const currentTermsVersion = await getCurrentTermsVersion()
 
     // Prestador precisa escolher o plano no passo final
     if (
@@ -152,6 +166,10 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      if (!profileImagePath) {
+        profileImagePath = await saveProfileImage(profileImageBuffer)
+      }
+
       const personType =
         fullData.personType ||
         (fullData.cpfCnpj.replace(/\D/g, "").length > 11 ? "PJ" : "PF");
@@ -184,6 +202,8 @@ export async function POST(request: NextRequest) {
               : null,
           extraData: {
             selectedPlan: fullData.selectedPlan,
+            termsVersion: currentTermsVersion,
+            profileImagePath,
           },
         },
       });
@@ -281,6 +301,10 @@ export async function POST(request: NextRequest) {
 
     await ensureUserTermsColumns();
 
+    if (!profileImagePath) {
+      profileImagePath = await saveProfileImage(profileImageBuffer)
+    }
+
     try {
       user = await prisma.user.create({
         data: {
@@ -297,7 +321,8 @@ export async function POST(request: NextRequest) {
             ? new Date(validatedData.dateOfBirth)
             : null,
           termsAcceptedAt: new Date(),
-          termsVersion: CURRENT_TERMS_VERSION,
+          termsVersion: currentTermsVersion,
+          profileImage: profileImagePath,
         },
       });
     } catch (err) {
@@ -328,18 +353,6 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      await prisma.notification.create({
-        data: {
-          userId: user.id,
-          type: 'SYSTEM',
-          title: 'Adicione uma foto de perfil',
-          message: 'Adicionar uma foto aumenta suas chances de aprovação e gera mais confiança nos clientes.',
-          isRead: false,
-          data: {
-            kind: 'COMPLETE_PROFILE_PHOTO',
-          },
-        },
-      })
     }
 
     const { password: _password, ...userWithoutSensitiveData } = user;

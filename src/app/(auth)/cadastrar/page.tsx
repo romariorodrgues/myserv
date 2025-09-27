@@ -7,8 +7,9 @@
 
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Eye, EyeOff, Mail, Lock, User, Phone, FileText, IdCard } from 'lucide-react'
@@ -67,6 +68,10 @@ function RegisterPageContent() {
   const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM' | null>(null)
   const [planPrices, setPlanPrices] = useState({ unlock: '4.90', monthly: '39.90' })
   const [formError, setFormError] = useState<string | null>(null)
+  const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
+  const [profileImageDataUrl, setProfileImageDataUrl] = useState<string | null>(null)
+  const [profileImageError, setProfileImageError] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const planFeatures: Record<'FREE' | 'PREMIUM', string[]> = {
     FREE: [
       'Propostas ilimitadas',
@@ -80,6 +85,42 @@ function RegisterPageContent() {
       'Destaque na busca',
       'Relatórios básicos',
     ],
+  }
+
+  const handleProfileImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp']
+    if (!allowedTypes.includes(file.type)) {
+      setProfileImageError('Use uma imagem JPG, PNG ou WebP')
+      setProfileImagePreview(null)
+      setProfileImageDataUrl(null)
+      return
+    }
+
+    const maxSize = 5 * 1024 * 1024
+    if (file.size > maxSize) {
+      setProfileImageError('Imagem muito grande. Até 5MB')
+      setProfileImagePreview(null)
+      setProfileImageDataUrl(null)
+      return
+    }
+
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result as string
+      setProfileImagePreview(result)
+      setProfileImageDataUrl(result)
+      setProfileImageError(null)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const triggerProfileImageSelect = () => {
+    fileInputRef.current?.click()
   }
 
   useEffect(() => {
@@ -117,83 +158,96 @@ function RegisterPageContent() {
   }, [searchParams, step])
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault()
-  setFormError(null)
-  setIsLoading(true)
+    e.preventDefault()
+    setFormError(null)
+    setIsLoading(true)
 
-  const passwordInput = document.getElementById('password') as HTMLInputElement
-const confirmInput = document.getElementById('confirmPassword') as HTMLInputElement
+    const passwordInput = document.getElementById('password') as HTMLInputElement
+    const confirmInput = document.getElementById('confirmPassword') as HTMLInputElement
 
-if (passwordInput.value !== confirmInput.value) {
-  confirmInput.setCustomValidity('As senhas não coincidem')
-  confirmInput.reportValidity()
-  setIsLoading(false)
-  return
-} else {
-  confirmInput.setCustomValidity('') // limpa o erro se estiver tudo certo
-}
+    if (passwordInput.value !== confirmInput.value) {
+      confirmInput.setCustomValidity('As senhas não coincidem')
+      confirmInput.reportValidity()
+      setIsLoading(false)
+      return
+    } else {
+      confirmInput.setCustomValidity('')
+    }
 
-  try {
-    // Se for prestador, aplicamos o wizard de planos
-    if (formData.userType === 'SERVICE_PROVIDER') {
-      if (step === 1) {
-        // Regras CPF/CNPJ conforme tipo de pessoa
-        if (formData.personType === 'PF' && formData.cpfCnpj.replace(/\D/g,'').length < 11) {
-          setFormError('CPF obrigatório para pessoa física')
-          toast.error('Informe um CPF válido para continuar')
+    try {
+      if (formData.userType === 'SERVICE_PROVIDER') {
+        if (step === 1) {
+          if (formData.personType === 'PF' && formData.cpfCnpj.replace(/\D/g, '').length < 11) {
+            setFormError('CPF obrigatório para pessoa física')
+            toast.error('Informe um CPF válido para continuar')
+            setIsLoading(false)
+            return
+          }
+          if (formData.personType === 'PJ' && formData.cpfCnpj.replace(/\D/g, '').length < 14) {
+            setFormError('CNPJ obrigatório para pessoa jurídica')
+            toast.error('Informe um CNPJ válido para continuar')
+            setIsLoading(false)
+            return
+          }
+          setStep(2)
+          setSelectedPlan(formData.personType === 'PJ' ? 'PREMIUM' : 'FREE')
           setIsLoading(false)
           return
         }
-        if (formData.personType === 'PJ' && formData.cpfCnpj.replace(/\D/g,'').length < 14) {
-          setFormError('CNPJ obrigatório para pessoa jurídica')
-          toast.error('Informe um CNPJ válido para continuar')
-          setIsLoading(false)
-          return
-        }
-        setStep(2)
-        setSelectedPlan(formData.personType === 'PJ' ? 'PREMIUM' : 'FREE')
+      }
+
+      if (profileImageError) {
+        setFormError(profileImageError)
         setIsLoading(false)
         return
       }
+
+      if (!profileImageDataUrl) {
+        const message = 'Envie uma foto de perfil para continuar'
+        setProfileImageError(message)
+        setFormError(message)
+        setIsLoading(false)
+        return
+      }
+
+      const payload: Record<string, unknown> = {
+        ...formData,
+        phone: formData.phone.replace(/\D/g, ''),
+        cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
+        selectedPlan,
+        profileImage: profileImageDataUrl,
+      }
+
+      if (payload.selectedPlan == null) {
+        delete payload.selectedPlan
+      }
+
+      const response = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        const message = data.error || 'Erro ao registrar'
+        setFormError(message)
+        toast.error(message)
+      } else {
+        toast.success(data.message || 'Conta criada com sucesso!')
+        router.push('/entrar')
+      }
+    } catch (err) {
+      console.error('Erro de rede:', err)
+      setFormError('Erro de rede ao registrar. Tente novamente.')
+      toast.error('Erro de rede ao registrar. Tente novamente.')
+    } finally {
+      setIsLoading(false)
     }
-
-    const payload: any = {
-      ...formData,
-      phone: formData.phone.replace(/\D/g, ''),
-      cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
-      selectedPlan,
-    }
-
-    if (payload.selectedPlan == null) {
-      delete payload.selectedPlan
-    }
-
-    const response = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      const message = data.error || 'Erro ao registrar'
-      setFormError(message)
-      toast.error(message)
-    } else {
-      toast.success(data.message || 'Conta criada com sucesso!')
-      router.push('/entrar')
-    }
-  } catch (err) {
-    console.error('Erro de rede:', err)
-    setFormError('Erro de rede ao registrar. Tente novamente.')
-    toast.error('Erro de rede ao registrar. Tente novamente.')
-  } finally {
-    setIsLoading(false)
   }
-}
 
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -257,11 +311,26 @@ if (passwordInput.value !== confirmInput.value) {
     setIsLoading(true)
     setFormError(null)
     try {
+      if (profileImageError) {
+        setFormError(profileImageError)
+        setIsLoading(false)
+        return
+      }
+
+      if (!profileImageDataUrl) {
+        const message = 'Envie uma foto de perfil para continuar'
+        setProfileImageError(message)
+        setFormError(message)
+        setIsLoading(false)
+        return
+      }
+
       const payload: any = {
         ...formData,
         phone: formData.phone.replace(/\D/g, ''),
         cpfCnpj: formData.cpfCnpj.replace(/\D/g, ''),
         selectedPlan,
+        profileImage: profileImageDataUrl,
       }
 
       if (payload.selectedPlan == null) {
@@ -430,6 +499,47 @@ if (passwordInput.value !== confirmInput.value) {
                     <div className="text-sm text-gray-600">Oferecer serviços</div>
                   </div>
                 </label>
+              </div>
+            </div>
+
+            {/* Profile Photo */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-3">
+                Foto de perfil *
+              </label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleProfileImageSelect}
+              />
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div className="relative h-24 w-24 rounded-full overflow-hidden border-2 border-blue-100 bg-gray-100">
+                  {profileImagePreview ? (
+                    <Image
+                      src={profileImagePreview}
+                      alt="Pré-visualização da foto de perfil"
+                      fill
+                      sizes="96px"
+                      unoptimized
+                      className="object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-full w-full items-center justify-center bg-gray-200">
+                      <User className="w-10 h-10 text-gray-500" />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 text-sm text-gray-600 text-center sm:text-left">
+                  <p>Envie uma foto nítida do seu rosto. Formatos aceitos: JPG, PNG ou WebP (máx. 5MB).</p>
+                  {profileImageError && (
+                    <p className="text-xs text-red-600 mt-2">{profileImageError}</p>
+                  )}
+                </div>
+                <Button type="button" variant="outline" onClick={triggerProfileImageSelect}>
+                  {profileImagePreview ? 'Trocar foto' : 'Enviar foto'}
+                </Button>
               </div>
             </div>
 

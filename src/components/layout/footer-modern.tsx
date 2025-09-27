@@ -188,8 +188,21 @@ export async function FooterModern() {
           </FooterSection>
         </div>
       </div>
-      <div className="border-t border-white/10 py-4 text-center text-xs text-gray-300 bg-gradient-to-t from-brand-navy/80 to-transparent">
-        © {currentYear} MyServ. Todos os direitos reservados.
+      <div className="border-t border-white/10 py-4 bg-gradient-to-t from-brand-navy/80 to-transparent">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-3 text-xs text-gray-300">
+          <span>© {currentYear} MyServ. Todos os direitos reservados.</span>
+          <div className="flex items-center gap-4">
+            <Link href="/termos" className="hover:text-white transition-colors">
+              Termos de Uso
+            </Link>
+            <Link href="/privacidade" className="hover:text-white transition-colors">
+              Política de Privacidade
+            </Link>
+            <Link href="/cookies" className="hover:text-white transition-colors">
+              Política de Cookies
+            </Link>
+          </div>
+        </div>
       </div>
     </footer>
   )

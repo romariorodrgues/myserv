@@ -261,10 +261,6 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     return null
   }
 
-  if (!isDesktop) {
-    return null
-  }
-
   // Verificar tipo de usuário - só mostrar para CLIENTE e PRESTADOR, não para ADMIN
   const userType = (session.user as any)?.userType
   if (userType === 'ADMIN') {
@@ -278,8 +274,12 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
 
   // Botão flutuante
   if (!isOpen) {
+    const buttonPosition = isDesktop
+      ? 'bottom-6 right-6'
+      : 'bottom-24 right-4'
+
     return (
-      <div className="fixed bottom-6 right-6 z-50">
+      <div className={`fixed ${buttonPosition} z-50`}>
         <div className="relative">
           <Button
             onClick={() => setIsOpen(true)}
@@ -305,9 +305,15 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
 
   // Widget minimizado
   if (isMinimized) {
+    const minimizedPosition = isDesktop
+      ? 'bottom-6 right-6'
+      : 'bottom-24 right-4 left-4'
+
     return (
-      <div className="fixed bottom-6 right-6 z-50">
-        <Card className="w-80 shadow-xl border border-brand-cyan/20 bg-white/95 backdrop-blur-sm">
+      <div className={`fixed ${minimizedPosition} z-50`}>
+        <Card className={`shadow-xl border border-brand-cyan/20 bg-white/95 backdrop-blur-sm ${
+          isDesktop ? 'w-80' : 'w-full max-w-md mx-auto'
+        }`}>
           <CardHeader className="flex flex-row items-center justify-between pb-2 bg-gradient-to-r from-brand-navy to-brand-cyan text-white rounded-t-lg">
             <CardTitle className="text-sm font-medium">Chat de Suporte</CardTitle>
             <div className="flex gap-1">
@@ -335,9 +341,17 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
   }
 
   // Widget completo
+  const openPosition = isDesktop
+    ? 'bottom-6 right-6'
+    : 'bottom-24 right-4 left-4'
+
   return (
-    <div className="fixed bottom-6 right-6 z-50">
-      <Card className="w-96 h-[600px] shadow-2xl flex flex-col border border-brand-cyan/20 bg-white/95 backdrop-blur-sm">
+    <div className={`fixed ${openPosition} z-50`}>
+      <Card
+        className={`shadow-2xl flex flex-col border border-brand-cyan/20 bg-white/95 backdrop-blur-sm ${
+          isDesktop ? 'w-96 h-[600px]' : 'w-full max-w-md mx-auto h-[75vh]'
+        }`}
+      >
         <CardHeader className="flex flex-row items-center justify-between pb-2 bg-gradient-to-r from-brand-navy to-brand-cyan text-white rounded-t-lg">
           <CardTitle className="text-sm font-medium">
             {currentChat ? currentChat.title : 'Chat de Suporte'}

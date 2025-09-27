@@ -9,47 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import sharp from 'sharp'
-import { mkdir } from 'fs/promises'
-import { join } from 'path'
-import { existsSync } from 'fs'
-
-const UPLOAD_DIR = join(process.cwd(), 'public', 'uploads', 'profiles')
-const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
-const ALLOWED_TYPES = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
-
-// Ensure upload directory exists
-async function ensureUploadDir() {
-  if (!existsSync(UPLOAD_DIR)) {
-    await mkdir(UPLOAD_DIR, { recursive: true })
-  }
-}
-
-// Generate unique filename
-function generateFileName(originalName: string): string {
-  const timestamp = Date.now()
-  const random = Math.random().toString(36).substring(2, 15)
-  const ext = originalName.split('.').pop()?.toLowerCase() || 'jpg'
-  return `profile_${timestamp}_${random}.${ext}`
-}
-
-// Process and optimize image
-async function processImage(buffer: Buffer, filename: string): Promise<string> {
-  const outputPath = join(UPLOAD_DIR, filename)
-  
-  await sharp(buffer)
-    .resize(400, 400, {
-      fit: 'cover',
-      position: 'center'
-    })
-    .jpeg({
-      quality: 85,
-      progressive: true
-    })
-    .toFile(outputPath)
-  
-  return `/uploads/profiles/${filename}`
-}
+import { PROFILE_IMAGE_ALLOWED_MIME, PROFILE_IMAGE_MAX_SIZE, saveProfileImageFromFile } from '@/lib/profile-image'
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
+    if (!PROFILE_IMAGE_ALLOWED_MIME.has(file.type)) {
       return NextResponse.json({
         success: false,
         error: 'Tipo de arquivo não permitido. Use JPG, PNG ou WebP'
@@ -82,23 +42,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
+    if (file.size > PROFILE_IMAGE_MAX_SIZE) {
       return NextResponse.json({
         success: false,
         error: 'Arquivo muito grande. Máximo 5MB'
       }, { status: 400 })
     }
 
-    // Ensure upload directory exists
-    await ensureUploadDir()
-
-    // Convert file to buffer
-    const bytes = await file.arrayBuffer()
-    const buffer = Buffer.from(bytes)
-
-    // Generate filename and process image
-    const filename = generateFileName(file.name)
-    const imagePath = await processImage(buffer, filename)
+    const imagePath = await saveProfileImageFromFile(file)
 
     // Update user profile image in database
     const updatedUser = await prisma.user.update({
