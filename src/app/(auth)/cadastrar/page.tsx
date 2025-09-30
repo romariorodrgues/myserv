@@ -354,8 +354,20 @@ function RegisterPageContent() {
       }
 
       if (data.requiresPayment) {
+        if (!data.initPoint) {
+          console.error('Resposta de pagamento sem initPoint', data)
+          setFormError('Não foi possível gerar o link de pagamento. Tente novamente em instantes.')
+          toast.error('Não foi possível gerar o link de pagamento. Tente novamente em instantes.')
+          return
+        }
+
         toast.message('Redirecionando para o pagamento seguro do Mercado Pago...')
-        window.location.href = data.initPoint
+        try {
+          window.location.href = data.initPoint as string
+        } catch (locationError) {
+          console.error('Falha ao redirecionar para o pagamento', locationError)
+          window.open(data.initPoint as string, '_blank', 'noopener,noreferrer')
+        }
         return
       }
 

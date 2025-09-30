@@ -154,10 +154,16 @@ export async function POST(request: NextRequest) {
 
     // Fluxo específico para prestador com plano pago: criar registro pendente + preferência Mercado Pago
     if (validatedData.userType === UserTypeValues.SERVICE_PROVIDER && fullData.selectedPlan && fullData.selectedPlan !== 'FREE') {
+      console.info('[register] provider selected paid plan', {
+        email: validatedData.email,
+        plan: fullData.selectedPlan,
+        personType: fullData.personType,
+      })
       const mercadoPagoConfig = getMercadoPagoConfig();
 
       if (!mercadoPagoConfig) {
         console.error("Mercado Pago configuration missing while trying to create a paid provider registration preference");
+        console.info('[register] preference created', { preferenceId: id, pendingId: pending.id })
         return NextResponse.json(
           {
             error: "Configuração de pagamento indisponível. Entre em contato com o suporte.",
