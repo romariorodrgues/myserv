@@ -81,12 +81,16 @@ const advancedSearchSchema = z.object({
   state: z.string().optional(),
   minPrice: z.number().optional(),
   maxPrice: z.number().optional(),
+  rating: z.number().optional(),
+  availability: z.enum(['TODAY', 'THIS_WEEK']).optional(),
+  hasQuoting: z.boolean().optional(),
+  isHighlighted: z.boolean().optional(),
   // novos:
   lat: z.number().optional(),
   lng: z.number().optional(),
   radiusKm: z.number().default(30),
   hasScheduling: z.boolean().optional(),
-  sortBy: z.enum(['RELEVANCE', 'DISTANCE', 'PRICE_LOW', 'PRICE_HIGH', 'NEWEST']).default('RELEVANCE'),
+  sortBy: z.enum(['RELEVANCE', 'DISTANCE', 'PRICE_LOW', 'PRICE_HIGH', 'RATING', 'NEWEST']).default('RELEVANCE'),
   page: z.number().default(1),
   limit: z.number().default(20),
   homeService: z.boolean().optional(),
@@ -109,7 +113,14 @@ export async function GET(request: NextRequest) {
       else if (parts.length === 1) { cityFilter = parts[0] }
     }
 
-const input = advancedSearchSchema.parse({
+    const availabilityParam = searchParams.get('availability')
+    const ratingParam = searchParams.get('rating')
+    const hasQuotingParam = searchParams.get('hasQuoting')
+    const isHighlightedParam = searchParams.get('isHighlighted')
+    const parsedRating = ratingParam != null ? Number(ratingParam) : undefined
+    const ratingValue = parsedRating != null && Number.isFinite(parsedRating) ? parsedRating : undefined
+
+    const input = advancedSearchSchema.parse({
   q: searchParams.get('q') || undefined,
   leafCategoryId: searchParams.get('leafCategoryId') || undefined,
   categoryId: searchParams.get('categoryId') || undefined,
@@ -117,6 +128,10 @@ const input = advancedSearchSchema.parse({
   state: stateFilter || undefined,
   minPrice: searchParams.get('minPrice') ? parseFloat(searchParams.get('minPrice')!) : undefined,
   maxPrice: searchParams.get('maxPrice') ? parseFloat(searchParams.get('maxPrice')!) : undefined,
+  rating: ratingValue,
+  availability: availabilityParam === 'TODAY' || availabilityParam === 'THIS_WEEK' ? availabilityParam : undefined,
+  hasQuoting: hasQuotingParam === 'true' ? true : undefined,
+  isHighlighted: isHighlightedParam === 'true' ? true : undefined,
   sortBy: (searchParams.get('sortBy') as any) || 'RELEVANCE',
   page: searchParams.get('page') ? parseInt(searchParams.get('page')!) : 1,
   limit: searchParams.get('limit') ? parseInt(searchParams.get('limit')!) : 20,
@@ -201,14 +216,17 @@ if (input.leafCategoryId) {
     if (input.hasScheduling) whereProvider.offersScheduling = true
     if (input.localService) whereProvider.providesLocalService = true
 
-    if (resolvedCity || resolvedState) {
-  const cityVariants = resolvedCity
-    ? Array.from(new Set([resolvedCity, resolvedCity.toLowerCase(), resolvedCity.toUpperCase()]))
-    : null
+    const serviceProviderConditions: Prisma.ServiceProviderWhereInput = {}
 
-  whereProvider.serviceProvider = {
-    is: {
-      user: {
+    if (input.hasQuoting) serviceProviderConditions.hasQuoting = true
+    if (input.isHighlighted) serviceProviderConditions.isHighlighted = true
+
+    if (resolvedCity || resolvedState) {
+      const cityVariants = resolvedCity
+        ? Array.from(new Set([resolvedCity, resolvedCity.toLowerCase(), resolvedCity.toUpperCase()]))
+        : null
+
+      serviceProviderConditions.user = {
         is: {
           address: {
             is: {
@@ -216,13 +234,15 @@ if (input.leafCategoryId) {
                 ? { OR: cityVariants.map(v => ({ city: { contains: v } })) }
                 : {}),
               ...(resolvedStateFilter ? { state: { equals: resolvedStateFilter } } : {}),
-            }
-          }
-        }
+            },
+          },
+        },
       }
     }
-  }
-}
+
+    if (Object.keys(serviceProviderConditions).length > 0) {
+      whereProvider.serviceProvider = { is: serviceProviderConditions }
+    }
 
     // orderBy tipado (evita "any" quebrar inferência)
     const orderByService: Prisma.ServiceOrderByWithRelationInput | undefined =
@@ -249,6 +269,32 @@ if (input.leafCategoryId) {
       take: input.limit
     }) as ServiceWithRels[]
 
+    const providerUserIds = new Set<string>()
+    for (const svc of services) {
+      for (const provider of svc.providers) {
+        providerUserIds.add(provider.serviceProvider.user.id)
+      }
+    }
+
+    const ratingByUser = new Map<string, { average: number; count: number }>()
+    if (providerUserIds.size > 0) {
+      const reviewStats = await prisma.review.groupBy({
+        by: ['receiverId'],
+        where: { receiverId: { in: Array.from(providerUserIds) } },
+        _avg: { rating: true },
+        _count: { rating: true },
+      })
+
+      for (const stat of reviewStats) {
+        const count = stat._count.rating ?? 0
+        const average = Number(stat._avg.rating ?? 0)
+        ratingByUser.set(stat.receiverId, {
+          average: count > 0 ? Math.round(average * 10) / 10 : 0,
+          count,
+        })
+      }
+    }
+
     const totalCount = await prisma.service.count({
   where: {
     ...whereService,
@@ -265,17 +311,22 @@ if (input.leafCategoryId) {
         name: s.name,
         description: s.description,
         category: s.category, // { id, name, icon }
-        providers: s.providers.map((p) => ({
-          id: p.serviceProvider.id,
-          userId: p.serviceProvider.user.id,
-          name: p.serviceProvider.user.name,
-          profileImage: p.serviceProvider.user.profileImage,
-          basePrice: normalizeDecimal(p.basePrice) ?? 0,
-          description: p.description,
-          offersScheduling: p.offersScheduling,
-          providesHomeService: p.providesHomeService ?? false,
-          providesLocalService: p.providesLocalService ?? true,
-        }))
+        providers: s.providers.map((p) => {
+          const stats = ratingByUser.get(p.serviceProvider.user.id)
+          return {
+            id: p.serviceProvider.id,
+            userId: p.serviceProvider.user.id,
+            name: p.serviceProvider.user.name,
+            profileImage: p.serviceProvider.user.profileImage,
+            basePrice: normalizeDecimal(p.basePrice) ?? 0,
+            description: p.description,
+            offersScheduling: p.offersScheduling,
+            providesHomeService: p.providesHomeService ?? false,
+            providesLocalService: p.providesLocalService ?? true,
+            rating: stats?.average ?? 0,
+            reviewCount: stats?.count ?? 0,
+          }
+        }),
       }))
 
     // ordenação por preço (menor preço por service)
@@ -299,6 +350,9 @@ if (input.leafCategoryId) {
   (resolvedLat != null && resolvedLng != null && addr?.latitude != null && addr?.longitude != null)
     ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
     : undefined
+        const stats = ratingByUser.get(p.serviceProvider.user.id)
+        const averageRating = stats?.average ?? 0
+        const reviewsCount = stats?.count ?? 0
 
         const basePriceNumber = normalizeDecimal(p.basePrice)
         if (!providerMap.has(pid)) {
@@ -314,16 +368,16 @@ if (input.leafCategoryId) {
             longitude: addr?.longitude ?? null,
             services: [svc.name],
             category: svc.category.name,
-            rating: 0,
-            reviewCount: 0,
-          basePrice: basePriceNumber,
-          distance: dist,
-          serviceRadiusKm: providerRadius,
-          available: true,
-          offersScheduling: p.offersScheduling,
-          providesHomeService: p.providesHomeService ?? false,
-          providesLocalService: p.providesLocalService ?? true,
-          travel: {
+            rating: averageRating,
+            reviewCount: reviewsCount,
+            basePrice: basePriceNumber,
+            distance: dist,
+            serviceRadiusKm: providerRadius,
+            available: true,
+            offersScheduling: p.offersScheduling,
+            providesHomeService: p.providesHomeService ?? false,
+            providesLocalService: p.providesLocalService ?? true,
+            travel: {
               chargesTravel: p.serviceProvider.chargesTravel,
               travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
               travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
@@ -335,6 +389,8 @@ if (input.leafCategoryId) {
           const entry = providerMap.get(pid)
           if (!entry.services.includes(svc.name)) entry.services.push(svc.name)
           if (!entry.primaryServiceId) entry.primaryServiceId = p.serviceId
+          entry.rating = averageRating
+          entry.reviewCount = reviewsCount
           if (basePriceNumber != null) {
             entry.basePrice = entry.basePrice == null
               ? basePriceNumber
@@ -392,6 +448,18 @@ if (input.sortBy === 'PRICE_HIGH') {
   })
 }
 
+if (input.sortBy === 'RATING') {
+  results.sort((a, b) => {
+    const rb = b.rating ?? 0
+    const ra = a.rating ?? 0
+    if (rb !== ra) return rb - ra
+    const cb = b.reviewCount ?? 0
+    const ca = a.reviewCount ?? 0
+    if (cb !== ca) return cb - ca
+    return (b.basePrice ?? Number.POSITIVE_INFINITY) - (a.basePrice ?? Number.POSITIVE_INFINITY)
+  })
+}
+
 // se vieram coordenadas, filtra por raio e, se solicitado, ordena por distância
 if (resolvedLat != null && resolvedLng != null) {
   const effectiveRadius = Number.isFinite(radiusKm) ? radiusKm : null
@@ -442,6 +510,11 @@ if (input.freeTravel) {
 
 if (input.localService) {
   results = results.filter((r) => r.providesLocalService !== false)
+}
+
+if (input.rating != null && Number.isFinite(input.rating)) {
+  const minimumRating = input.rating
+  results = results.filter((r) => (r.rating ?? 0) >= minimumRating)
 }
 // --- Paginação dos providers "results" (lista achatada)
 const resultsTotal = results.length

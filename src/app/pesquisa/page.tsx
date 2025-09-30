@@ -736,6 +736,9 @@ function PesquisaPage() {
                 ? provider.basePrice
                 : null
               const showPrice = provider.offersScheduling && basePriceValue != null
+              const hasReviews = provider.reviewCount > 0
+              const ratingDisplay = hasReviews ? provider.rating.toFixed(1) : '—'
+              const reviewsDisplay = hasReviews ? `(${provider.reviewCount})` : 'Sem avaliações'
               return (
                 <Card key={provider.id} className="hover:shadow-lg transition-shadow">
                   <CardContent className="flex flex-col gap-4 p-6 md:flex-row">
@@ -767,8 +770,8 @@ function PesquisaPage() {
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 text-sm text-gray-600">
                             <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span>{provider.rating}</span>
-                            <span className="text-gray-400">({provider.reviewCount})</span>
+                            <span>{ratingDisplay}</span>
+                            <span className="text-gray-400">{reviewsDisplay}</span>
                           </div>
                           <Button
                             variant="ghost"

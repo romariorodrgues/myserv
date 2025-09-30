@@ -12,7 +12,6 @@ const mercadoPagoClient = new MercadoPagoConfig({
   accessToken: process.env.MERCADOPAGO_ACCESS_TOKEN!,
   options: {
     timeout: 5000,
-    idempotencyKey: 'abc'
   }
 })
 
@@ -39,6 +38,7 @@ export interface PaymentResponse {
   sandboxInitPoint?: string
   error?: string
   transactionId?: string
+  status?: string
 }
 
 export class PaymentService {
@@ -49,7 +49,11 @@ export class PaymentService {
   static async createMercadoPagoPreference(data: PaymentData): Promise<PaymentResponse> {
     try {
       const preference = new Preference(mercadoPagoClient)
-      
+
+      const sanitizedPhone = data.payerPhone ? data.payerPhone.replace(/[^0-9]/g, '') : undefined
+      const phoneAreaCode = sanitizedPhone && sanitizedPhone.length > 2 ? sanitizedPhone.slice(0, 2) : undefined
+      const phoneNumber = sanitizedPhone && sanitizedPhone.length > 2 ? sanitizedPhone.slice(2) : undefined
+
       const preferenceData = {
         items: [
           {
@@ -63,10 +67,12 @@ export class PaymentService {
         payer: {
           name: data.payerName,
           email: data.payerEmail,
-          phone: data.payerPhone ? {
-            area_code: data.payerPhone.substring(0, 2),
-            number: data.payerPhone.substring(2)
-          } : undefined,
+          phone: sanitizedPhone && phoneAreaCode && phoneNumber
+            ? {
+                area_code: phoneAreaCode,
+                number: phoneNumber
+              }
+            : undefined,
           identification: data.payerDocument ? {
             type: 'CPF',
             number: data.payerDocument
@@ -86,14 +92,15 @@ export class PaymentService {
         },
         metadata: data.metadata
       }
-      
+
       const response = await preference.create({ body: preferenceData })
 
       return {
         success: true,
         preferenceId: response.id,
         initPoint: response.init_point,
-        sandboxInitPoint: response.sandbox_init_point
+        sandboxInitPoint: response.sandbox_init_point,
+        status: 'pending'
       }
 
     } catch (error) {
@@ -115,6 +122,10 @@ export class PaymentService {
     payerEmail: string
     externalReference: string
     installments?: number
+    paymentMethodId: string
+    notificationUrl?: string
+    metadata?: Record<string, unknown>
+    idempotencyKey?: string
   }): Promise<PaymentResponse> {
     try {
       const payment = new Payment(mercadoPagoClient)
@@ -124,19 +135,25 @@ export class PaymentService {
         token: paymentData.token,
         description: paymentData.description,
         installments: paymentData.installments || 1,
-        payment_method_id: 'visa', // This should come from the token
+        payment_method_id: paymentData.paymentMethodId,
         payer: {
           email: paymentData.payerEmail
         },
-        external_reference: paymentData.externalReference
+        external_reference: paymentData.externalReference,
+        metadata: paymentData.metadata,
+        notification_url: paymentData.notificationUrl
       }
 
-      const response = await payment.create({ body: paymentRequest })
+      const response = await payment.create({
+        body: paymentRequest,
+        requestOptions: paymentData.idempotencyKey ? { idempotencyKey: paymentData.idempotencyKey } : undefined,
+      })
 
       return {
-        success: response.status === 'approved',
+        success: response.status !== 'rejected' && response.status !== 'cancelled',
         paymentId: response.id?.toString(),
-        transactionId: response.id?.toString()
+        transactionId: response.id?.toString(),
+        status: response.status
       }
 
     } catch (error) {

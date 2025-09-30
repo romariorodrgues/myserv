@@ -4,25 +4,33 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
 import { z } from 'zod'
 import { PaymentService } from '@/lib/payment-service'
 import { prisma } from '@/lib/prisma'
+import { authOptions } from '@/lib/auth'
+import { PaymentGateway, PaymentMethod, PaymentStatus } from '@/types'
 
 const createPaymentSchema = z.object({
   bookingId: z.string(),
   amount: z.number().positive(),
   gateway: z.enum(['mercadopago', 'pagarme']),
   paymentMethod: z.enum(['credit_card', 'debit_card', 'pix', 'boleto']).optional(),
+  paymentMethodId: z.string().optional(),
   installments: z.number().min(1).max(12).optional(),
   cardToken: z.string().optional()
 })
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { bookingId, amount, gateway, paymentMethod, installments, cardToken } = createPaymentSchema.parse(body)
+    const session = await getServerSession(authOptions)
+    if (!session?.user?.id) {
+      return NextResponse.json({ success: false, error: 'Não autenticado' }, { status: 401 })
+    }
 
-    // Get booking details
+    const body = await request.json()
+    const { bookingId, amount, gateway, paymentMethod, paymentMethodId, installments, cardToken } = createPaymentSchema.parse(body)
+
     const booking = await prisma.serviceRequest.findUnique({
       where: { id: bookingId },
       include: {
@@ -33,114 +41,168 @@ export async function POST(request: NextRequest) {
     })
 
     if (!booking) {
-      return NextResponse.json(
-        { success: false, error: 'Reserva não encontrada' },
-        { status: 404 }
-      )
+      return NextResponse.json({ success: false, error: 'Reserva não encontrada' }, { status: 404 })
     }
 
-    // Calculate fees
+    if (session.user.userType !== 'SERVICE_PROVIDER' || session.user.id !== booking.providerId) {
+      return NextResponse.json({ success: false, error: 'Somente prestadores podem pagar esta solicitação' }, { status: 403 })
+    }
+
+    if (gateway !== 'mercadopago') {
+      return NextResponse.json({ success: false, error: 'Gateway ainda não suportado' }, { status: 400 })
+    }
+
+    if (paymentMethod === 'credit_card' && cardToken && !paymentMethodId) {
+      return NextResponse.json({ success: false, error: 'paymentMethodId é obrigatório para pagamentos com cartão' }, { status: 400 })
+    }
+
+    const payerUser = booking.provider
+
     const fees = PaymentService.calculateFees(amount)
 
-    const paymentData = {
+    const metadata = {
+      booking: { id: booking.id },
+      payer: {
+        userId: session.user.id,
+        role: 'PROVIDER'
+      }
+    }
+
+    const basePaymentData = {
       amount: fees.finalAmount,
       description: `${booking.service.name} - MyServ`,
-      payerEmail: booking.client.email,
-      payerName: booking.client.name,
-      payerPhone: booking.client.phone,
-      payerDocument: booking.client.cpfCnpj,
+      payerEmail: payerUser.email,
+      payerName: payerUser.name,
+      payerPhone: payerUser.phone,
+      payerDocument: payerUser.cpfCnpj,
       externalReference: bookingId,
       notificationUrl: `${process.env.BASE_URL}/api/payments/webhook/booking`,
       successUrl: `${process.env.BASE_URL}/pagamento/sucesso?booking=${bookingId}`,
       failureUrl: `${process.env.BASE_URL}/pagamento/erro?booking=${bookingId}`,
       pendingUrl: `${process.env.BASE_URL}/pagamento/pendente?booking=${bookingId}`,
-      metadata: {
-        booking: {
-          id: booking.id
-        },
-        payer: {
-          userId: booking.provider.id
-        }
-      }
+      metadata
     }
+
+    const idempotencyKey = `booking-${bookingId}-${session.user.id}-${Date.now()}`
 
     let paymentResult
 
-    if (gateway === 'mercadopago') {
-      if (paymentMethod === 'credit_card' && cardToken) {
-        // Direct payment with credit card
-        paymentResult = await PaymentService.processMercadoPagoPayment({
-          token: cardToken,
-          amount: fees.finalAmount,
-          description: paymentData.description,
-          payerEmail: paymentData.payerEmail,
-          externalReference: paymentData.externalReference,
-          installments
-        })
-      } else {
-        // Create preference for checkout
-        paymentResult = await PaymentService.createMercadoPagoPreference(paymentData)
-      }
+    if (paymentMethod === 'credit_card' && cardToken) {
+      paymentResult = await PaymentService.processMercadoPagoPayment({
+        token: cardToken,
+        amount: fees.finalAmount,
+        description: basePaymentData.description,
+        payerEmail: basePaymentData.payerEmail,
+        externalReference: basePaymentData.externalReference,
+        installments,
+        paymentMethodId: paymentMethodId!,
+        notificationUrl: basePaymentData.notificationUrl,
+        metadata,
+        idempotencyKey
+      })
     } else {
-      paymentResult = await PaymentService.processPagarmePayment(paymentData)
+      paymentResult = await PaymentService.createMercadoPagoPreference(basePaymentData)
     }
 
     if (!paymentResult.success) {
-      return NextResponse.json(
-        { success: false, error: paymentResult.error },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: paymentResult.error }, { status: 400 })
     }
 
-    // Create payment record
-    // const payment = await prisma.payment.create({
-    //   data: {
-    //     userId: booking.clientId,
-    //     serviceRequestId: bookingId,
-    //     amount: fees.finalAmount,
-    //     gateway: gateway === 'mercadopago' ? 'MERCADO_PAGO' : 'PAGAR_ME',
-    //     paymentMethod: (paymentMethod === 'credit_card' ? 'CREDIT_CARD' : 
-    //                    paymentMethod === 'debit_card' ? 'DEBIT_CARD' :
-    //                    paymentMethod === 'pix' ? 'PIX' :
-    //                    paymentMethod === 'boleto' ? 'BOLETO' : 'CREDIT_CARD') as any,
-    //     gatewayPaymentId: paymentResult.paymentId || paymentResult.preferenceId || '',
-    //     status: paymentResult.paymentId ? 'APPROVED' : 'PENDING',
-    //     description: `Pagamento - ${booking.service.name}`
-    //   }
-    // })
+    const mapStatus = (status?: string): PaymentStatus => {
+      switch (status) {
+        case 'approved':
+          return PaymentStatus.APPROVED
+        case 'in_process':
+          return PaymentStatus.PROCESSING
+        case 'pending':
+        case 'pending_waiting_payment':
+        case 'pending_contingency':
+          return PaymentStatus.PENDING
+        case 'rejected':
+        case 'cancelled':
+          return PaymentStatus.REJECTED
+        default:
+          return PaymentStatus.PENDING
+      }
+    }
+
+    const mapMethod = (method?: string): string => {
+      switch (method) {
+        case 'credit_card':
+          return PaymentMethod.CREDIT_CARD
+        case 'debit_card':
+          return PaymentMethod.DEBIT_CARD
+        case 'pix':
+          return PaymentMethod.PIX
+        case 'boleto':
+          return PaymentMethod.BOLETO
+        default:
+          return 'CHECKOUT'
+      }
+    }
+
+    const resolvedGateway = gateway === 'mercadopago' ? PaymentGateway.MERCADO_PAGO : PaymentGateway.PAGAR_ME
+    const resolvedStatus = mapStatus(paymentResult.status)
+    const resolvedMethod = mapMethod(paymentMethod)
+
+    let paymentRecord = paymentResult.paymentId
+      ? await prisma.payment.findFirst({ where: { gatewayPaymentId: paymentResult.paymentId } })
+      : null
+
+    if (!paymentRecord) {
+      paymentRecord = await prisma.payment.findFirst({
+        where: {
+          serviceRequestId: bookingId,
+          userId: session.user.id,
+          gateway: resolvedGateway,
+          status: { in: [PaymentStatus.PENDING, PaymentStatus.PROCESSING] },
+          gatewayPaymentId: null
+        },
+        orderBy: { createdAt: 'desc' }
+      })
+    }
+
+    const paymentDataForDb = {
+      userId: session.user.id,
+      serviceRequestId: bookingId,
+      amount: fees.finalAmount,
+      currency: 'BRL',
+      paymentMethod: resolvedMethod,
+      gateway: resolvedGateway,
+      status: resolvedStatus,
+      description: `Pagamento - ${booking.service.name}`,
+      gatewayPaymentId: paymentResult.paymentId ?? paymentRecord?.gatewayPaymentId ?? null
+    }
+
+    if (paymentRecord) {
+      paymentRecord = await prisma.payment.update({ where: { id: paymentRecord.id }, data: paymentDataForDb })
+    } else {
+      paymentRecord = await prisma.payment.create({ data: paymentDataForDb })
+    }
 
     return NextResponse.json({
       success: true,
-      // payment: {
-      //   id: payment.id,
-      //   amount: payment.amount,
-      //   fees: {
-      //     commission: fees.commission,
-      //     schedulingFee: fees.schedulingFee,
-      //     total: fees.totalFees
-      //   }
-      // },
-      checkout: {
-        preferenceId: paymentResult.preferenceId,
-        initPoint: paymentResult.initPoint,
-        sandboxInitPoint: paymentResult.sandboxInitPoint
-      }
+      payment: {
+        id: paymentRecord.id,
+        status: paymentRecord.status
+      },
+      checkout: paymentResult.preferenceId
+        ? {
+            preferenceId: paymentResult.preferenceId,
+            initPoint: paymentResult.initPoint,
+            sandboxInitPoint: paymentResult.sandboxInitPoint
+          }
+        : undefined
     })
 
   } catch (error) {
     console.error('Payment creation error:', error)
-    
+
     if (error instanceof z.ZodError) {
-      return NextResponse.json(
-        { success: false, error: 'Dados inválidos', details: error.errors },
-        { status: 400 }
-      )
+      return NextResponse.json({ success: false, error: 'Dados inválidos', details: error.errors }, { status: 400 })
     }
 
-    return NextResponse.json(
-      { success: false, error: 'Erro interno do servidor' },
-      { status: 500 }
-    )
+    return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 })
   }
 }
 
