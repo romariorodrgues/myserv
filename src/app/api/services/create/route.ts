@@ -52,11 +52,36 @@ export async function POST(request: NextRequest) {
 
     // Busca o provider logado
     const provider = await prisma.serviceProvider.findFirst({
-      where: { userId: session.user.id }
+      where: { userId: session.user.id },
+      include: {
+        user: {
+          select: {
+            address: {
+              select: {
+                street: true,
+                number: true,
+                district: true,
+                city: true,
+                state: true,
+                zipCode: true,
+              },
+            },
+          },
+        },
+      },
     })
 
     if (!provider) {
       return NextResponse.json({ success: false, error: 'Prestador não encontrado' }, { status: 404 })
+    }
+
+    const address = provider.user?.address
+    const missingAddress = !address || !address.city || !address.state || !address.street || !address.number || !address.zipCode
+    if (missingAddress) {
+      return NextResponse.json({
+        success: false,
+        error: 'Cadastre seu endereço completo em Configurações antes de publicar serviços. Cidade, estado, rua, número e CEP são obrigatórios para aparecer nas buscas.',
+      }, { status: 400 })
     }
 
     // Cria o vínculo do serviço com o prestador
