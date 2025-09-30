@@ -339,7 +339,7 @@ if (input.leafCategoryId) {
     }
 
     // ---- flatten para a sua pesquisa/page.tsx (data.results)
-    const providerMap = new Map<string, any>()
+    const resultEntries: any[] = []
     for (const svc of services) {
       for (const p of svc.providers) {
         const pid = p.serviceProvider.id
@@ -347,89 +347,49 @@ if (input.leafCategoryId) {
         const loc = addr ? (addr.state ? `${addr.city}, ${addr.state}` : addr.city ?? '') : ''
         const providerRadius = p.serviceProvider.serviceRadiusKm ?? null
         const dist =
-  (resolvedLat != null && resolvedLng != null && addr?.latitude != null && addr?.longitude != null)
-    ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
-    : undefined
+          resolvedLat != null && resolvedLng != null && addr?.latitude != null && addr?.longitude != null
+            ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
+            : undefined
         const stats = ratingByUser.get(p.serviceProvider.user.id)
         const averageRating = stats?.average ?? 0
         const reviewsCount = stats?.count ?? 0
-
         const basePriceNumber = normalizeDecimal(p.basePrice)
-        if (!providerMap.has(pid)) {
-          providerMap.set(pid, {
-            id: pid,
-            name: p.serviceProvider.user.name,
-            profileImage: p.serviceProvider.user.profileImage || undefined,
-            primaryServiceId: p.serviceId,
-            location: loc,
-            city: addr?.city ?? null,
-            state: addr?.state ?? null,
-            latitude: addr?.latitude ?? null,
-            longitude: addr?.longitude ?? null,
-            services: [svc.name],
-            category: svc.category.name,
-            rating: averageRating,
-            reviewCount: reviewsCount,
-            basePrice: basePriceNumber,
-            distance: dist,
-            serviceRadiusKm: providerRadius,
-            available: true,
-            offersScheduling: p.offersScheduling,
-            providesHomeService: p.providesHomeService ?? false,
-            providesLocalService: p.providesLocalService ?? true,
-            travel: {
-              chargesTravel: p.serviceProvider.chargesTravel,
-              travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
-              travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
-              travelFixedFee: normalizeDecimal(p.serviceProvider.travelCost),
-              waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
-            },
-          })
-        } else {
-          const entry = providerMap.get(pid)
-          if (!entry.services.includes(svc.name)) entry.services.push(svc.name)
-          if (!entry.primaryServiceId) entry.primaryServiceId = p.serviceId
-          entry.rating = averageRating
-          entry.reviewCount = reviewsCount
-          if (basePriceNumber != null) {
-            entry.basePrice = entry.basePrice == null
-              ? basePriceNumber
-              : Math.min(entry.basePrice, basePriceNumber)
-          }
-          if (dist != null && (entry.distance == null || dist < entry.distance)) {
-            entry.distance = dist
-          }
-          if (providerRadius != null) {
-            entry.serviceRadiusKm = entry.serviceRadiusKm == null
-              ? providerRadius
-              : Math.min(entry.serviceRadiusKm, providerRadius)
-          }
-          if (p.providesHomeService) {
-            entry.providesHomeService = true
-          }
-          if (p.providesLocalService === true) {
-            entry.providesLocalService = true
-          } else if (p.providesLocalService === false && entry.providesLocalService !== true) {
-            entry.providesLocalService = false
-          }
-          if (p.offersScheduling && !entry.offersScheduling) entry.offersScheduling = true
-          if (!entry.travel) {
-            entry.travel = {
-              chargesTravel: p.serviceProvider.chargesTravel,
-              travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
-              travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
-              travelFixedFee: normalizeDecimal(p.serviceProvider.travelCost),
-              waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
-            }
-          }
-        }
+
+        resultEntries.push({
+          id: pid,
+          name: p.serviceProvider.user.name,
+          profileImage: p.serviceProvider.user.profileImage || undefined,
+          primaryServiceId: p.serviceId,
+          serviceId: svc.id,
+          serviceName: svc.name,
+          location: loc,
+          city: addr?.city ?? null,
+          state: addr?.state ?? null,
+          latitude: addr?.latitude ?? null,
+          longitude: addr?.longitude ?? null,
+          services: [svc.name],
+          category: svc.category.name,
+          rating: averageRating,
+          reviewCount: reviewsCount,
+          basePrice: basePriceNumber ?? null,
+          distance: dist,
+          serviceRadiusKm: providerRadius,
+          available: true,
+          offersScheduling: p.offersScheduling,
+          providesHomeService: p.providesHomeService ?? false,
+          providesLocalService: p.providesLocalService ?? true,
+          travel: {
+            chargesTravel: p.serviceProvider.chargesTravel,
+            travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
+            travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
+            travelFixedFee: normalizeDecimal(p.serviceProvider.travelCost),
+            waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
+          },
+        })
       }
     }
 
- let results = Array.from(providerMap.values()).map((entry) => ({
-  ...entry,
-  basePrice: entry.basePrice ?? null,
-}))
+    let results = resultEntries
 
 // ordenação por preço quando solicitado (fallback)
 if (input.sortBy === 'PRICE_LOW') {

@@ -37,6 +37,8 @@ interface SearchResultProvider {
   name: string
   profileImage?: string | null
   primaryServiceId?: string
+  serviceId?: string
+  serviceName?: string
   location: string
   city: string | null
   state: string | null
@@ -48,6 +50,7 @@ interface SearchResultProvider {
   reviewCount: number
   basePrice: number | null
   distance?: number
+  serviceRadiusKm?: number | null
   available: boolean
   offersScheduling: boolean
   providesHomeService?: boolean
@@ -536,7 +539,19 @@ function PesquisaPage() {
 
     const quote = travelQuotes[provider.id]
     if (quote) {
-      const total = provider.basePrice + quote.travelCost
+      const travelCost = quote.travelCost
+      const hasEstimatedTotal = typeof quote.estimatedTotal === 'number' && Number.isFinite(quote.estimatedTotal)
+      const fallbackTotal = !hasEstimatedTotal && provider.basePrice != null
+        ? provider.basePrice + travelCost
+        : null
+      const servicePortion = hasEstimatedTotal
+        ? Math.max((quote.estimatedTotal ?? 0) - travelCost, 0)
+        : provider.basePrice ?? null
+      const totalLabel = hasEstimatedTotal
+        ? `Serviço + deslocamento: ${formatCurrency(quote.estimatedTotal!)}`
+        : fallbackTotal != null
+          ? `Serviço + deslocamento: ${formatCurrency(fallbackTotal)}`
+          : `Custo de deslocamento: ${formatCurrency(travelCost)}`
       return (
         <div className="space-y-1 text-sm">
           {quote.distanceText ? (
@@ -545,7 +560,7 @@ function PesquisaPage() {
             <p className="text-gray-600">Distância estimada: {quote.distanceKm.toFixed(1)} km</p>
           ) : null}
           <p className="text-gray-600">
-            Deslocamento: <span className="font-medium text-brand-navy">{formatCurrency(quote.travelCost)}</span>
+            Deslocamento: <span className="font-medium text-brand-navy">{formatCurrency(travelCost)}</span>
           </p>
           {quote.travelCostBreakdown?.perKmPortion ? (
             <p className="text-xs text-gray-500">
@@ -553,9 +568,12 @@ function PesquisaPage() {
               {formatCurrency(quote.travelCostBreakdown.fixedFee)} de taxa fixa
             </p>
           ) : null}
-          <p className="text-gray-700 font-semibold">
-            Estimativa total: {formatCurrency(total)}
-          </p>
+          {servicePortion != null && servicePortion > 0 && (
+            <p className="text-xs text-gray-500">
+              {formatCurrency(servicePortion)} (serviço) + {formatCurrency(travelCost)} (deslocamento)
+            </p>
+          )}
+          <p className="text-gray-700 font-semibold">{totalLabel}</p>
           {quote.usedFallback && (
             <p className="text-xs text-amber-600">
               Distância calculada por aproximação. Confirme com o profissional.
@@ -727,6 +745,11 @@ function PesquisaPage() {
             </div>
 
             {providers.map((provider) => {
+              const cardKey = provider.primaryServiceId
+                ? `${provider.id}-${provider.primaryServiceId}`
+                : provider.serviceId
+                ? `${provider.id}-${provider.serviceId}`
+                : provider.id
               const favoriteActive = favorites.has(provider.id)
               const travelQuote = travelQuotes[provider.id]
               const displayDistanceValue = travelQuote?.distanceKm ?? provider.distance
@@ -740,7 +763,7 @@ function PesquisaPage() {
               const ratingDisplay = hasReviews ? provider.rating.toFixed(1) : '—'
               const reviewsDisplay = hasReviews ? `(${provider.reviewCount})` : 'Sem avaliações'
               return (
-                <Card key={provider.id} className="hover:shadow-lg transition-shadow">
+                <Card key={cardKey} className="hover:shadow-lg transition-shadow">
                   <CardContent className="flex flex-col gap-4 p-6 md:flex-row">
                     <div className="flex justify-center md:block">
                       <div className="relative h-20 w-20 overflow-hidden rounded-full border-2 border-brand-cyan/20 bg-brand-cyan/10">
@@ -762,10 +785,25 @@ function PesquisaPage() {
 
                     <div className="flex-1 space-y-3">
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                        <div>
+                        <div className="space-y-1">
                           <h3 className="text-lg font-semibold text-brand-navy">{provider.name}</h3>
                           <p className="text-sm text-gray-600">{provider.category}</p>
-                          <p className="text-xs text-gray-500">{provider.services.join(', ')}</p>
+                          {provider.serviceName && (
+                            <p className="text-sm font-medium text-brand-navy/80">{provider.serviceName}</p>
+                          )}
+                          {provider.services.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-2">
+                              {provider.services.map((serviceName) => (
+                                <Badge
+                                  key={`${provider.id}-${serviceName}`}
+                                  variant="secondary"
+                                  className="bg-brand-cyan/10 text-brand-cyan border-brand-cyan/20"
+                                >
+                                  {serviceName}
+                                </Badge>
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="flex items-center gap-1 text-sm text-gray-600">
