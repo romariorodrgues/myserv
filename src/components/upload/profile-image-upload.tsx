@@ -121,6 +121,7 @@ export function ProfileImageUpload({
   }
 
   const isBlobPreview = preview?.startsWith('blob:') || preview?.startsWith('data:')
+  const isLocalPreview = preview?.startsWith('/')
 
   return (
     <div className={className}>
@@ -144,7 +145,7 @@ export function ProfileImageUpload({
                   fill
                   sizes="128px"
                   quality={95}
-                  unoptimized={isBlobPreview}
+                  unoptimized={isBlobPreview || isLocalPreview}
                   className="object-cover"
                 />
               ) : (
@@ -337,6 +338,7 @@ export function ProfileImageUploadCompact({
   }
 
   const compactBlobPreview = preview?.startsWith('blob:') || preview?.startsWith('data:')
+  const compactLocalPreview = preview?.startsWith('/')
 
   return (
     <div className={className}>
@@ -358,7 +360,7 @@ export function ProfileImageUploadCompact({
                 fill
                 sizes="64px"
                 quality={95}
-                unoptimized={compactBlobPreview}
+                unoptimized={compactBlobPreview || compactLocalPreview}
                 className="object-cover"
               />
             ) : (
