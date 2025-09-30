@@ -230,20 +230,25 @@ export function ProfileImageUpload({
             try {
               setUploading(true)
               const blob = await getCroppedImg(cropSrc, pixels)
-              const pres = await fetch('/api/uploads/avatar/presign', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mime: 'image/jpeg', filename: 'avatar.jpg' }) })
-              if (pres.ok) {
-                const { data } = await pres.json()
-                const form = new FormData()
-                Object.entries(data.fields || {}).forEach(([k, v]) => form.append(k, String(v)))
-                form.append('file', blob, 'avatar.jpg')
-                const uploadRes = await fetch(data.url, { method: 'POST', body: form })
-                if (!uploadRes.ok) throw new Error('Falha ao enviar para Spaces')
-                await fetch('/api/users/me', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ profileImageKey: data.key }) })
-                const host = (data.cdnHost || '').replace(/^https?:\/\//, '')
-                const absolute = host ? `https://${host}/${data.key}` : data.key
-                setPreview(absolute)
-                onImageUpdate?.(absolute)
+              const file = blob instanceof File ? blob : new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+              const formData = new FormData()
+              formData.append('image', file, 'avatar.jpg')
+
+              const uploadRes = await fetch('/api/upload/profile-image', {
+                method: 'POST',
+                body: formData,
+              })
+
+              const payload = await uploadRes.json().catch(() => ({}))
+              const imagePath = payload?.data?.imagePath as string | undefined
+
+              if (!uploadRes.ok || !payload?.success || !imagePath) {
+                throw new Error(payload?.error || 'Erro ao enviar imagem')
               }
+
+              const resolved = cdnImageUrl(imagePath)
+              setPreview(resolved)
+              onImageUpdate?.(imagePath)
             } catch (e: any) {
               setError(e?.message || 'Erro ao enviar imagem')
             } finally {
@@ -402,40 +407,25 @@ export function ProfileImageUploadCompact({
             try {
               setUploading(true)
               const blob = await getCroppedImg(cropSrc, pixels)
-              const presignRes = await fetch('/api/uploads/avatar/presign', {
+              const file = blob instanceof File ? blob : new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+              const formData = new FormData()
+              formData.append('image', file, 'avatar.jpg')
+
+              const uploadRes = await fetch('/api/upload/profile-image', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ mime: 'image/jpeg', filename: 'avatar.jpg' })
+                body: formData,
               })
 
-              if (!presignRes.ok) {
-                throw new Error('Falha ao gerar URL de upload')
+              const payload = await uploadRes.json().catch(() => ({}))
+              const imagePath = payload?.data?.imagePath as string | undefined
+
+              if (!uploadRes.ok || !payload?.success || !imagePath) {
+                throw new Error(payload?.error || 'Erro ao fazer upload')
               }
 
-              const { data } = await presignRes.json()
-              const form = new FormData()
-              Object.entries(data.fields || {}).forEach(([key, value]) => form.append(key, String(value)))
-              form.append('file', blob, 'avatar.jpg')
-
-              const uploadRes = await fetch(data.url, { method: 'POST', body: form })
-              if (!uploadRes.ok) {
-                throw new Error('Falha ao enviar imagem')
-              }
-
-              const updateRes = await fetch('/api/users/me', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ profileImageKey: data.key })
-              })
-
-              if (!updateRes.ok) {
-                throw new Error('Erro ao atualizar perfil')
-              }
-
-              const host = (data.cdnHost || '').replace(/^https?:\/\//, '')
-              const absolute = host ? `https://${host}/${data.key}` : data.key
-              setPreview(absolute)
-              onImageUpdate?.(absolute)
+              const resolved = cdnImageUrl(imagePath)
+              setPreview(resolved)
+              onImageUpdate?.(imagePath)
               setError('')
             } catch (err: any) {
               console.error('Compact crop upload error:', err)
