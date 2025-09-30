@@ -205,21 +205,29 @@ if (input.leafCategoryId) {
     if (input.isHighlighted) serviceProviderConditions.isHighlighted = true
 
     if (resolvedCity || resolvedState) {
-      const cityVariants = resolvedCity
-        ? Array.from(new Set([resolvedCity, resolvedCity.toLowerCase(), resolvedCity.toUpperCase()]))
-        : null
+      const addressFilters: Prisma.AddressWhereInput = {}
+      if (resolvedStateFilter) {
+        addressFilters.state = { equals: resolvedStateFilter }
+      }
 
-      serviceProviderConditions.user = {
-        is: {
-          address: {
-            is: {
-              ...(cityVariants
-                ? { OR: cityVariants.map(v => ({ city: { contains: v } })) }
-                : {}),
-              ...(resolvedStateFilter ? { state: { equals: resolvedStateFilter } } : {}),
+      const cityHasDiacritics = resolvedCity ? /[^\u0000-\u007F]/.test(resolvedCity) : false
+      if (resolvedCity && cityHasDiacritics) {
+        const cityVariants = Array.from(new Set([
+          resolvedCity,
+          resolvedCity.toLowerCase(),
+          resolvedCity.toUpperCase(),
+        ]))
+        addressFilters.OR = cityVariants.map((v) => ({ city: { contains: v } }))
+      }
+
+      if (Object.keys(addressFilters).length > 0) {
+        serviceProviderConditions.user = {
+          is: {
+            address: {
+              is: addressFilters,
             },
           },
-        },
+        }
       }
     }
 
@@ -451,6 +459,17 @@ if (input.localService) {
 if (input.rating != null && Number.isFinite(input.rating)) {
   const minimumRating = input.rating
   results = results.filter((r) => (r.rating ?? 0) >= minimumRating)
+}
+
+if ((resolvedLat == null || resolvedLng == null) && normalizedCity) {
+  results = results.filter((r) => {
+    const providerCity = r.city ?? (typeof r.location === 'string' ? r.location.split(',')[0] : null)
+    const cityMatch = normalize(providerCity) === normalizedCity
+    if (!cityMatch) return false
+    if (!normalizedState) return true
+    const providerState = r.state ?? (typeof r.location === 'string' ? r.location.split(',')[1]?.trim() : null)
+    return normalize(providerState) === normalizedState
+  })
 }
 // --- Paginação dos providers "results" (lista achatada)
 const resultsTotal = results.length

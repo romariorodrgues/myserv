@@ -282,17 +282,12 @@ function PesquisaPage() {
   }
 
   const handleResetFilters = async () => {
-    const preservedLocation: Partial<SearchFilters> = {
-      city: filters.city,
-      state: filters.state,
-      latitude: filters.latitude,
-      longitude: filters.longitude,
-    }
     const next: SearchFilters = {
       ...DEFAULT_FILTERS,
-      ...preservedLocation,
       sortBy: filters.sortBy,
     }
+    setLocationInput('')
+    setAppliedLocationLabel('')
     setFilters(next)
     clearScheduledSearch()
     setCurrentPage(1)

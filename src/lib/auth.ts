@@ -81,6 +81,35 @@ export const authOptions: NextAuthOptions = {
         ;(token as any).deactivatedAt = (user as any).deactivatedAt
       }
 
+      if (!user && token.sub) {
+        const shouldRefreshStatus =
+          token.userType === 'SERVICE_PROVIDER' &&
+          (!token.isApproved || typeof (token as any).statusLastChecked !== 'number' || Date.now() - Number((token as any).statusLastChecked) > 60 * 1000)
+
+        if (shouldRefreshStatus) {
+          try {
+            const fresh = await prisma.user.findUnique({
+              where: { id: token.sub },
+              select: {
+                isApproved: true,
+                isActive: true,
+                profileImage: true,
+                address: true,
+              },
+            })
+            ;(token as any).statusLastChecked = Date.now()
+            if (fresh) {
+              token.isApproved = fresh.isApproved
+              token.isActive = fresh.isActive
+              token.profileImage = fresh.profileImage
+              token.address = fresh.address
+            }
+          } catch (statusError) {
+            console.error('[auth][jwt] status refresh error', statusError)
+          }
+        }
+      }
+
       if (trigger === 'update' && session?.user) {
         const updatedUser = session.user as typeof session.user & {
           isActive?: boolean
@@ -150,7 +179,7 @@ export const authOptions: NextAuthOptions = {
             }
           })
         }
-      } catch (e) {
+      } catch {
         // silencioso
       }
     }
