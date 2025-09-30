@@ -125,9 +125,36 @@ await prisma.clientPrivacy.upsert({
     select: { id: true, name: true },
   })
 
+  const serviceCustomConfig: Record<string, {
+    basePrice?: number
+    offersScheduling?: boolean
+    providesHomeService?: boolean
+    providesLocalService?: boolean
+  }> = {
+    'Diarista/Limpeza de casa': {
+      basePrice: 160,
+      offersScheduling: true,
+      providesHomeService: true,
+      providesLocalService: true,
+    },
+    'Lavanderia/Limpeza de roupas': {
+      basePrice: 95,
+      offersScheduling: false,
+      providesHomeService: false,
+      providesLocalService: true,
+    },
+    'Manicure/Pedicure': {
+      basePrice: 80,
+      offersScheduling: true,
+      providesHomeService: true,
+      providesLocalService: false,
+    },
+  }
+
   // Create ServiceProviderService relationships
   for (const svc of servicesToAttach) {
-    const basePrice = svc.name.includes('Manicure') ? 80.0 : 150.0
+    const config = serviceCustomConfig[svc.name] ?? {}
+    const basePrice = config.basePrice ?? (svc.name.includes('Manicure') ? 80.0 : 150.0)
     await prisma.serviceProviderService.upsert({
       where: {
         serviceProviderId_serviceId: {
@@ -135,7 +162,12 @@ await prisma.clientPrivacy.upsert({
           serviceId: svc.id,
         },
       },
-      update: {},
+      update: {
+        basePrice,
+        offersScheduling: config.offersScheduling ?? false,
+        providesHomeService: config.providesHomeService ?? false,
+        providesLocalService: config.providesLocalService ?? true,
+      },
       create: {
         serviceProviderId: serviceProvider.id,
         serviceId: svc.id,
@@ -143,6 +175,112 @@ await prisma.clientPrivacy.upsert({
         unit: 'FIXED',
         description: `Atendimento para ${svc.name.toLowerCase()}`,
         isActive: true,
+        offersScheduling: config.offersScheduling ?? false,
+        providesHomeService: config.providesHomeService ?? false,
+        providesLocalService: config.providesLocalService ?? true,
+      },
+    })
+  }
+
+  // Additional provider to enrich search scenarios
+  const provider2Password = await bcrypt.hash('provedor123', 12)
+  const provider2 = await prisma.user.upsert({
+    where: { email: 'provedor2@teste.com' },
+    update: {},
+    create: {
+      email: 'provedor2@teste.com',
+      name: 'João Prestador',
+      phone: '(11) 98888-0000',
+      cpfCnpj: '33333333333',
+      password: provider2Password,
+      userType: 'PROVIDER',
+      isActive: true,
+      isApproved: true,
+    },
+  })
+
+  const provider2Profile = await prisma.serviceProvider.upsert({
+    where: { userId: provider2.id },
+    update: {},
+    create: {
+      userId: provider2.id,
+      hasScheduling: true,
+      hasQuoting: true,
+      chargesTravel: false,
+      waivesTravelOnHire: true,
+      serviceRadiusKm: 25,
+      travelRatePerKm: 3.5,
+      travelMinimumFee: 15,
+    },
+  })
+
+  await prisma.address.upsert({
+    where: { userId: provider2.id },
+    update: {},
+    create: {
+      userId: provider2.id,
+      street: 'Rua dos Prestadores',
+      number: '789',
+      district: 'Jardins',
+      city: 'São Paulo',
+      state: 'SP',
+      zipCode: '01415-000',
+      latitude: -23.570302,
+      longitude: -46.644845,
+    },
+  })
+
+  const serviceByName = new Map(servicesToAttach.map((svc) => [svc.name, svc]))
+
+  const provider2Assignments: Array<{
+    name: typeof targetServiceNames[number]
+    basePrice: number
+    offersScheduling?: boolean
+    providesHomeService?: boolean
+    providesLocalService?: boolean
+  }> = [
+    {
+      name: 'Diarista/Limpeza de casa',
+      basePrice: 140,
+      offersScheduling: true,
+      providesHomeService: true,
+      providesLocalService: true,
+    },
+    {
+      name: 'Lavanderia/Limpeza de roupas',
+      basePrice: 70,
+      offersScheduling: false,
+      providesHomeService: false,
+      providesLocalService: true,
+    },
+  ]
+
+  for (const assignment of provider2Assignments) {
+    const svc = serviceByName.get(assignment.name)
+    if (!svc) continue
+    await prisma.serviceProviderService.upsert({
+      where: {
+        serviceProviderId_serviceId: {
+          serviceProviderId: provider2Profile.id,
+          serviceId: svc.id,
+        },
+      },
+      update: {
+        basePrice: assignment.basePrice,
+        offersScheduling: assignment.offersScheduling ?? false,
+        providesHomeService: assignment.providesHomeService ?? false,
+        providesLocalService: assignment.providesLocalService ?? true,
+      },
+      create: {
+        serviceProviderId: provider2Profile.id,
+        serviceId: svc.id,
+        basePrice: assignment.basePrice,
+        unit: 'FIXED',
+        description: `Serviço especializado de ${assignment.name.toLowerCase()}`,
+        isActive: true,
+        offersScheduling: assignment.offersScheduling ?? false,
+        providesHomeService: assignment.providesHomeService ?? false,
+        providesLocalService: assignment.providesLocalService ?? true,
       },
     })
   }

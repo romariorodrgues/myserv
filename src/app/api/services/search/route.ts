@@ -56,22 +56,6 @@ async function getDescendantLeafIds(rootId: string): Promise<string[]> {
   return Array.from(new Set(leaves))
 }
 
-// Tipagem forte do retorno com relações
-type ServiceWithRels = Prisma.ServiceGetPayload<{
-  include: {
-    category: { select: { id: true; name: true; icon: true } }
-    providers: {
-      include: {
-        serviceProvider: {
-          include: {
-            user: { select: { id: true; name: true; profileImage: true; address: true } }
-          }
-        }
-      }
-    }
-  }
-}>
-
 // Validation schema
 const advancedSearchSchema = z.object({
   q: z.string().optional(),
@@ -206,8 +190,7 @@ if (input.leafCategoryId) {
 }
 
 
-    // paginação
-    const skip = (input.page - 1) * input.limit
+    const effectiveLimit = Math.max(1, input.limit)
 
     // filtros em providers
     const whereProvider: Prisma.ServiceProviderServiceWhereInput = { isActive: true }
@@ -244,36 +227,52 @@ if (input.leafCategoryId) {
       whereProvider.serviceProvider = { is: serviceProviderConditions }
     }
 
-    // orderBy tipado (evita "any" quebrar inferência)
-    const orderByService: Prisma.ServiceOrderByWithRelationInput | undefined =
-      input.sortBy === 'NEWEST' ? { createdAt: 'desc' } : undefined
+    const serviceProviderServiceWhere: Prisma.ServiceProviderServiceWhereInput = {
+      ...whereProvider,
+      service: { is: whereService },
+    }
 
-    // consulta (tipada) — note o "as const" para preservar include literal
-    const services = await prisma.service.findMany({
-      where: whereService,
+    const providerServices = await prisma.serviceProviderService.findMany({
+      where: serviceProviderServiceWhere,
       include: {
-        category: { select: { id: true, name: true, icon: true } },
-        providers: {
-          where: whereProvider,
-          include: {
-            serviceProvider: {
-              include: {
-                user: { select: { id: true, name: true, profileImage: true, address: true } }
-              }
-            }
-          }
-        }
-      } as const,
-      orderBy: orderByService,
-      skip,
-      take: input.limit
-    }) as ServiceWithRels[]
+        service: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            createdAt: true,
+            category: { select: { id: true, name: true, icon: true } },
+          },
+        },
+        serviceProvider: {
+          select: {
+            id: true,
+            serviceRadiusKm: true,
+            chargesTravel: true,
+            travelRatePerKm: true,
+            travelMinimumFee: true,
+            travelCost: true,
+            waivesTravelOnHire: true,
+            hasScheduling: true,
+            hasQuoting: true,
+            isHighlighted: true,
+            createdAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                profileImage: true,
+                address: true,
+              },
+            },
+          },
+        },
+      },
+    })
 
     const providerUserIds = new Set<string>()
-    for (const svc of services) {
-      for (const provider of svc.providers) {
-        providerUserIds.add(provider.serviceProvider.user.id)
-      }
+    for (const ps of providerServices) {
+      providerUserIds.add(ps.serviceProvider.user.id)
     }
 
     const ratingByUser = new Map<string, { average: number; count: number }>()
@@ -295,99 +294,68 @@ if (input.leafCategoryId) {
       }
     }
 
-    const totalCount = await prisma.service.count({
-  where: {
-    ...whereService,
-    providers: { some: whereProvider },
-  },
-})
-
-
-    // ---- shape "services" (compat)
-    const servicesWithProviders = services
-      .filter((s) => s.providers.length > 0)
-      .map((s) => ({
-        id: s.id,
-        name: s.name,
-        description: s.description,
-        category: s.category, // { id, name, icon }
-        providers: s.providers.map((p) => {
-          const stats = ratingByUser.get(p.serviceProvider.user.id)
-          return {
-            id: p.serviceProvider.id,
-            userId: p.serviceProvider.user.id,
-            name: p.serviceProvider.user.name,
-            profileImage: p.serviceProvider.user.profileImage,
-            basePrice: normalizeDecimal(p.basePrice) ?? 0,
-            description: p.description,
-            offersScheduling: p.offersScheduling,
-            providesHomeService: p.providesHomeService ?? false,
-            providesLocalService: p.providesLocalService ?? true,
-            rating: stats?.average ?? 0,
-            reviewCount: stats?.count ?? 0,
-          }
-        }),
-      }))
-
-    // ordenação por preço (menor preço por service)
-    if (input.sortBy === 'PRICE_LOW' || input.sortBy === 'PRICE_HIGH') {
-      servicesWithProviders.sort((a, b) => {
-        const minA = Math.min(...a.providers.map((p) => p.basePrice ?? Number.POSITIVE_INFINITY))
-        const minB = Math.min(...b.providers.map((p) => p.basePrice ?? Number.POSITIVE_INFINITY))
-        return input.sortBy === 'PRICE_LOW' ? minA - minB : minB - minA
-      })
-    }
-
     // ---- flatten para a sua pesquisa/page.tsx (data.results)
-    const resultEntries: any[] = []
-    for (const svc of services) {
-      for (const p of svc.providers) {
-        const pid = p.serviceProvider.id
-        const addr = p.serviceProvider.user.address
-        const loc = addr ? (addr.state ? `${addr.city}, ${addr.state}` : addr.city ?? '') : ''
-        const providerRadius = p.serviceProvider.serviceRadiusKm ?? null
-        const dist =
-          resolvedLat != null && resolvedLng != null && addr?.latitude != null && addr?.longitude != null
-            ? haversine(resolvedLat, resolvedLng, addr.latitude!, addr.longitude!)
-            : undefined
-        const stats = ratingByUser.get(p.serviceProvider.user.id)
-        const averageRating = stats?.average ?? 0
-        const reviewsCount = stats?.count ?? 0
-        const basePriceNumber = normalizeDecimal(p.basePrice)
+    const resultEntries = providerServices.map((ps) => {
+      const providerProfile = ps.serviceProvider.user
+      const providerAddress = providerProfile.address
+      const providerRadius = ps.serviceProvider.serviceRadiusKm ?? null
+      const locationLabel = providerAddress
+        ? (providerAddress.state ? `${providerAddress.city}, ${providerAddress.state}` : providerAddress.city ?? '')
+        : ''
+      const dist =
+        resolvedLat != null && resolvedLng != null && providerAddress?.latitude != null && providerAddress?.longitude != null
+          ? haversine(resolvedLat, resolvedLng, providerAddress.latitude!, providerAddress.longitude!)
+          : undefined
+      const stats = ratingByUser.get(providerProfile.id)
+      const averageRating = stats?.average ?? 0
+      const reviewsCount = stats?.count ?? 0
+      const basePriceNumber = normalizeDecimal(ps.basePrice)
 
-        resultEntries.push({
-          id: pid,
-          name: p.serviceProvider.user.name,
-          profileImage: p.serviceProvider.user.profileImage || undefined,
-          primaryServiceId: p.serviceId,
-          serviceId: svc.id,
-          serviceName: svc.name,
-          location: loc,
-          city: addr?.city ?? null,
-          state: addr?.state ?? null,
-          latitude: addr?.latitude ?? null,
-          longitude: addr?.longitude ?? null,
-          services: [svc.name],
-          category: svc.category.name,
-          rating: averageRating,
-          reviewCount: reviewsCount,
-          basePrice: basePriceNumber ?? null,
-          distance: dist,
-          serviceRadiusKm: providerRadius,
-          available: true,
-          offersScheduling: p.offersScheduling,
-          providesHomeService: p.providesHomeService ?? false,
-          providesLocalService: p.providesLocalService ?? true,
-          travel: {
-            chargesTravel: p.serviceProvider.chargesTravel,
-            travelRatePerKm: normalizeDecimal(p.serviceProvider.travelRatePerKm),
-            travelMinimumFee: normalizeDecimal(p.serviceProvider.travelMinimumFee),
-            travelFixedFee: normalizeDecimal(p.serviceProvider.travelCost),
-            waivesTravelOnHire: p.serviceProvider.waivesTravelOnHire,
-          },
-        })
+      return {
+        id: ps.id,
+        providerId: ps.serviceProvider.id,
+        providerUserId: providerProfile.id,
+        name: providerProfile.name,
+        providerName: providerProfile.name,
+        profileImage: providerProfile.profileImage || undefined,
+        providerProfileImage: providerProfile.profileImage || undefined,
+        customDescription: ps.description,
+        unit: ps.unit,
+        primaryServiceId: ps.serviceId,
+        serviceId: ps.service.id,
+        serviceName: ps.service.name,
+        serviceDescription: ps.service.description,
+        serviceCategory: {
+          id: ps.service.category.id,
+          name: ps.service.category.name,
+          icon: ps.service.category.icon,
+        },
+        category: ps.service.category.name,
+        location: locationLabel,
+        city: providerAddress?.city ?? null,
+        state: providerAddress?.state ?? null,
+        latitude: providerAddress?.latitude ?? null,
+        longitude: providerAddress?.longitude ?? null,
+        rating: averageRating,
+        reviewCount: reviewsCount,
+        basePrice: basePriceNumber ?? null,
+        distance: dist,
+        serviceRadiusKm: providerRadius,
+        available: true,
+        offersScheduling: ps.offersScheduling,
+        providesHomeService: ps.providesHomeService ?? false,
+        providesLocalService: ps.providesLocalService ?? true,
+        travel: {
+          chargesTravel: ps.serviceProvider.chargesTravel,
+          travelRatePerKm: normalizeDecimal(ps.serviceProvider.travelRatePerKm),
+          travelMinimumFee: normalizeDecimal(ps.serviceProvider.travelMinimumFee),
+          travelFixedFee: normalizeDecimal(ps.serviceProvider.travelCost),
+          waivesTravelOnHire: ps.serviceProvider.waivesTravelOnHire,
+        },
+        serviceCreatedAt: ps.service.createdAt,
+        providerServiceCreatedAt: ps.createdAt,
       }
-    }
+    })
 
     let results = resultEntries
 
@@ -405,6 +373,14 @@ if (input.sortBy === 'PRICE_HIGH') {
     const pa = a.basePrice ?? Number.NEGATIVE_INFINITY
     const pb = b.basePrice ?? Number.NEGATIVE_INFINITY
     return pb - pa
+  })
+}
+
+if (input.sortBy === 'NEWEST') {
+  results.sort((a, b) => {
+    const timeA = (a.serviceCreatedAt ?? a.providerServiceCreatedAt)?.valueOf() ?? 0
+    const timeB = (b.serviceCreatedAt ?? b.providerServiceCreatedAt)?.valueOf() ?? 0
+    return timeB - timeA
   })
 }
 
@@ -478,8 +454,81 @@ if (input.rating != null && Number.isFinite(input.rating)) {
 }
 // --- Paginação dos providers "results" (lista achatada)
 const resultsTotal = results.length
-const resultsSkip = (input.page - 1) * input.limit
-const pagedResults = results.slice(resultsSkip, resultsSkip + input.limit)
+const resultsSkip = (input.page - 1) * effectiveLimit
+const pagedResults = results.slice(resultsSkip, resultsSkip + effectiveLimit)
+
+type ServiceGroup = {
+  id: string
+  name: string
+  description: string | null | undefined
+  category: { id: string; name: string; icon: string | null }
+  providers: Array<{
+    id: string
+    userId: string
+    name: string
+    profileImage?: string | null
+    basePrice: number
+    description?: string | null
+    offersScheduling: boolean
+    providesHomeService: boolean
+    providesLocalService: boolean
+    rating: number
+    reviewCount: number
+  }>
+}
+
+const servicesAllMap = new Map<string, ServiceGroup>()
+const servicesPageMap = new Map<string, ServiceGroup>()
+
+const appendToMap = (
+  map: Map<string, ServiceGroup>,
+  entry: typeof results[number],
+) => {
+  let serviceEntry = map.get(entry.serviceId)
+  if (!serviceEntry) {
+    serviceEntry = {
+      id: entry.serviceId,
+      name: entry.serviceName,
+      description: entry.serviceDescription,
+      category: entry.serviceCategory,
+      providers: [],
+    }
+    map.set(entry.serviceId, serviceEntry)
+  }
+
+  const basePriceValue = entry.basePrice ?? 0
+  serviceEntry.providers.push({
+    id: entry.providerId,
+    userId: entry.providerUserId,
+    name: entry.providerName,
+    profileImage: entry.profileImage,
+    basePrice: Number.isFinite(basePriceValue) ? basePriceValue : 0,
+    description: entry.customDescription,
+    offersScheduling: entry.offersScheduling,
+    providesHomeService: entry.providesHomeService ?? false,
+    providesLocalService: entry.providesLocalService ?? true,
+    rating: entry.rating,
+    reviewCount: entry.reviewCount,
+  })
+}
+
+for (const entry of results) {
+  appendToMap(servicesAllMap, entry)
+}
+
+for (const entry of pagedResults) {
+  appendToMap(servicesPageMap, entry)
+}
+
+const servicesWithProviders = Array.from(servicesPageMap.values())
+const totalServices = servicesAllMap.size
+
+const sanitizedPagedResults = pagedResults.map((entry) => {
+  const clone = { ...entry }
+  delete (clone as any).serviceCreatedAt
+  delete (clone as any).providerServiceCreatedAt
+  return clone
+})
 
 // --- Resposta final
 return NextResponse.json({
@@ -488,21 +537,21 @@ return NextResponse.json({
     services: servicesWithProviders,
     pagination: {
       page: input.page,
-      limit: input.limit,
-      total: servicesWithProviders.length, // quantos serviços vieram nesta página
-      totalServices: totalCount,           // total de serviços com pelo menos 1 provider compatível
-      pages: Math.ceil(totalCount / input.limit),
+      limit: effectiveLimit,
+      total: servicesWithProviders.length,
+      totalServices,
+      pages: Math.max(1, Math.ceil(totalServices / effectiveLimit)),
     },
     appliedRadiusKm: radiusKm,
     requestedRadiusKm: rawRadiusKm,
     cityFilterApplied: enforceCityOnly,
   },
-  results: pagedResults,
+  results: sanitizedPagedResults,
   resultsPagination: {
     page: input.page,
-    limit: input.limit,
+    limit: effectiveLimit,
     total: resultsTotal,
-    pages: Math.ceil(resultsTotal / input.limit),
+    pages: Math.max(1, Math.ceil(resultsTotal / effectiveLimit)),
   },
 })
 

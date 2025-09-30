@@ -162,17 +162,22 @@ export default function ServiceRequestPage() {
         setService(data.service)
 
         // Seleção inicial do prestador
+        const providerServiceIdFromQuery = searchParams.get('providerServiceId') || '' // ServiceProviderService.id opcional
         const providerIdFromQuery = searchParams.get('providerId') || '' // ServiceProvider.id opcional
         const providers: any[] = data.service?.providers || []
         let chosen = providers[0]
-        if (providerIdFromQuery) {
+        if (providerServiceIdFromQuery) {
+          const match = providers.find(p => p.id === providerServiceIdFromQuery)
+          if (match) chosen = match
+        }
+        if (!providerServiceIdFromQuery && providerIdFromQuery) {
           const match = providers.find(p => p.serviceProvider.id === providerIdFromQuery)
           if (match) chosen = match
         }
         if (chosen) {
           setSelectedProvider(chosen.id) // SPS id
           setSelectedProviderProfileId(chosen.serviceProvider.id)
-          setSelectedProviderLocked(!!providerIdFromQuery)
+          setSelectedProviderLocked(!!(providerServiceIdFromQuery || providerIdFromQuery))
 
           // fallback imediato com dados do provider
           setProviderProfile({
