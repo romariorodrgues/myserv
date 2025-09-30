@@ -7,8 +7,8 @@
 
 import { ProfileVisibility } from '@/types/index'
 import { getMyProfile } from '@/lib/api/get-my-profile'
-import { useState } from 'react'
-import { User, MapPin, Bell, Shield, Eye, EyeOff, Save, Navigation } from 'lucide-react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { User, MapPin, Bell, Shield, Eye, EyeOff, Save, Navigation, Search, Loader2 } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -18,9 +18,6 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { ProfileImageUploadCompact } from '@/components/upload/profile-image-upload'
 import { toast } from 'sonner'
-import Image from 'next/image'
-import { cdnImageUrl } from '@/lib/cdn'
-import { useEffect } from 'react'
 import { updateMyProfile } from '@/lib/api/update-my-profile'
 import type { ClientProfileData } from '@/types'
 import { signOut, useSession } from 'next-auth/react'
@@ -78,9 +75,37 @@ const [passwordData, setPasswordData] = useState({
   newPassword: '',
   confirmPassword: ''
 })
+  const [stateOptions, setStateOptions] = useState<Array<{ id: number; sigla: string; nome: string }>>([])
+  const [statesLoading, setStatesLoading] = useState(false)
+  const [cities, setCities] = useState<string[]>([])
+  const [citiesLoading, setCitiesLoading] = useState(false)
+  const [cepLoading, setCepLoading] = useState(false)
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
   const [deactivateReason, setDeactivateReason] = useState('')
   const [deactivating, setDeactivating] = useState(false)
+
+  const updateAddress = useCallback((changes: Partial<NonNullable<ClientProfileData['address']>>) => {
+    setProfileData((prev) => {
+      if (!prev) return prev
+      const currentAddress = {
+        street: '',
+        number: '',
+        district: '',
+        city: '',
+        state: '',
+        zipCode: '',
+        complement: '',
+        ...prev.address,
+      }
+      return {
+        ...prev,
+        address: {
+          ...currentAddress,
+          ...changes,
+        },
+      }
+    })
+  }, [])
 
   const handleSaveProfile = async () => {
     try {
@@ -228,6 +253,132 @@ const [passwordData, setPasswordData] = useState({
     { id: 'privacy', label: 'Privacidade', icon: Eye },
     { id: 'security', label: 'Segurança', icon: Shield }
   ]
+
+  useEffect(() => {
+    let active = true
+    const fetchStates = async () => {
+      setStatesLoading(true)
+      try {
+        const response = await fetch('/api/locations/states')
+        if (!response.ok) throw new Error('Falha ao buscar estados')
+        const data = await response.json()
+        if (!active) return
+        if (data.success && Array.isArray(data.states)) {
+          setStateOptions(data.states)
+        } else {
+          toast.error('Não foi possível carregar os estados.')
+        }
+      } catch (error) {
+        console.error('Erro ao buscar estados:', error)
+        if (active) toast.error('Não foi possível carregar os estados.')
+      } finally {
+        if (active) setStatesLoading(false)
+      }
+    }
+
+    void fetchStates()
+    return () => {
+      active = false
+    }
+  }, [])
+
+  useEffect(() => {
+    const uf = profileData?.address?.state?.toUpperCase()
+    if (!uf) {
+      setCities([])
+      return
+    }
+
+    let active = true
+    const fetchCities = async () => {
+      setCitiesLoading(true)
+      try {
+        const response = await fetch(`/api/locations/cities?state=${uf}`)
+        if (!response.ok) throw new Error('Falha ao buscar cidades')
+        const data = await response.json()
+        if (!active) return
+        if (data.success && Array.isArray(data.cities)) {
+          const names: string[] = data.cities.map((city: { nome: string }) => city.nome)
+          setCities(names)
+        } else {
+          toast.error('Não foi possível carregar as cidades desse estado.')
+          setCities([])
+        }
+      } catch (error) {
+        console.error('Erro ao buscar cidades:', error)
+        if (active) {
+          toast.error('Não foi possível carregar as cidades desse estado.')
+          setCities([])
+        }
+      } finally {
+        if (active) setCitiesLoading(false)
+      }
+    }
+
+    void fetchCities()
+    return () => {
+      active = false
+    }
+  }, [profileData?.address?.state])
+
+  const stateOptionsWithCurrent = useMemo(() => {
+    const currentState = profileData?.address?.state?.toUpperCase()
+    if (!currentState) return stateOptions
+    if (stateOptions.some((state) => state.sigla === currentState)) return stateOptions
+    return [...stateOptions, { id: -1, sigla: currentState, nome: currentState }]
+  }, [stateOptions, profileData?.address?.state])
+
+  const cityOptions = useMemo(() => {
+    const currentCity = profileData?.address?.city
+    if (!currentCity) return cities
+    if (cities.includes(currentCity)) return cities
+    return [currentCity, ...cities]
+  }, [cities, profileData?.address?.city])
+
+  const handleStateChange = (value: string) => {
+    const normalized = value.toUpperCase()
+    updateAddress({ state: normalized, city: '' })
+  }
+
+  const handleCepLookup = async () => {
+    const cep = profileData?.address?.zipCode?.replace(/\D/g, '')
+    if (!cep || cep.length !== 8) {
+      toast.error('Informe um CEP válido antes de buscar.')
+      return
+    }
+
+    try {
+      setCepLoading(true)
+      const response = await fetch(`/api/locations/cep/${cep}`)
+      if (!response.ok) {
+        const payload = await response.json().catch(() => ({ error: 'CEP não encontrado' }))
+        throw new Error(payload.error || 'CEP não encontrado')
+      }
+      const data = await response.json()
+      if (!data.success) throw new Error(data.error || 'CEP não encontrado')
+
+      updateAddress({
+        street: data.street ?? '',
+        district: data.district ?? '',
+        complement: data.complement ?? '',
+        zipCode: data.cep ?? cep,
+        state: (data.state ?? '').toUpperCase(),
+        city: data.city ?? '',
+      })
+
+      setCities((prev) => {
+        if (!data.city) return prev
+        return prev.includes(data.city) ? prev : [data.city, ...prev]
+      })
+
+      toast.success('Endereço preenchido a partir do CEP.')
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error)
+      toast.error(error instanceof Error ? error.message : 'Não foi possível buscar o CEP.')
+    } finally {
+      setCepLoading(false)
+    }
+  }
 
 useEffect(() => {
   const fetchProfile = async () => {
@@ -422,16 +573,7 @@ if (loading || !profileData) {
                   <Input
                     id="street"
                     value={profileData?.address?.street || ''}
-                    onChange={(e) =>
-                      setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              address: { ...prev.address, street: e.target.value }
-                            }
-                          : prev
-                      )
-                    }
+                    onChange={(e) => updateAddress({ street: e.target.value })}
                     placeholder="Nome da rua"
                   />
                 </div>
@@ -441,10 +583,7 @@ if (loading || !profileData) {
                   <Input
                     id="number"
                     value={profileData?.address?.number || ''}
-                    onChange={(e) => setProfileData(prev => prev ? ({
-                      ...prev,
-                      address: { ...prev.address, number: e.target.value }
-                    }) : prev)}
+                    onChange={(e) => updateAddress({ number: e.target.value })}
                     placeholder="123"
                   />
                 </div>
@@ -454,16 +593,7 @@ if (loading || !profileData) {
                   <Input
                     id="complement"
                     value={profileData?.address?.complement || ''}
-                    onChange={(e) =>
-                      setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              address: { ...prev.address, complement: e.target.value }
-                            }
-                          : prev
-                      )
-                    }
+                    onChange={(e) => updateAddress({ complement: e.target.value })}
                     placeholder="Apto, sala..."
                   />
                 </div>
@@ -473,31 +603,39 @@ if (loading || !profileData) {
                   <Input
                     id="district"
                     value={profileData?.address?.district || ''}
-                    onChange={(e) => setProfileData(prev => prev ? ({
-                      ...prev,
-                      address: { ...prev.address, district: e.target.value }
-                    }) : prev)}
+                    onChange={(e) => updateAddress({ district: e.target.value })}
                     placeholder="Nome do bairro"
                   />
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="city">Cidade</Label>
-                  <Input
-                    id="city"
-                    value={profileData?.address?.city || ''}
-                    onChange={(e) =>
-                      setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              address: { ...prev.address, city: e.target.value }
-                            }
-                          : prev
-                      )
-                    }
-                    placeholder="Nome da cidade"
-                  />
+                  {citiesLoading ? (
+                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                      <Loader2 className="h-4 w-4 animate-spin" /> Carregando cidades...
+                    </div>
+                  ) : cityOptions.length > 0 ? (
+                    <select
+                      id="city"
+                      value={profileData?.address?.city || ''}
+                      onChange={(e) => updateAddress({ city: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">Selecione...</option>
+                      {cityOptions.map((city) => (
+                        <option key={city} value={city}>
+                          {city}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <Input
+                      id="city"
+                      value={profileData?.address?.city || ''}
+                      onChange={(e) => updateAddress({ city: e.target.value })}
+                      placeholder="Digite sua cidade"
+                    />
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -505,43 +643,49 @@ if (loading || !profileData) {
                   <select
                     id="state"
                     value={profileData?.address?.state || ''}
-                    onChange={(e) =>
-                      setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              address: { ...prev.address, state: e.target.value }
-                            }
-                          : prev
-                      )
-                    }
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    onChange={(e) => handleStateChange(e.target.value)}
+                    disabled={statesLoading}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-60"
                   >
                     <option value="">Selecione...</option>
-                    <option value="SP">São Paulo</option>
-                    <option value="RJ">Rio de Janeiro</option>
-                    <option value="MG">Minas Gerais</option>
-                    {/* Add more states */}
+                    {stateOptionsWithCurrent
+                      .sort((a, b) => a.nome.localeCompare(b.nome))
+                      .map((state) => (
+                        <option key={state.sigla} value={state.sigla}>
+                          {state.nome} ({state.sigla})
+                        </option>
+                      ))}
                   </select>
+                  {statesLoading && (
+                    <p className="text-xs text-gray-500">Carregando lista de estados...</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="zipCode">CEP</Label>
-                  <Input
-                    id="zipCode"
-                    value={profileData?.address?.zipCode || ''}
-                    onChange={(e) =>
-                      setProfileData(prev =>
-                        prev
-                          ? {
-                              ...prev,
-                              address: { ...prev.address, zipCode: e.target.value }
-                            }
-                          : prev
-                      )
-                    }
-                    placeholder="00000-000"
-                  />
+                  <div className="flex items-end gap-2">
+                    <Input
+                      id="zipCode"
+                      value={profileData?.address?.zipCode || ''}
+                      onChange={(e) => updateAddress({ zipCode: e.target.value })}
+                      placeholder="00000-000"
+                      className="flex-1"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleCepLookup}
+                      disabled={cepLoading}
+                    >
+                      {cepLoading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Search className="h-4 w-4 mr-1" /> Buscar CEP
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
             </div>
