@@ -19,6 +19,8 @@ export default function PerfilPage() {
   const [stats, setStats] = useState({ completed: 0, totalSpent: 0, favorites: 0 })
   const [providerAvg, setProviderAvg] = useState<number | null>(null)
   const [providerCount, setProviderCount] = useState<number>(0)
+  const [clientAvg, setClientAvg] = useState<number | null>(null)
+  const [clientCount, setClientCount] = useState<number>(0)
 
   useEffect(() => {
     const load = async () => {
@@ -33,6 +35,8 @@ export default function PerfilPage() {
         const fav = favRes.ok ? await favRes.json() : []
         const hist = histRes.ok ? await histRes.json() : []
         setProfile(me.user)
+        setClientAvg(me.user?.clientRatingAverage ?? null)
+        setClientCount(me.user?.clientRatingCount ?? 0)
         const totalSpent = hist.reduce((sum: number, r: any) => sum + (r.price || 0), 0)
         setStats({ completed: hist.length, totalSpent, favorites: fav.length })
 
@@ -67,6 +71,7 @@ export default function PerfilPage() {
 
   const menuItems = useMemo(() => {
     const isProvider = session?.user?.userType === 'SERVICE_PROVIDER'
+    const isClient = session?.user?.userType === 'CLIENT'
     if (session?.user?.userType === 'ADMIN') {
       return [
         { icon: LayoutDashboard, title: 'Painel Administrativo', description: 'Visão geral da plataforma', href: '/admin/dashboard' },
@@ -141,7 +146,7 @@ export default function PerfilPage() {
           <span className="bg-[#ecf4f6] text-[#00a9d4] text-xs px-3 py-1 rounded-md font-medium">
             Membro desde {memberSince}
           </span>
-          {session?.user?.userType === 'SERVICE_PROVIDER' && (
+          {(session?.user?.userType === 'SERVICE_PROVIDER' && providerAvg !== null) && (
             <span className="flex items-center gap-1 text-sm text-yellow-600">
               {Array.from({ length: 5 }).map((_, i) => {
                 const filled = providerAvg ? i < Math.round(providerAvg) : false
@@ -154,6 +159,19 @@ export default function PerfilPage() {
               {providerAvg !== null && (
                 <span className="ml-1">{providerAvg.toFixed(1)} ({providerCount})</span>
               )}
+            </span>
+          )}
+          {(session?.user?.userType === 'CLIENT' && clientAvg !== null && clientCount > 0) && (
+            <span className="flex items-center gap-1 text-sm text-amber-600">
+              {Array.from({ length: 5 }).map((_, i) => {
+                const filled = clientAvg ? i < Math.round(clientAvg) : false
+                return (
+                  <svg key={i} xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill={filled ? 'currentColor' : 'none'} stroke="currentColor" className={`w-4 h-4 ${filled ? 'text-yellow-500' : 'text-gray-300'}`}>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.286 3.967a1 1 0 00.95.69h4.172c.969 0 1.371 1.24.588 1.81l-3.378 2.455a1 1 0 00-.364 1.118l1.286 3.966c.3.922-.755 1.688-1.54 1.118l-3.378-2.454a1 1 0 00-1.175 0l-3.378 2.454c-.784.57-1.838-.196-1.539-1.118l1.285-3.966a1 1 0 00-.364-1.118L2.955 9.394c-.783-.57-.38-1.81.588-1.81h4.172a1 1 0 00.95-.69l1.286-3.967z" />
+                  </svg>
+                )
+              })}
+              <span className="ml-1">{clientAvg.toFixed(1)} ({clientCount})</span>
             </span>
           )}
         </div>
@@ -194,7 +212,11 @@ export default function PerfilPage() {
           <Card>
             <CardContent className="p-6 text-center">
               <div className="text-3xl font-bold text-brand-navy mb-2">
-                {session?.user?.userType === 'SERVICE_PROVIDER' && providerAvg !== null ? providerAvg.toFixed(1) : '—'}
+                {session?.user?.userType === 'SERVICE_PROVIDER' && providerAvg !== null
+                  ? providerAvg.toFixed(1)
+                  : session?.user?.userType === 'CLIENT' && clientAvg !== null
+                  ? clientAvg.toFixed(1)
+                  : '—'}
               </div>
               <div className="text-sm text-gray-600">
                 Avaliação Média

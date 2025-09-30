@@ -20,19 +20,45 @@ export async function GET(request: NextRequest) {
 
     // Provider pending reviews
     if (providerId && (providerIdParam || session?.user?.userType === 'SERVICE_PROVIDER' && !clientIdParam)) {
-      const pending = await prisma.serviceRequest.findMany({
+    const pending = await prisma.serviceRequest.findMany({
+      where: {
+        providerId,
+        status: 'COMPLETED',
+        providerReviewGivenAt: null,
+      },
+      include: {
+        service: { select: { id: true, name: true } },
+        client: { select: { id: true, name: true, profileImage: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+    })
+
+    const clientIds = pending.map((p) => p.clientId).filter((id): id is string => Boolean(id))
+    const ratingMap = new Map<string, { average: number; count: number }>()
+
+    if (clientIds.length > 0) {
+      const ratingStats = await prisma.serviceRequest.groupBy({
+        by: ['clientId'],
         where: {
-          providerId,
-          status: 'COMPLETED',
-          providerReviewGivenAt: null,
+          clientId: { in: clientIds },
+          providerReviewRating: { not: null },
         },
-        include: {
-          service: { select: { id: true, name: true } },
-          client: { select: { id: true, name: true, profileImage: true } },
-        },
-        orderBy: { updatedAt: 'desc' },
-        take: 20,
+        _avg: { providerReviewRating: true },
+        _count: { providerReviewRating: true },
       })
+
+      for (const stat of ratingStats) {
+        const avg = stat._avg.providerReviewRating
+        const count = stat._count.providerReviewRating
+        if (avg != null && count > 0) {
+          ratingMap.set(stat.clientId, {
+            average: Math.round(avg * 10) / 10,
+            count,
+          })
+        }
+      }
+    }
 
       const count = await prisma.serviceRequest.count({
         where: {
@@ -47,16 +73,18 @@ export async function GET(request: NextRequest) {
         data: {
           count,
           items: pending.map((p) => ({
-            id: p.id,
-            serviceName: p.service.name,
-            client: {
-              id: p.client.id,
-              name: p.client.name,
-              profileImage: p.client.profileImage,
-            },
-          })),
-        },
-      })
+          id: p.id,
+          serviceName: p.service.name,
+          client: {
+            id: p.client.id,
+            name: p.client.name,
+            profileImage: p.client.profileImage,
+            ratingAverage: ratingMap.get(p.client.id)?.average ?? null,
+            ratingCount: ratingMap.get(p.client.id)?.count ?? 0,
+          },
+        })),
+      },
+    })
     }
 
     if (!clientId) {

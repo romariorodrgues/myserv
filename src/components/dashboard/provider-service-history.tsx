@@ -35,6 +35,8 @@ interface ServiceHistory {
     name: string
     profileImage: string | null
     totalBookings?: number
+    ratingAverage?: number | null
+    ratingCount?: number
   }
   payment: {
     method: 'CREDIT' | 'DEBIT' | 'PIX' | 'CASH'
@@ -501,11 +503,11 @@ export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryPro
                       </div>
                       
                       <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                            {item.client.profileImage ? (
-                              <Image
-                                src={item.client.profileImage}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                          {item.client.profileImage ? (
+                            <Image
+                              src={item.client.profileImage}
                                 alt={item.client.name}
                                 width={32}
                                 height={32}
@@ -514,13 +516,19 @@ export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryPro
                             ) : (
                               <User className="w-4 h-4 text-gray-500" />
                             )}
-                          </div>
-                          <span className="text-sm font-medium">{item.client.name}</span>
-                          {item.client.totalBookings && item.client.totalBookings > 1 && (
-                            <Badge variant="outline" className="text-xs">
-                              <Award className="w-3 h-3 mr-1" />
-                              Cliente Fiel
-                            </Badge>
+                        </div>
+                        <span className="text-sm font-medium">{item.client.name}</span>
+                        {item.client.ratingAverage != null && item.client.ratingCount && item.client.ratingCount > 0 && (
+                          <span className="flex items-center gap-1 text-xs text-amber-600">
+                            <Star className="w-3 h-3 fill-current" />
+                            {item.client.ratingAverage.toFixed(1)} ({item.client.ratingCount})
+                          </span>
+                        )}
+                        {item.client.totalBookings && item.client.totalBookings > 1 && (
+                          <Badge variant="outline" className="text-xs">
+                            <Award className="w-3 h-3 mr-1" />
+                            Cliente Fiel
+                          </Badge>
                           )}
                         </div>
                         

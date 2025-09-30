@@ -146,6 +146,8 @@ export interface ClientProfileData {
     waivesTravelOnHire: boolean
   }
   plan: string,
+  clientRatingAverage?: number | null
+  clientRatingCount?: number
 }
 
 export interface User {

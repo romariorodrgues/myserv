@@ -43,6 +43,32 @@ export async function GET(request: NextRequest) {
       take: limit,
     })
 
+    const clientIds = requests.map((r) => r.clientId).filter((id): id is string => Boolean(id))
+    const ratingMap = new Map<string, { average: number; count: number }>()
+
+    if (clientIds.length > 0) {
+      const ratingStats = await prisma.serviceRequest.groupBy({
+        by: ['clientId'],
+        where: {
+          clientId: { in: clientIds },
+          providerReviewRating: { not: null },
+        },
+        _avg: { providerReviewRating: true },
+        _count: { providerReviewRating: true },
+      })
+
+      for (const stat of ratingStats) {
+        const avg = stat._avg.providerReviewRating
+        const count = stat._count.providerReviewRating
+        if (avg != null && count > 0) {
+          ratingMap.set(stat.clientId, {
+            average: Math.round(avg * 10) / 10,
+            count,
+          })
+        }
+      }
+    }
+
     // Map items
     const items = requests.map(r => {
       const approved = r.payments.find(p => p.status === 'APPROVED')
@@ -78,6 +104,8 @@ export async function GET(request: NextRequest) {
           name: r.client.name,
           profileImage: r.client.profileImage,
           totalBookings: undefined,
+          ratingAverage: ratingMap.get(r.client.id)?.average ?? null,
+          ratingCount: ratingMap.get(r.client.id)?.count ?? 0,
         },
         payment: {
           method: method ? methodMap[method] || 'PIX' : 'PIX',

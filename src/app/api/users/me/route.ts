@@ -70,6 +70,20 @@ export async function GET() {
   const planName =
     activeSubscription?.plan?.name ?? user.serviceProvider?.activePlan?.name ?? "Start";
 
+  const clientRatingStats = await prisma.serviceRequest.aggregate({
+    where: {
+      clientId: user.id,
+      providerReviewRating: { not: null },
+    },
+    _avg: { providerReviewRating: true },
+    _count: { providerReviewRating: true },
+  })
+
+  const clientRatingAverage = clientRatingStats._avg.providerReviewRating != null
+    ? Math.round(clientRatingStats._avg.providerReviewRating * 10) / 10
+    : null
+  const clientRatingCount = clientRatingStats._count.providerReviewRating ?? 0
+
   const responseData: ClientProfileData = {
     id: user.id,
     name: user.name,
@@ -112,6 +126,8 @@ export async function GET() {
         }
       : undefined,
     plan: planName,
+    clientRatingAverage,
+    clientRatingCount,
   };
 
   return NextResponse.json({ user: responseData });

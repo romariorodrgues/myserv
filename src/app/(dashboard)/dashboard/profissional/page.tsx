@@ -77,6 +77,8 @@ interface ProviderBooking {
     profileImage: string | null
     phone?: string
   }
+  clientRatingAverage?: number | null
+  clientRatingCount?: number
   payment?: {
     status: 'PENDING' | 'APPROVED' | 'FAILED' | 'REFUNDED'
   }
@@ -196,6 +198,10 @@ function ProviderDashboardContent() {
 
         const statusText = newStatus === 'ACCEPTED' ? 'aceita' : newStatus === 'REJECTED' ? 'rejeitada' : 'marcada como concluída'
         alert(`Solicitação ${statusText} com sucesso!`)
+
+        if (newStatus === 'COMPLETED') {
+          setProviderReviewBookingId(bookingId)
+        }
       } else {
         const error = await response.json()
         alert(error.error || 'Erro ao atualizar status')
@@ -209,7 +215,7 @@ function ProviderDashboardContent() {
   const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
   const [openPricingId, setOpenPricingId] = useState<string | null>(null)
   const [pendingProviderReviews, setPendingProviderReviews] = useState(0)
-  const [providerPendingItems, setProviderPendingItems] = useState<Array<{ id: string; client: { id: string; name: string; profileImage?: string | null }; serviceName: string }>>([])
+  const [providerPendingItems, setProviderPendingItems] = useState<Array<{ id: string; client: { id: string; name: string; profileImage?: string | null; ratingAverage?: number | null; ratingCount?: number }; serviceName: string }>>([])
   const [providerReviewBookingId, setProviderReviewBookingId] = useState<string | null>(null)
   const openScheduleFor = (id: string) => {
     setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
@@ -520,15 +526,21 @@ function ProviderDashboardContent() {
                   <div className="space-y-3">
                     {providerPendingItems.slice(0, 3).map((item) => (
                       <div key={item.id} className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-brand-cyan/10 flex items-center justify-center text-brand-cyan font-semibold">
-                            {item.client.name.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-medium text-brand-navy">{item.client.name}</p>
-                            <p className="text-xs text-muted-foreground">{item.serviceName}</p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-brand-cyan/10 flex items-center justify-center text-brand-cyan font-semibold">
+                          {item.client.name.charAt(0).toUpperCase()}
                         </div>
+                        <div>
+                          <p className="font-medium text-brand-navy">{item.client.name}</p>
+                          <p className="text-xs text-muted-foreground">{item.serviceName}</p>
+                          {item.client.ratingAverage != null && item.client.ratingCount > 0 && (
+                            <p className="text-xs text-amber-600 flex items-center gap-1">
+                              <Star className="w-3 h-3 fill-current" />
+                              {item.client.ratingAverage.toFixed(1)} ({item.client.ratingCount})
+                            </p>
+                          )}
+                        </div>
+                      </div>
                         <Button size="sm" onClick={() => setProviderReviewBookingId(item.id)}>
                           Avaliar
                         </Button>

@@ -101,7 +101,12 @@ export function ProviderReviewModal({ bookingId, onClose, onSubmitted }: Provide
                   </div>
                 </div>
 
-                <ReviewForm serviceRequestId={bookingId} onSubmit={handleSubmit} loading={submitting} />
+                <ReviewForm
+                  serviceRequestId={bookingId}
+                  onSubmit={handleSubmit}
+                  loading={submitting}
+                  showComment={false}
+                />
               </div>
             )}
           </CardContent>

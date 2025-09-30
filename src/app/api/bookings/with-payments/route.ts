@@ -82,6 +82,32 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    const clientIds = bookings.map((booking) => booking.clientId).filter((id): id is string => Boolean(id))
+    const clientRatings = new Map<string, { average: number; count: number }>()
+
+    if (clientIds.length > 0) {
+      const stats = await prisma.serviceRequest.groupBy({
+        by: ['clientId'],
+        where: {
+          clientId: { in: clientIds },
+          providerReviewRating: { not: null },
+        },
+        _avg: { providerReviewRating: true },
+        _count: { providerReviewRating: true },
+      })
+
+      for (const stat of stats) {
+        const avg = stat._avg.providerReviewRating
+        const count = stat._count.providerReviewRating
+        if (avg != null && count > 0) {
+          clientRatings.set(stat.clientId, {
+            average: Math.round(avg * 10) / 10,
+            count,
+          })
+        }
+      }
+    }
+
     const transformedBookings = bookings.map((booking) => {
       const unlockedByPayment = booking.payments?.some?.(
         (p) => p.status === 'APPROVED' || p.status === 'COMPLETED' || p.status === 'PAID'
@@ -90,6 +116,7 @@ export async function GET(request: NextRequest) {
       const client = unlocked
         ? { ...booking.client, id: booking.clientId }
         : { name: 'Dados bloqueados', phone: undefined, id: undefined }
+      const ratingEntry = booking.clientId ? clientRatings.get(booking.clientId) : undefined
       return ({
       id: booking.id,
       status: booking.status,
@@ -111,6 +138,8 @@ export async function GET(request: NextRequest) {
       serviceProvider: {
         user: booking.provider,
       },
+      clientRatingAverage: ratingEntry?.average ?? null,
+      clientRatingCount: ratingEntry?.count ?? 0,
       providerReviewRating: booking.providerReviewRating ?? null,
       providerReviewComment: booking.providerReviewComment ?? null,
       providerReviewGivenAt: booking.providerReviewGivenAt?.toISOString?.() ?? null,
