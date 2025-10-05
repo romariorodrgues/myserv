@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronRight, ChevronLeft, Folder, Leaf } from 'lucide-react'
@@ -123,9 +123,7 @@ export default function CascadingCategoryPicker({ value, onChange, className = '
     }
   }
 
-  const rootClassName = useMemo(() => {
-    return ['space-y-3', className].filter(Boolean).join(' ')
-  }, [className])
+  const rootClassName = className ? `${className} space-y-3` : 'space-y-3'
 
   return (
     <div className={rootClassName}>
@@ -178,7 +176,7 @@ export default function CascadingCategoryPicker({ value, onChange, className = '
                       </span>
                       <Badge variant="secondary">{c.serviceCount}</Badge>
                     </button>
-                  )}
+                  )
                 })}
                 {list.length === 0 && <div className="text-sm text-gray-500 p-2">Sem itens</div>}
                 {loading && <div className="text-sm text-gray-400 p-2">Carregando...</div>}
