@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ChevronRight, ChevronLeft, Folder, Leaf } from 'lucide-react'
@@ -123,8 +123,12 @@ export default function CascadingCategoryPicker({ value, onChange, className = '
     }
   }
 
+  const rootClassName = useMemo(() => {
+    return ['space-y-3', className].filter(Boolean).join(' ')
+  }, [className])
+
   return (
-    <div className={className}>
+    <div className={rootClassName}>
       {/* Breadcrumb */}
       <div className="mb-2 flex flex-wrap items-center gap-1 text-sm text-gray-600">
         <Button variant="ghost" size="sm" className="h-7 px-2" onClick={goRoot}>
