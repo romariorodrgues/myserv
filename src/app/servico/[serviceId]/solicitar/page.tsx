@@ -31,13 +31,31 @@ interface Service {
     description: string
     isActive: boolean
     offersScheduling: boolean
+    offersQuoting?: boolean
+    providesHomeService?: boolean
+    providesLocalService?: boolean
+    chargesTravel?: boolean
+    quoteFee?: number | null
     serviceProvider: {
       id: string
       hasScheduling: boolean
       hasQuoting: boolean
+      chargesTravel: boolean
+      waivesTravelOnHire?: boolean
+      travelRatePerKm?: number | null
+      travelMinimumFee?: number | null
+      travelCost?: number | null
       user: {
         name: string
         profileImage: string | null
+        address?: {
+          city?: string | null
+          state?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          street?: string | null
+          number?: string | null
+        }
       }
     }
   }[]
@@ -123,10 +141,15 @@ export default function ServiceRequestPage() {
   const [travelError, setTravelError] = useState<string | null>(null)
   const travelDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const [showTravelDetails, setShowTravelDetails] = useState(false)
+  const [serviceDeliveryMode, setServiceDeliveryMode] = useState<'HOME' | 'LOCAL'>('LOCAL')
 
   const selectedProviderData = service?.providers.find((p) => p.id === selectedProvider)
   const providerSupportsScheduling = selectedProviderData?.offersScheduling ?? selectedProviderData?.serviceProvider.hasScheduling ?? false
-  const providerHasQuoting = selectedProviderData?.serviceProvider.hasQuoting ?? false
+  const providerSupportsQuoting = selectedProviderData?.offersQuoting ?? selectedProviderData?.serviceProvider.hasQuoting ?? true
+  const providerOffersHomeService = selectedProviderData?.providesHomeService ?? false
+  const providerOffersLocalService = selectedProviderData?.providesLocalService ?? true
+  const serviceChargesTravel = selectedProviderData?.chargesTravel ?? selectedProviderData?.serviceProvider.chargesTravel ?? false
+  const quoteFeeValue = selectedProviderData?.quoteFee ?? 0
 
   const fetchUserProfile = useCallback(async () => {
     if (!session?.user?.id) return
@@ -255,9 +278,50 @@ export default function ServiceRequestPage() {
   }, [selectedProvider, service])
 
   useEffect(() => {
+    if (!selectedProviderData) {
+      setServiceDeliveryMode('LOCAL')
+      return
+    }
+
+    if (providerOffersHomeService && !providerOffersLocalService) {
+      setServiceDeliveryMode('HOME')
+      return
+    }
+
+    if (!providerOffersHomeService) {
+      setServiceDeliveryMode('LOCAL')
+      return
+    }
+
+    setServiceDeliveryMode((prev) => (prev === 'HOME' || prev === 'LOCAL' ? prev : 'LOCAL'))
+  }, [selectedProviderData, providerOffersHomeService, providerOffersLocalService])
+
+  useEffect(() => {
     let isActive = true
 
     if (!selectedProviderProfileId) {
+      setTravelQuote(null)
+      setTravelError(null)
+      setTravelLoading(false)
+      return
+    }
+
+    if (!providerOffersHomeService || serviceDeliveryMode !== 'HOME') {
+      if (travelDebounceRef.current) {
+        clearTimeout(travelDebounceRef.current)
+        travelDebounceRef.current = null
+      }
+      setTravelQuote(null)
+      setTravelError(null)
+      setTravelLoading(false)
+      return
+    }
+
+    if (!serviceChargesTravel) {
+      if (travelDebounceRef.current) {
+        clearTimeout(travelDebounceRef.current)
+        travelDebounceRef.current = null
+      }
       setTravelQuote(null)
       setTravelError(null)
       setTravelLoading(false)
@@ -340,7 +404,7 @@ export default function ServiceRequestPage() {
       }
       setTravelLoading(false)
     }
-  }, [selectedProviderProfileId, bookingData.address, bookingData.city, bookingData.state, bookingData.zipCode, serviceId])
+  }, [selectedProviderProfileId, bookingData.address, bookingData.city, bookingData.state, bookingData.zipCode, serviceId, providerOffersHomeService, serviceDeliveryMode, serviceChargesTravel])
 
   useEffect(() => {
     fetchService()
@@ -389,6 +453,11 @@ export default function ServiceRequestPage() {
       return
     }
 
+    if (!providerSupportsQuoting) {
+      alert('Este profissional não aceita solicitações de orçamento. Utilize a agenda para agendar um horário.')
+      return
+    }
+
     setSubmitting(true)
 
     try {
@@ -411,6 +480,7 @@ export default function ServiceRequestPage() {
         city: bookingData.city,
         state: bookingData.state,
         zipCode: bookingData.zipCode,
+        fulfillmentMode: serviceDeliveryMode,
         // Não enviar preferredDate/Time para criar QUOTE
       } as any
 
@@ -597,7 +667,7 @@ export default function ServiceRequestPage() {
                 )}
 
                 {/* Quote Request Message - Show only if provider has quoting */}
-                {selectedProviderData && providerHasQuoting && !providerSupportsScheduling && (
+                {selectedProviderData && providerSupportsQuoting && !providerSupportsScheduling && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h3 className="font-medium text-blue-900 mb-2">Solicitação de Orçamento</h3>
                     <p className="text-sm text-blue-700">
@@ -605,6 +675,71 @@ export default function ServiceRequestPage() {
                     </p>
                   </div>
                 )}
+
+                {/* Delivery mode selection */}
+                <div className="border-t pt-6">
+                  <h3 className="text-lg font-medium mb-4">Como deseja ser atendido?</h3>
+
+                  {providerOffersHomeService && providerOffersLocalService ? (
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <label
+                        className={`flex flex-1 items-center gap-3 rounded-lg border px-4 py-3 text-sm transition hover:border-blue-400 hover:bg-blue-50 ${
+                          serviceDeliveryMode === 'LOCAL' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="delivery-mode"
+                          value="LOCAL"
+                          checked={serviceDeliveryMode === 'LOCAL'}
+                          onChange={() => setServiceDeliveryMode('LOCAL')}
+                          className="sr-only"
+                        />
+                        <span className="leading-tight">
+                          Atendimento no local do profissional
+                          <span className="block text-xs text-gray-500">
+                            Você vai até o endereço do prestador.
+                          </span>
+                        </span>
+                      </label>
+
+                      <label
+                        className={`flex flex-1 items-center gap-3 rounded-lg border px-4 py-3 text-sm transition hover:border-blue-400 hover:bg-blue-50 ${
+                          serviceDeliveryMode === 'HOME' ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="delivery-mode"
+                          value="HOME"
+                          checked={serviceDeliveryMode === 'HOME'}
+                          onChange={() => setServiceDeliveryMode('HOME')}
+                          className="sr-only"
+                        />
+                        <span className="leading-tight">
+                          Atendimento no meu endereço
+                          <span className="block text-xs text-gray-500">
+                            O profissional vai até você.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
+                  ) : providerOffersHomeService ? (
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                      Este serviço é realizado no seu endereço.
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                      Este serviço é realizado no local do profissional.
+                    </div>
+                  )}
+
+                  {serviceDeliveryMode === 'HOME' && providerOffersHomeService && !serviceChargesTravel && (
+                    <p className="mt-2 text-xs text-emerald-700">
+                      Deslocamento grátis: o prestador não cobra taxa para ir até você.
+                    </p>
+                  )}
+                </div>
 
                 {/* Client Information */}
                 <div className="border-t pt-6">
@@ -735,6 +870,7 @@ export default function ServiceRequestPage() {
                               city: bookingData.city,
                               state: bookingData.state,
                               zipCode: bookingData.zipCode,
+                              fulfillmentMode: serviceDeliveryMode,
                             }
                             sessionStorage.setItem('pendingBooking', JSON.stringify(payload))
                           } catch {}
@@ -746,13 +882,19 @@ export default function ServiceRequestPage() {
                       </Button>
                     ) : null}
 
-                    <Button
-                      type="submit"
-                      disabled={submitting || !isFormValid()}
-                      className="px-8 py-2"
-                    >
-                      {submitting ? 'Enviando…' : 'Solicitar Orçamento'}
-                    </Button>
+                    {providerSupportsQuoting ? (
+                      <Button
+                        type="submit"
+                        disabled={submitting || !isFormValid()}
+                        className="px-8 py-2"
+                      >
+                        {submitting ? 'Enviando…' : 'Solicitar Orçamento'}
+                      </Button>
+                    ) : (
+                      <span className="text-sm text-gray-500">
+                        Este serviço não aceita pedidos de orçamento.
+                      </span>
+                    )}
                   </div>
 
                   {successMsg && (
@@ -782,14 +924,16 @@ export default function ServiceRequestPage() {
                   const price = (providerProfile?.basePrice ?? chosen?.basePrice)
                   const desc = providerProfile?.description ?? chosen?.description
 
-                  const travelCostValue = travelQuote?.travelCost ?? null
-                  const totalEstimate = travelQuote?.estimatedTotal ?? (
-                    typeof price === 'number' && travelCostValue != null
-                      ? Math.round((price + travelCostValue) * 100) / 100
-                      : typeof price === 'number'
-                        ? price
-                        : travelCostValue
-                  )
+                  const basePriceValue = typeof price === 'number' && Number.isFinite(price) ? price : null
+                  const showHomeBreakdown = serviceDeliveryMode === 'HOME' && providerOffersHomeService
+                  const effectiveTravelCost = showHomeBreakdown
+                    ? serviceChargesTravel
+                      ? travelQuote?.travelCost ?? null
+                      : 0
+                    : null
+                  const quoteFeeDisplay = providerSupportsQuoting && quoteFeeValue > 0 ? quoteFeeValue : 0
+                  const subtotalValue = (basePriceValue ?? 0) + (effectiveTravelCost ?? 0)
+                  const totalEstimate = subtotalValue + quoteFeeDisplay
                   const distanceLabel = travelQuote?.distanceText || (travelQuote?.distanceKm != null
                     ? `${travelQuote.distanceKm.toFixed(1)} km`
                     : null)
@@ -850,38 +994,57 @@ export default function ServiceRequestPage() {
                         </div>
 
                         <div className="mt-3 space-y-2 text-sm text-gray-700">
-                          {typeof price === 'number' && providerSupportsScheduling && (
+                          {basePriceValue != null && (
                             <div className="flex items-center justify-between">
                               <span>Serviço base</span>
-                              <span>R$ {price.toFixed(2)}</span>
+                              <span>R$ {basePriceValue.toFixed(2)}</span>
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between">
-                            <span>Deslocamento</span>
-                            <span>
-                              {travelLoading && 'Calculando...'}
-                              {!travelLoading && travelQuote && `R$ ${travelQuote.travelCost.toFixed(2)}`}
-                              {!travelLoading && !travelQuote && !travelError && 'Informe o endereço'}
-                              {!travelLoading && distanceLabel && travelQuote && (
-                                <span className="text-xs text-gray-500 ml-2">({distanceLabel})</span>
-                              )}
-                            </span>
-                          </div>
+                          {showHomeBreakdown && (
+                            <div className="flex items-center justify-between">
+                              <span>Deslocamento</span>
+                              <span>
+                                {serviceChargesTravel ? (
+                                  travelLoading
+                                    ? 'Calculando...'
+                                    : effectiveTravelCost != null
+                                      ? `R$ ${effectiveTravelCost.toFixed(2)}`
+                                      : travelError
+                                        ? 'Não calculado'
+                                        : 'Informe o endereço'
+                                ) : (
+                                  'Grátis'
+                                )}
+                                {!travelLoading && serviceChargesTravel && distanceLabel && effectiveTravelCost != null && (
+                                  <span className="text-xs text-gray-500 ml-2">({distanceLabel})</span>
+                                )}
+                              </span>
+                            </div>
+                          )}
 
-                          <div className="flex items-center justify-between font-semibold text-brand-navy border-t pt-2">
-                            <span>Total estimado</span>
-                            <span>
-                              {travelLoading ? '—' : totalEstimate != null ? `R$ ${totalEstimate.toFixed(2)}` : '—'}
-                            </span>
-                          </div>
+                          {quoteFeeDisplay > 0 && providerSupportsQuoting && (
+                            <div className="flex items-center justify-between">
+                              <span>Taxa de orçamento</span>
+                              <span>R$ {quoteFeeDisplay.toFixed(2)}</span>
+                            </div>
+                          )}
+
+                          {(basePriceValue != null || (showHomeBreakdown && (serviceChargesTravel ? effectiveTravelCost != null : true)) || (quoteFeeDisplay > 0 && providerSupportsQuoting)) && (
+                            <div className="flex items-center justify-between font-semibold text-brand-navy border-t pt-2">
+                              <span>Total estimado</span>
+                              <span>
+                                {travelLoading && serviceChargesTravel ? '—' : `R$ ${totalEstimate.toFixed(2)}`}
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {travelError && (
                           <p className="mt-2 text-xs text-red-600">{travelError}</p>
                         )}
 
-                        {!travelLoading && travelQuote && (
+                        {!travelLoading && serviceChargesTravel && travelQuote && (
                           <div className="mt-3 space-y-2">
                             <button
                               type="button"

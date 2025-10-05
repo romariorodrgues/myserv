@@ -79,37 +79,60 @@ export async function POST(request: NextRequest) {
       'Brasil',
     ])
 
-    const basePrice = provider.services?.[0]?.basePrice ?? null
+    const serviceLink = provider.services?.[0]
+    const basePrice = serviceLink?.basePrice ?? null
+    const chargesTravel = serviceLink?.chargesTravel ?? provider.chargesTravel
 
-    const travelResult = await calculateTravelPricing({
-      provider: {
-        coords: providerAddress.latitude != null && providerAddress.longitude != null
-          ? { lat: providerAddress.latitude, lng: providerAddress.longitude }
-          : undefined,
-        addressString: providerAddressString,
-        travel: {
-          chargesTravel: provider.chargesTravel,
-          travelRatePerKm: provider.travelRatePerKm,
-          travelMinimumFee: provider.travelMinimumFee,
-          travelFixedFee: provider.travelCost,
-          waivesTravelOnHire: provider.waivesTravelOnHire,
+    let travelResult: TravelCalculationResult
+    if (!chargesTravel) {
+      travelResult = {
+        success: true,
+        travelCost: 0,
+        travelCostBreakdown: {
+          perKmPortion: 0,
+          fixedFee: 0,
+          minimumFee: 0,
+          appliedMinimum: false,
+          travelRatePerKm: null,
+          waivesTravelOnHire: provider.waivesTravelOnHire ?? null,
         },
-      },
-      client: {
-        coords: input.clientLat != null && input.clientLng != null
-          ? { lat: input.clientLat, lng: input.clientLng }
-          : undefined,
-        addressString: clientAddressString,
-      },
-      basePrice,
-    })
+        estimatedTotal: basePrice,
+        usedFallback: false,
+        warnings: [],
+      }
+    } else {
+      const result = await calculateTravelPricing({
+        provider: {
+          coords: providerAddress.latitude != null && providerAddress.longitude != null
+            ? { lat: providerAddress.latitude, lng: providerAddress.longitude }
+            : undefined,
+          addressString: providerAddressString,
+          travel: {
+            chargesTravel: true,
+            travelRatePerKm: provider.travelRatePerKm,
+            travelMinimumFee: provider.travelMinimumFee,
+            travelFixedFee: provider.travelCost,
+            waivesTravelOnHire: provider.waivesTravelOnHire,
+          },
+        },
+        client: {
+          coords: input.clientLat != null && input.clientLng != null
+            ? { lat: input.clientLat, lng: input.clientLng }
+            : undefined,
+          addressString: clientAddressString,
+        },
+        basePrice,
+      })
 
-    if (!travelResult.success) {
-      return NextResponse.json({
-        success: false,
-        error: 'Não foi possível calcular o deslocamento',
-        details: travelResult,
-      }, { status: 400 })
+      if (!result.success) {
+        return NextResponse.json({
+          success: false,
+          error: 'Não foi possível calcular o deslocamento',
+          details: result,
+        }, { status: 400 })
+      }
+
+      travelResult = result
     }
 
     return NextResponse.json({

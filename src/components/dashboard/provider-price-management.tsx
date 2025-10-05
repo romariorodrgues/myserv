@@ -36,8 +36,11 @@ interface ServicePrice {
   promotionalPrice?: number
   promotionalEndDate?: string
   offersScheduling?: boolean
+  offersQuoting?: boolean
   providesHomeService?: boolean
   providesLocalService?: boolean
+  chargesTravel?: boolean
+  quoteFee?: number
   allowScheduling?: boolean
   variations: Array<{
     id: string
@@ -111,8 +114,11 @@ const [newService, setNewService] = useState({
   isActive: true,
   isPromotional: false,
   offersScheduling: false,
+  offersQuoting: true,
   providesHomeService: false,
   providesLocalService: true,
+  chargesTravel: false,
+  quoteFee: 0,
   // customUnit: '',
   promotionalPrice: 0,
   promotionalEndDate: '',
@@ -155,9 +161,12 @@ type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
           isActive: s.isActive ?? true,
           isPromotional: s.isPromotional ?? false,
           offersScheduling: s.offersScheduling ?? false,
+          offersQuoting: s.offersQuoting ?? true,
           allowScheduling: s.category?.allowScheduling ?? true,
           providesHomeService: s.providesHomeService ?? false,
           providesLocalService: s.providesLocalService ?? true,
+          chargesTravel: s.chargesTravel ?? false,
+          quoteFee: s.quoteFee ?? 0,
           promotionalPrice: s.promotionalPrice ?? null,
           promotionalEndDate: s.promotionalEndDate ?? null,
           variations: s.variations ?? [],
@@ -207,8 +216,11 @@ const handleUpdateService = async (service: ServicePrice) => {
       description: typeof service.description === 'string' ? service.description : undefined,
       isActive: service.isActive,
       offersScheduling: service.offersScheduling,
+      offersQuoting: service.offersQuoting,
       providesHomeService: !!service.providesHomeService,
       providesLocalService: service.providesLocalService,
+      chargesTravel: !!service.chargesTravel,
+      quoteFee: typeof service.quoteFee === 'number' ? service.quoteFee : undefined,
     }
     if (service.categoryId && service.categoryId !== current?.categoryId) {
       body.leafCategoryId = service.categoryId
@@ -258,8 +270,11 @@ const handleUpdateService = async (service: ServicePrice) => {
         description: newService.description || undefined,
         isActive: newService.isActive, // opcional
         offersScheduling: newService.offersScheduling,
+        offersQuoting: newService.offersQuoting,
         providesHomeService: newService.providesHomeService,
         providesLocalService: newService.providesLocalService,
+        chargesTravel: newService.providesHomeService ? newService.chargesTravel : false,
+        quoteFee: newService.offersQuoting ? Number(newService.quoteFee || 0) : 0,
       }),
     });
 
@@ -274,8 +289,11 @@ const handleUpdateService = async (service: ServicePrice) => {
       description: '',
       basePrice: 0,
       offersScheduling: false,
+      offersQuoting: true,
       providesHomeService: false,
       providesLocalService: true,
+      chargesTravel: false,
+      quoteFee: 0,
     } as any));
     setShowAddService(false);
     toast.success('Serviço adicionado com sucesso!');
@@ -546,6 +564,22 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
               <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
+                    checked={newService.offersQuoting}
+                    onCheckedChange={(checked: boolean) => setNewService(prev => ({
+                      ...prev,
+                      offersQuoting: checked,
+                      quoteFee: checked ? prev.quoteFee ?? 0 : 0,
+                    }))}
+                    className="shrink-0"
+                  />
+                  <div className="space-y-1">
+                    <Label className="text-sm font-medium">Permitir pedidos de orçamento</Label>
+                    <p className="text-xs text-gray-500 leading-relaxed">Clientes poderão enviar uma solicitação antes de contratar.</p>
+                  </div>
+                </div>
+
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                  <Switch
                     checked={selectedLeaf?.allowScheduling ? newService.offersScheduling : false}
                     onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, offersScheduling: checked }))}
                     disabled={!selectedLeaf?.allowScheduling}
@@ -562,7 +596,11 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
                     checked={newService.providesHomeService || false}
-                    onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, providesHomeService: checked }))}
+                    onCheckedChange={(checked: boolean) => setNewService(prev => ({
+                      ...prev,
+                      providesHomeService: checked,
+                      chargesTravel: checked ? prev.chargesTravel : false,
+                    }))}
                     className="shrink-0"
                   />
                   <div className="space-y-1">
@@ -570,6 +608,22 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     <p className="text-xs text-gray-500 leading-relaxed">Mostra aos clientes que você atende no endereço deles.</p>
                   </div>
                 </div>
+
+                {newService.providesHomeService && (
+                  <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
+                    <Switch
+                      checked={newService.chargesTravel || false}
+                      onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, chargesTravel: checked }))}
+                      className="shrink-0"
+                    />
+                    <div className="space-y-1">
+                      <Label className="text-sm font-medium">Cobrar deslocamento</Label>
+                      <p className="text-xs text-gray-500 leading-relaxed">
+                        Quando desabilitado, o cliente verá &quot;Deslocamento grátis&quot; nas simulações.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
@@ -593,7 +647,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     <Label className="text-sm font-medium">Serviço ativo</Label>
                   </div>
                 </div>
-                
+
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
                     checked={newService.isPromotional || false}
@@ -605,6 +659,27 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                   </div>
                 </div>
               </div>
+
+              {newService.offersQuoting && (
+                <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="quote-fee">Taxa de orçamento (opcional)</Label>
+                    <Input
+                      id="quote-fee"
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={newService.quoteFee ?? 0}
+                      onChange={(e) => setNewService(prev => ({
+                        ...prev,
+                        quoteFee: Math.max(0, parseFloat(e.target.value) || 0),
+                      }))}
+                      placeholder="0.00"
+                    />
+                    <p className="text-xs text-gray-500">Será exibida ao cliente no subtotal quando ele solicitar um orçamento.</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <Button variant="outline" onClick={() => setShowAddService(false)}>
@@ -661,8 +736,19 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                         ) : (
                           <Badge className="bg-amber-100 text-amber-800">Somente orçamento</Badge>
                         )}
+                        {service.offersQuoting === false && (
+                          <Badge className="bg-gray-200 text-gray-800">Orçamento desativado</Badge>
+                        )}
+                        {service.offersQuoting !== false && (service.quoteFee ?? 0) > 0 && (
+                          <Badge className="bg-purple-100 text-purple-800">Taxa de orçamento R$ {(service.quoteFee ?? 0).toFixed(2)}</Badge>
+                        )}
                         {service.providesHomeService && (
                           <Badge className="bg-brand-cyan/10 text-brand-cyan">Atende a domicílio</Badge>
+                        )}
+                        {service.providesHomeService && (
+                          service.chargesTravel
+                            ? <Badge className="bg-rose-100 text-rose-700">Cobra deslocamento</Badge>
+                            : <Badge className="bg-emerald-100 text-emerald-700">Deslocamento grátis</Badge>
                         )}
                         {service.providesLocalService !== false && (
                           <Badge className="bg-blue-50 text-blue-800">Atendimento no local</Badge>
@@ -871,10 +957,26 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
     if (!(next.allowScheduling ?? true)) {
       next.offersScheduling = false
     }
+    if (!next.offersQuoting) {
+      next.quoteFee = 0
+    } else {
+      next.quoteFee = Math.max(0, Number(next.quoteFee ?? 0))
+    }
+    if (!next.providesHomeService) {
+      next.chargesTravel = false
+    }
     onSave(next)
   }
 
   const allowsScheduling = editedService.allowScheduling ?? true
+
+  const handleToggleHomeService = (checked: boolean) => {
+    setEditedService(prev => ({
+      ...prev,
+      providesHomeService: checked,
+      chargesTravel: checked ? prev.chargesTravel : false,
+    }))
+  }
 
 
   return (
@@ -954,7 +1056,24 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
         />
       </div>
 
-      <div className="flex items-center space-x-6">
+      <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+        <div className="flex items-center space-x-2">
+          <Switch
+            checked={editedService.offersQuoting ?? true}
+            onCheckedChange={(checked: boolean) =>
+              setEditedService(prev => ({
+                ...prev,
+                offersQuoting: checked,
+                quoteFee: checked ? prev.quoteFee ?? 0 : 0,
+              }))
+            }
+          />
+          <div>
+            <Label>Permitir pedidos de orçamento</Label>
+            <p className="text-xs text-gray-500">Clientes poderão enviar solicitações antes de fechar.</p>
+          </div>
+        </div>
+
         <div className="flex items-center space-x-2">
           <Switch
             checked={allowsScheduling ? (editedService.offersScheduling ?? false) : false}
@@ -974,15 +1093,28 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
         <div className="flex items-center space-x-2">
           <Switch
             checked={editedService.providesHomeService || false}
-            onCheckedChange={(checked: boolean) =>
-              setEditedService(prev => ({ ...prev, providesHomeService: checked }))
-            }
+            onCheckedChange={handleToggleHomeService}
           />
           <div>
             <Label>Atendimento a domicílio</Label>
             <p className="text-xs text-gray-500">Mostra aos clientes que você atende no endereço deles.</p>
           </div>
         </div>
+
+        {editedService.providesHomeService && (
+          <div className="flex items-center space-x-2">
+            <Switch
+              checked={editedService.chargesTravel || false}
+              onCheckedChange={(checked: boolean) =>
+                setEditedService(prev => ({ ...prev, chargesTravel: checked }))
+              }
+            />
+            <div>
+              <Label>Cobrar deslocamento</Label>
+              <p className="text-xs text-gray-500">Desligado = o cliente verá &quot;Deslocamento grátis&quot;.</p>
+            </div>
+          </div>
+        )}
 
         <div className="flex items-center space-x-2">
           <Switch
@@ -1017,6 +1149,28 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
           <Label>Promocional</Label>
         </div>
       </div>
+
+      {editedService.offersQuoting !== false && (
+        <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2">
+          <div className="space-y-2">
+            <Label htmlFor="edit-quote-fee">Taxa de orçamento</Label>
+            <Input
+              id="edit-quote-fee"
+              type="number"
+              min="0"
+              step="0.01"
+              value={editedService.quoteFee ?? 0}
+              onChange={(e) =>
+                setEditedService(prev => ({
+                  ...prev,
+                  quoteFee: Math.max(0, parseFloat(e.target.value) || 0),
+                }))
+              }
+            />
+            <p className="text-xs text-gray-500">Exibida ao cliente no subtotal do orçamento.</p>
+          </div>
+        </div>
+      )}
 
       {editedService.isPromotional && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

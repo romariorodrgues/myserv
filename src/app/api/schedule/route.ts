@@ -203,6 +203,14 @@ export async function GET(request: NextRequest) {
               isAvailable = false
             }
           }
+
+          if (isAvailable) {
+            const slotDateTime = new Date(`${date}T${slot.startTime}`)
+            const now = new Date()
+            if (!Number.isNaN(slotDateTime.getTime()) && slotDateTime.getTime() <= now.getTime()) {
+              isAvailable = false
+            }
+          }
         }
         return {
           id: slot.id,
@@ -336,6 +344,14 @@ export async function POST(request: NextRequest) {
       // Enforce min/max advance
       const selectedDate = new Date(validatedData.date + 'T' + validatedData.startTime)
       const now = new Date()
+
+      if (Number.isNaN(selectedDate.getTime())) {
+        return NextResponse.json({ success: false, error: 'Data ou horário inválido' }, { status: 400 })
+      }
+      if (selectedDate.getTime() <= now.getTime()) {
+        return NextResponse.json({ success: false, error: 'Não é possível agendar em um horário que já passou' }, { status: 400 })
+      }
+
       const diffMs = selectedDate.getTime() - now.getTime()
       if (minAdvanceHours > 0 && diffMs < minAdvanceHours * 3600_000) {
         return NextResponse.json({ success: false, error: 'Data/hora abaixo da antecedência mínima' }, { status: 400 })

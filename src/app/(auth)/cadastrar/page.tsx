@@ -71,6 +71,7 @@ function RegisterPageContent() {
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
   const [profileImageDataUrl, setProfileImageDataUrl] = useState<string | null>(null)
   const [profileImageError, setProfileImageError] = useState<string | null>(null)
+  const [submitAttempted, setSubmitAttempted] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const planFeatures: Record<'FREE' | 'PREMIUM', string[]> = {
     FREE: [
@@ -86,6 +87,64 @@ function RegisterPageContent() {
       'Relatórios básicos',
     ],
   }
+
+  const MIN_PROFILE_IMAGE_SIZE_PX = 400
+  const MAX_PROFILE_IMAGE_SIZE_PX = 4000
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+  type FieldKey = 'name' | 'email' | 'phone' | 'cpfCnpj' | 'password' | 'confirmPassword' | 'acceptTerms'
+  type FieldErrors = Partial<Record<FieldKey, string>>
+
+  const trackedFields: FieldKey[] = ['name', 'email', 'phone', 'cpfCnpj', 'password', 'confirmPassword', 'acceptTerms']
+  const isFieldKey = (value: string): value is FieldKey => trackedFields.includes(value as FieldKey)
+
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
+  const [touched, setTouched] = useState<Record<FieldKey, boolean>>({} as Record<FieldKey, boolean>)
+
+  const markFieldTouched = (field: FieldKey) => {
+    setTouched((prev) => ({ ...prev, [field]: true }))
+  }
+
+  const validateFormFields = (state: RegisterFormData, options: { includeTerms?: boolean } = {}) => {
+    const errors: FieldErrors = {}
+
+    if (!state.name.trim()) {
+      errors.name = 'Informe seu nome completo.'
+    }
+
+    if (!emailRegex.test(state.email.trim())) {
+      errors.email = 'Informe um e-mail válido.'
+    }
+
+    const phoneDigits = state.phone.replace(/\D/g, '')
+    if (phoneDigits.length < 10) {
+      errors.phone = 'Informe um número de WhatsApp válido com DDD.'
+    }
+
+    const documentDigits = state.cpfCnpj.replace(/\D/g, '')
+    const requiresCnpj = state.userType === UserTypeValues.SERVICE_PROVIDER && state.personType === 'PJ'
+    const expectedDocLength = requiresCnpj ? 14 : 11
+    if (documentDigits.length !== expectedDocLength) {
+      errors.cpfCnpj = requiresCnpj ? 'Informe um CNPJ válido.' : 'Informe um CPF válido.'
+    }
+
+    if (state.password.length < 8) {
+      errors.password = 'A senha deve ter pelo menos 8 caracteres.'
+    }
+
+    if (state.password !== state.confirmPassword) {
+      errors.confirmPassword = 'As senhas não coincidem.'
+    }
+
+    if (options.includeTerms && !state.acceptTerms) {
+      errors.acceptTerms = 'É necessário aceitar os termos para continuar.'
+    }
+
+    return errors
+  }
+
+  const showFieldError = (field: FieldKey) => Boolean(fieldErrors[field] && (submitAttempted || touched[field]))
+  const getFirstErrorMessage = (errors: FieldErrors) => Object.values(errors).find(Boolean) || null
 
   const handleProfileImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -112,9 +171,33 @@ function RegisterPageContent() {
     const reader = new FileReader()
     reader.onload = () => {
       const result = reader.result as string
-      setProfileImagePreview(result)
-      setProfileImageDataUrl(result)
-      setProfileImageError(null)
+      const image = new window.Image()
+      image.onload = () => {
+        if (image.width < MIN_PROFILE_IMAGE_SIZE_PX || image.height < MIN_PROFILE_IMAGE_SIZE_PX) {
+          setProfileImageError(`Use uma imagem com no mínimo ${MIN_PROFILE_IMAGE_SIZE_PX}x${MIN_PROFILE_IMAGE_SIZE_PX} pixels`)
+          setProfileImagePreview(null)
+          setProfileImageDataUrl(null)
+          return
+        }
+
+        if (image.width > MAX_PROFILE_IMAGE_SIZE_PX || image.height > MAX_PROFILE_IMAGE_SIZE_PX) {
+          setProfileImageError(`Use uma imagem com no máximo ${MAX_PROFILE_IMAGE_SIZE_PX}x${MAX_PROFILE_IMAGE_SIZE_PX} pixels`)
+          setProfileImagePreview(null)
+          setProfileImageDataUrl(null)
+          return
+        }
+
+        setProfileImagePreview(result)
+        setProfileImageDataUrl(result)
+        setProfileImageError(null)
+        setFormError((prev) => (prev === profileImageError ? null : prev))
+      }
+      image.onerror = () => {
+        setProfileImageError('Não foi possível ler a imagem selecionada. Tente outro arquivo.')
+        setProfileImagePreview(null)
+        setProfileImageDataUrl(null)
+      }
+      image.src = result
     }
     reader.readAsDataURL(file)
   }
@@ -160,56 +243,43 @@ function RegisterPageContent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setFormError(null)
-    setIsLoading(true)
+    setSubmitAttempted(true)
+    const touchedAll = trackedFields.reduce((acc, field) => ({ ...acc, [field]: true }), {} as Record<FieldKey, boolean>)
+    setTouched((prev) => ({ ...touchedAll, ...prev }))
 
-    const passwordInput = document.getElementById('password') as HTMLInputElement
-    const confirmInput = document.getElementById('confirmPassword') as HTMLInputElement
+    const errors = validateFormFields(formData, { includeTerms: true })
+    setFieldErrors(errors)
+    const firstError = getFirstErrorMessage(errors)
 
-    if (passwordInput.value !== confirmInput.value) {
-      confirmInput.setCustomValidity('As senhas não coincidem')
-      confirmInput.reportValidity()
-      setIsLoading(false)
+    if (firstError) {
+      setFormError(firstError)
+      toast.error(firstError)
       return
-    } else {
-      confirmInput.setCustomValidity('')
     }
 
+    if (formData.userType === 'SERVICE_PROVIDER' && step === 1) {
+      setStep(2)
+      setSelectedPlan(formData.personType === 'PJ' ? 'PREMIUM' : 'FREE')
+      return
+    }
+
+    if (profileImageError) {
+      setFormError(profileImageError)
+      toast.error(profileImageError)
+      return
+    }
+
+    if (!profileImageDataUrl) {
+      const message = 'Envie uma foto de perfil para continuar.'
+      setProfileImageError(message)
+      setFormError(message)
+      toast.error(message)
+      return
+    }
+
+    setIsLoading(true)
+
     try {
-      if (formData.userType === 'SERVICE_PROVIDER') {
-        if (step === 1) {
-          if (formData.personType === 'PF' && formData.cpfCnpj.replace(/\D/g, '').length < 11) {
-            setFormError('CPF obrigatório para pessoa física')
-            toast.error('Informe um CPF válido para continuar')
-            setIsLoading(false)
-            return
-          }
-          if (formData.personType === 'PJ' && formData.cpfCnpj.replace(/\D/g, '').length < 14) {
-            setFormError('CNPJ obrigatório para pessoa jurídica')
-            toast.error('Informe um CNPJ válido para continuar')
-            setIsLoading(false)
-            return
-          }
-          setStep(2)
-          setSelectedPlan(formData.personType === 'PJ' ? 'PREMIUM' : 'FREE')
-          setIsLoading(false)
-          return
-        }
-      }
-
-      if (profileImageError) {
-        setFormError(profileImageError)
-        setIsLoading(false)
-        return
-      }
-
-      if (!profileImageDataUrl) {
-        const message = 'Envie uma foto de perfil para continuar'
-        setProfileImageError(message)
-        setFormError(message)
-        setIsLoading(false)
-        return
-      }
-
       const payload: Record<string, unknown> = {
         ...formData,
         phone: formData.phone.replace(/\D/g, ''),
@@ -254,6 +324,11 @@ function RegisterPageContent() {
     const { name, value, type } = e.target
     const isCheckbox = type === 'checkbox'
 
+    if (isFieldKey(name)) {
+      markFieldTouched(name)
+    }
+
+    let updatedState: RegisterFormData | null = null
     setFormData((prev) => {
       let nextValue: any = isCheckbox ? (e.target as HTMLInputElement).checked : value
       const nextState = { ...prev }
@@ -269,7 +344,7 @@ function RegisterPageContent() {
         nextValue = isPJ ? formatCNPJ(digits) : formatCPF(digits)
       }
 
-      nextState[name] = nextValue
+      nextState[name as keyof RegisterFormData] = nextValue
 
       if (name === 'userType') {
         if (nextValue === UserTypeValues.CLIENT) {
@@ -292,39 +367,65 @@ function RegisterPageContent() {
         }
       }
 
+      updatedState = nextState
       return nextState
     })
+
+    if (updatedState) {
+      const includeTerms = submitAttempted || updatedState.acceptTerms
+      setFieldErrors(validateFormFields(updatedState, { includeTerms }))
+    }
+
+    if (formError) {
+      setFormError(null)
+    }
   }
 
   const completeProviderRegistration = async () => {
-    if (!selectedPlan) {
-      setFormError('Escolha um plano para continuar')
-      toast.error('Selecione um plano para concluir o cadastro')
+    setSubmitAttempted(true)
+    const touchedAll = trackedFields.reduce((acc, field) => ({ ...acc, [field]: true }), {} as Record<FieldKey, boolean>)
+    setTouched((prev) => ({ ...touchedAll, ...prev }))
+
+    const errors = validateFormFields(formData, { includeTerms: true })
+    setFieldErrors(errors)
+    const firstError = getFirstErrorMessage(errors)
+    if (firstError) {
+      setFormError(firstError)
+      toast.error(firstError)
       return
     }
+
+    if (!selectedPlan) {
+      const message = 'Escolha um plano para continuar.'
+      setFormError(message)
+      toast.error(message)
+      return
+    }
+
     if (formData.personType === 'PJ' && selectedPlan !== 'PREMIUM') {
-      setFormError('Pessoa jurídica deve escolher o plano profissional')
-      toast.error('Pessoa jurídica deve escolher o plano profissional')
+      const message = 'Pessoa jurídica deve escolher o plano profissional.'
+      setFormError(message)
+      toast.error(message)
+      return
+    }
+
+    if (profileImageError) {
+      setFormError(profileImageError)
+      toast.error(profileImageError)
+      return
+    }
+
+    if (!profileImageDataUrl) {
+      const message = 'Envie uma foto de perfil para continuar.'
+      setProfileImageError(message)
+      setFormError(message)
+      toast.error(message)
       return
     }
 
     setIsLoading(true)
     setFormError(null)
     try {
-      if (profileImageError) {
-        setFormError(profileImageError)
-        setIsLoading(false)
-        return
-      }
-
-      if (!profileImageDataUrl) {
-        const message = 'Envie uma foto de perfil para continuar'
-        setProfileImageError(message)
-        setFormError(message)
-        setIsLoading(false)
-        return
-      }
-
       const payload: any = {
         ...formData,
         phone: formData.phone.replace(/\D/g, ''),
@@ -544,7 +645,7 @@ function RegisterPageContent() {
                   )}
                 </div>
                 <div className="flex-1 text-sm text-gray-600 text-center sm:text-left">
-                  <p>Envie uma foto nítida do seu rosto. Formatos aceitos: JPG, PNG ou WebP (máx. 5MB).</p>
+                  <p>Envie uma foto nítida do seu rosto. Formatos aceitos: JPG, PNG ou WebP (até 5&nbsp;MB). Utilize imagens quadradas entre {MIN_PROFILE_IMAGE_SIZE_PX}x{MIN_PROFILE_IMAGE_SIZE_PX} px e {MAX_PROFILE_IMAGE_SIZE_PX}x{MAX_PROFILE_IMAGE_SIZE_PX} px — nós ajustaremos automaticamente para 400x400 px.</p>
                   {profileImageError && (
                     <p className="text-xs text-red-600 mt-2">{profileImageError}</p>
                   )}
@@ -568,12 +669,16 @@ function RegisterPageContent() {
                     name="name"
                     type="text"
                     required
-                    className="pl-10"
+                    className={`pl-10 ${showFieldError('name') ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500' : ''}`}
                     placeholder="Seu nome completo"
                     value={formData.name}
                     onChange={handleInputChange}
+                    onBlur={() => markFieldTouched('name')}
                   />
                 </div>
+                {showFieldError('name') && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.name}</p>
+                )}
               </div>
 
               <div>
@@ -587,12 +692,16 @@ function RegisterPageContent() {
                     name="email"
                     type="email"
                     required
-                    className="pl-10"
+                    className={`pl-10 ${showFieldError('email') ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500' : ''}`}
                     placeholder="seu@email.com"
                     value={formData.email}
                     onChange={handleInputChange}
+                    onBlur={() => markFieldTouched('email')}
                   />
                 </div>
+                {showFieldError('email') && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.email}</p>
+                )}
               </div>
 
               <div>
@@ -606,13 +715,17 @@ function RegisterPageContent() {
                     name="phone"
                     type="tel"
                     required
-                    className="pl-10"
+                    className={`pl-10 ${showFieldError('phone') ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500' : ''}`}
                     placeholder="(11) 99999-9999"
                     value={formData.phone}
                     maxLength={15}
                     onChange={handleInputChange}
+                    onBlur={() => markFieldTouched('phone')}
                   />
                 </div>
+                {showFieldError('phone') && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.phone}</p>
+                )}
               </div>
 
               <div>
@@ -626,13 +739,17 @@ function RegisterPageContent() {
                     name="cpfCnpj"
                     type="text"
                     required
-                    className="pl-10"
+                    className={`pl-10 ${showFieldError('cpfCnpj') ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500' : ''}`}
                     placeholder={formData.userType === UserTypeValues.SERVICE_PROVIDER && formData.personType === 'PJ' ? '00.000.000/0000-00' : '000.000.000-00'}
                     value={formData.cpfCnpj}
                     maxLength={formData.userType === UserTypeValues.SERVICE_PROVIDER && formData.personType === 'PJ' ? 18 : 14}
                     onChange={handleInputChange}
+                    onBlur={() => markFieldTouched('cpfCnpj')}
                   />
                 </div>
+                {showFieldError('cpfCnpj') && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.cpfCnpj}</p>
+                )}
               </div>
             </div>
 
@@ -723,10 +840,11 @@ function RegisterPageContent() {
                     name="password"
                     type={showPassword ? 'text' : 'password'}
                     required
-                    className="pl-10 pr-10"
+                    className={`pl-10 pr-10 ${showFieldError('password') ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500' : ''}`}
                     placeholder="Mínimo 8 caracteres"
                     value={formData.password}
                     onChange={handleInputChange}
+                    onBlur={() => markFieldTouched('password')}
                   />
                   <button
                     type="button"
@@ -736,6 +854,9 @@ function RegisterPageContent() {
                     {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {showFieldError('password') && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.password}</p>
+                )}
               </div>
 
               <div>
@@ -749,18 +870,11 @@ function RegisterPageContent() {
                     name="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
                     required
-                    className="pl-10 pr-10"
+                    className={`pl-10 pr-10 ${showFieldError('confirmPassword') ? 'border-red-500 focus-visible:ring-red-500 focus-visible:border-red-500' : ''}`}
                     placeholder="Confirme sua senha"
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    onInvalid={(e) =>
-                      e.currentTarget.setCustomValidity(
-                        formData.confirmPassword !== formData.password
-                          ? 'As senhas não coincidem'
-                          : ''
-                      )
-                    }
-                    onInput={(e) => e.currentTarget.setCustomValidity('')}
+                    onBlur={() => markFieldTouched('confirmPassword')}
                   />
 
                   <button
@@ -771,6 +885,9 @@ function RegisterPageContent() {
                     {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                   </button>
                 </div>
+                {showFieldError('confirmPassword') && (
+                  <p className="mt-1 text-xs text-red-600">{fieldErrors.confirmPassword}</p>
+                )}
               </div>
             </div>
 
@@ -784,6 +901,7 @@ function RegisterPageContent() {
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded mt-1"
                 checked={formData.acceptTerms}
                 onChange={handleInputChange}
+                onBlur={() => markFieldTouched('acceptTerms')}
               />
               <label htmlFor="acceptTerms" className="ml-2 block text-sm text-gray-900">
                 Aceito os{' '}
@@ -796,6 +914,9 @@ function RegisterPageContent() {
                 </Link>
               </label>
             </div>
+            {showFieldError('acceptTerms') && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.acceptTerms}</p>
+            )}
 
             {formError && (
               <p className="text-sm text-red-600">{formError}</p>

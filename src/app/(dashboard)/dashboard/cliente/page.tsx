@@ -169,7 +169,7 @@ if (!session) {
       <div className="space-y-6">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {[...Array(3)].map((_, i) => (
               <div key={i} className="bg-gray-200 rounded-lg h-32"></div>
             ))}
@@ -186,16 +186,16 @@ if (!session) {
     <SupportChatWidgetWrapper />
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard do Cliente</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-navy">Dashboard do Cliente</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Bem-vindo de volta, {session?.user?.name ?? 'usuário'}!
           </p>
         </div>
-        
-        <div className="flex items-center space-x-2 mt-4 sm:mt-0">
-          <Button asChild>
+
+        <div className="flex flex-wrap gap-2">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/servicos">
               <Search className="h-4 w-4 mr-2" />
               Buscar Serviços
@@ -227,7 +227,7 @@ if (!session) {
         </nav>
       </div> */}
       <div className="border-b">
-  <nav className="flex justify-around overflow-x-auto">
+  <nav className="flex flex-wrap justify-between sm:justify-start gap-1 sm:gap-4 overflow-x-auto pb-1">
     {tabs.map((tab) => {
       const Icon = tab.icon
       const isActive = activeTab === tab.id
@@ -235,7 +235,7 @@ if (!session) {
         <button
           key={tab.id}
           onClick={() => setActiveTab(tab.id as TabOption)}
-          className={`flex flex-col items-center justify-center px-3 py-3 text-sm font-semibold transition-colors border-b-4 ${
+          className={`flex flex-col items-center justify-center min-w-[120px] px-2 py-2 text-sm font-semibold transition-colors border-b-4 rounded-t-md ${
             isActive
               ? 'text-[#00a9d4] border-[#00a9d4]'
               : 'text-gray-500 border-transparent hover:text-[#00a9d4]'
@@ -324,14 +324,14 @@ if (!session) {
                   {bookings.slice(0, 3).map((booking) => (
                     <div
                       key={booking.id}
-                      className="flex items-start space-x-4 p-4 border rounded-lg hover:shadow-md transition-shadow"
+                      className="flex flex-col md:flex-row md:items-start gap-4 p-4 border rounded-lg hover:shadow-md transition-shadow"
                     >
-                      <div className="flex-shrink-0 mt-1">
+                      <div className="flex-shrink-0 md:mt-1">
                         {getStatusIcon(booking.status)}
                       </div>
                       
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between mb-2">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
                           <h3 className="text-sm font-medium text-foreground truncate">
                             {booking.service.name}
                           </h3>
@@ -342,19 +342,19 @@ if (!session) {
                           {booking.description}
                         </p>
                         
-                        <div className="flex items-center space-x-4 text-xs text-muted-foreground">
-                          <div className="flex items-center space-x-1">
+                        <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                          <div className="inline-flex items-center space-x-1">
                             <User className="h-3 w-3" />
                             <span>{booking.serviceProvider.user.name}</span>
                           </div>
                           
-                          <div className="flex items-center space-x-1">
+                          <div className="inline-flex items-center space-x-1">
                             <MapPin className="h-3 w-3" />
                             <span>{booking.city}, {booking.state}</span>
                           </div>
                           
                           {booking.preferredDate && (
-                            <div className="flex items-center space-x-1">
+                            <div className="inline-flex items-center space-x-1">
                               <Calendar className="h-3 w-3" />
                               <span>{formatDate(booking.preferredDate)}</span>
                             </div>
@@ -383,25 +383,25 @@ if (!session) {
               <CardTitle>Ações Rápidas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button className="h-20 flex-col" variant="outline" asChild>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" asChild>
                   <Link href="/servicos">
                     <Search className="h-6 w-6 mb-2" />
                     Buscar Serviços
                   </Link>
                 </Button>
                 
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('history')}>
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('history')}>
                   <History className="h-6 w-6 mb-2" />
                   Ver Histórico
                 </Button>
                 
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('favorites')}>
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('favorites')}>
                   <Heart className="h-6 w-6 mb-2" />
                   Meus Favoritos
                 </Button>
                 
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('settings')}>
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('settings')}>
                   <Settings className="h-6 w-6 mb-2" />
                   Configurações
                 </Button>

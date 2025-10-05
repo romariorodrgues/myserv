@@ -69,8 +69,11 @@ export async function GET() {
         unit: s.unit,
         isActive: s.isActive,
         offersScheduling: s.offersScheduling,
+        offersQuoting: s.offersQuoting,
         providesHomeService: s.providesHomeService,
         providesLocalService: s.providesLocalService,
+        chargesTravel: s.chargesTravel,
+        quoteFee: s.quoteFee,
         category: s.service.category,
         categoryId: s.service.categoryId,
         allowScheduling: s.service.category?.allowScheduling ?? true,
@@ -92,8 +95,11 @@ const upsertSchema = z.object({
   description: z.string().max(2000).optional(),
   isActive: z.boolean().optional(),
   offersScheduling: z.boolean().optional(),
+  offersQuoting: z.boolean().optional(),
   providesHomeService: z.boolean().optional(),
   providesLocalService: z.boolean().optional(),
+  chargesTravel: z.boolean().optional(),
+  quoteFee: z.number().nonnegative().optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -157,9 +163,18 @@ export async function POST(req: NextRequest) {
     // upsert do vínculo prestador x serviço (único por [serviceProviderId, serviceId])
     const requestedHomeService = typeof input.providesHomeService === 'boolean' ? input.providesHomeService : undefined
     const requestedLocalService = typeof input.providesLocalService === 'boolean' ? input.providesLocalService : undefined
+    const requestedQuoting = typeof input.offersQuoting === 'boolean' ? input.offersQuoting : undefined
+    const requestedChargesTravel = typeof input.chargesTravel === 'boolean' ? input.chargesTravel : undefined
+    const requestedQuoteFee = typeof input.quoteFee === 'number' ? input.quoteFee : undefined
 
     const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
     const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
+    const travelData = requestedChargesTravel !== undefined ? { chargesTravel: requestedChargesTravel } : {}
+    const quoteFeeData = requestedQuoting === false
+      ? { quoteFee: 0 }
+      : requestedQuoteFee !== undefined
+        ? { quoteFee: requestedQuoteFee }
+        : {}
 
     const link = await prisma.serviceProviderService.upsert({
       where: {
@@ -174,8 +189,11 @@ export async function POST(req: NextRequest) {
         description: input.description ?? null,
         isActive: input.isActive ?? true,
         offersScheduling: cat.allowScheduling && !!input.offersScheduling,
+        offersQuoting: requestedQuoting ?? true,
         ...homeServiceData,
         ...localServiceData,
+        ...travelData,
+        ...quoteFeeData,
       },
       create: {
         serviceProviderId: sp.id,
@@ -185,8 +203,11 @@ export async function POST(req: NextRequest) {
         description: input.description ?? null,
         isActive: input.isActive ?? true,
         offersScheduling: cat.allowScheduling && !!input.offersScheduling,
+        offersQuoting: requestedQuoting ?? true,
         providesHomeService: requestedHomeService ?? false,
         providesLocalService: requestedLocalService ?? true,
+        chargesTravel: requestedChargesTravel ?? false,
+        quoteFee: requestedQuoting === false ? 0 : (requestedQuoteFee ?? 0),
       },
       include: {
         service: { include: { category: { select: { id: true, name: true, icon: true, allowScheduling: true } } } }
@@ -207,8 +228,11 @@ export async function POST(req: NextRequest) {
         unit: link.unit,
         isActive: link.isActive,
         offersScheduling: link.offersScheduling,
+        offersQuoting: link.offersQuoting,
         providesHomeService: link.providesHomeService,
         providesLocalService: link.providesLocalService,
+        chargesTravel: link.chargesTravel,
+        quoteFee: link.quoteFee,
         category: link.service.category,
         categoryId: service.categoryId,
         allowScheduling: link.service.category.allowScheduling,
@@ -294,11 +318,14 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService, providesLocalService } = await req.json()
+    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService, providesLocalService, offersQuoting, chargesTravel, quoteFee } = await req.json()
 
     const requestedScheduling = typeof offersScheduling === 'boolean' ? offersScheduling : undefined
     const requestedHomeService = typeof providesHomeService === 'boolean' ? providesHomeService : undefined
     const requestedLocalService = typeof providesLocalService === 'boolean' ? providesLocalService : undefined
+    const requestedQuoting = typeof offersQuoting === 'boolean' ? offersQuoting : undefined
+    const requestedChargesTravel = typeof chargesTravel === 'boolean' ? chargesTravel : undefined
+    const requestedQuoteFee = typeof quoteFee === 'number' ? quoteFee : undefined
 
     const sps = await prisma.serviceProviderService.findUnique({
       where: { id: serviceProviderServiceId },
@@ -317,6 +344,16 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Não autorizado' }, { status: 403 })
     }
 
+    const baseHomeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
+    const baseLocalServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
+    const baseQuotingData = requestedQuoting !== undefined ? { offersQuoting: requestedQuoting } : {}
+    const baseTravelData = requestedChargesTravel !== undefined ? { chargesTravel: requestedChargesTravel } : {}
+    const baseQuoteFeeData = requestedQuoting === false
+      ? { quoteFee: 0 }
+      : requestedQuoteFee !== undefined
+        ? { quoteFee: requestedQuoteFee }
+        : {}
+
     // Se veio uma nova folha, mover para o serviço canônico da nova categoria
     if (typeof leafCategoryId === 'string') {
       const cat = await prisma.serviceCategory.findUnique({ where: { id: leafCategoryId }, select: { id: true, isLeaf: true, isActive: true, name: true, allowScheduling: true } })
@@ -330,8 +367,8 @@ export async function PATCH(req: NextRequest) {
       const schedulingData = {
         offersScheduling: cat.allowScheduling ? (requestedScheduling ?? false) : false,
       }
-      const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
-      const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
+      const homeServiceData = baseHomeServiceData
+      const localServiceData = baseLocalServiceData
 
       const selectSvc = { id: true, categoryId: true } as const
       let target = await prisma.service.findFirst({ where: { categoryId: cat.id }, select: selectSvc })
@@ -356,6 +393,9 @@ export async function PATCH(req: NextRequest) {
               ...schedulingData,
               ...homeServiceData,
               ...localServiceData,
+              ...baseQuotingData,
+              ...baseTravelData,
+              ...baseQuoteFeeData,
             }
           })
           await prisma.serviceProviderService.delete({ where: { id: serviceProviderServiceId } })
@@ -371,13 +411,14 @@ export async function PATCH(req: NextRequest) {
               ...schedulingData,
               ...homeServiceData,
               ...localServiceData,
+              ...baseQuotingData,
+              ...baseTravelData,
+              ...baseQuoteFeeData,
             }
           })
         }
       } else {
         // mesma folha — apenas atualiza campos
-        const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
-        const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
         await prisma.serviceProviderService.update({
           where: { id: serviceProviderServiceId },
           data: {
@@ -388,6 +429,9 @@ export async function PATCH(req: NextRequest) {
             ...schedulingData,
             ...homeServiceData,
             ...localServiceData,
+            ...baseQuotingData,
+            ...baseTravelData,
+            ...baseQuoteFeeData,
           }
         })
       }
@@ -397,8 +441,6 @@ export async function PATCH(req: NextRequest) {
       const schedulingData: { offersScheduling?: boolean } = currentAllows
         ? (requestedScheduling !== undefined ? { offersScheduling: requestedScheduling } : {})
         : { offersScheduling: false }
-      const homeServiceData = requestedHomeService !== undefined ? { providesHomeService: requestedHomeService } : {}
-      const localServiceData = requestedLocalService !== undefined ? { providesLocalService: requestedLocalService } : {}
 
       await prisma.serviceProviderService.update({
         where: { id: serviceProviderServiceId },
@@ -408,8 +450,11 @@ export async function PATCH(req: NextRequest) {
           ...(typeof description === 'string' ? { description } : {}),
           ...(typeof isActive === 'boolean' ? { isActive } : {}),
           ...schedulingData,
-          ...homeServiceData,
-          ...localServiceData,
+          ...baseHomeServiceData,
+          ...baseLocalServiceData,
+          ...baseQuotingData,
+          ...baseTravelData,
+          ...baseQuoteFeeData,
         }
       })
     }

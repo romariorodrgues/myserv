@@ -10,7 +10,7 @@ import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
 import { WhatsAppService } from '@/lib/whatsapp-service'
 import { EmailService } from '@/lib/email-service'
-import calculateTravelPricing from '@/lib/travel-calculator'
+import calculateTravelPricing, { type TravelCalculationResult } from '@/lib/travel-calculator'
 
 // Validation schema for booking creation
 const createBookingSchema = z.object({
@@ -25,7 +25,8 @@ const createBookingSchema = z.object({
   address: z.string().min(5, 'Endereço deve ter pelo menos 5 caracteres'),
   city: z.string().min(2, 'Cidade é obrigatória'),
   state: z.string().min(2, 'Estado é obrigatório'),
-  zipCode: z.string().min(8, 'CEP deve ter 8 caracteres')
+  zipCode: z.string().min(8, 'CEP deve ter 8 caracteres'),
+  fulfillmentMode: z.enum(['HOME', 'LOCAL']).optional()
 })
 
 function buildAddressString(parts: Array<string | null | undefined>): string | undefined {
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const validatedData = createBookingSchema.parse(body)
+    const fulfillmentMode = validatedData.fulfillmentMode === 'LOCAL' ? 'LOCAL' : 'HOME'
 
     // Verify that service and provider exist and are active
     // Aceita tanto ServiceProvider.id quanto User.id
@@ -115,28 +117,65 @@ export async function POST(request: NextRequest) {
       'Brasil'
     ])
 
+    const requestType = (validatedData.preferredDate || validatedData.preferredTime) ? 'SCHEDULING' : 'QUOTE'
+
+    let selectedDateTime: Date | null = null
+    if (requestType === 'SCHEDULING') {
+      if (!validatedData.preferredDate || !validatedData.preferredTime) {
+        return NextResponse.json({ success: false, error: 'Data e horário são obrigatórios para agendamento.' }, { status: 400 })
+      }
+
+      selectedDateTime = new Date(`${validatedData.preferredDate}T${validatedData.preferredTime}`)
+      if (Number.isNaN(selectedDateTime.getTime())) {
+        return NextResponse.json({ success: false, error: 'Data ou horário inválido.' }, { status: 400 })
+      }
+
+      if (selectedDateTime.getTime() <= Date.now()) {
+        return NextResponse.json({ success: false, error: 'Não é possível agendar em um horário que já passou.' }, { status: 400 })
+      }
+    }
+
     const providerServiceLink = serviceProvider.services?.[0]
+    const basePriceValue = providerServiceLink?.basePrice ?? null
+    const chargesTravel = fulfillmentMode === 'HOME'
+      ? (providerServiceLink?.chargesTravel ?? serviceProvider.chargesTravel)
+      : false
 
-    const travelQuote = await calculateTravelPricing({
-      provider: {
-        coords: providerCoords,
-        addressString: providerAddressString,
-        travel: {
-          chargesTravel: serviceProvider.chargesTravel,
-          travelRatePerKm: serviceProvider.travelRatePerKm,
-          travelMinimumFee: serviceProvider.travelMinimumFee,
-          travelFixedFee: serviceProvider.travelCost,
-          waivesTravelOnHire: serviceProvider.waivesTravelOnHire,
+    let travelQuote: TravelCalculationResult | null = null
+    if (chargesTravel) {
+      travelQuote = await calculateTravelPricing({
+        provider: {
+          coords: providerCoords,
+          addressString: providerAddressString,
+          travel: {
+            chargesTravel: true,
+            travelRatePerKm: serviceProvider.travelRatePerKm,
+            travelMinimumFee: serviceProvider.travelMinimumFee,
+            travelFixedFee: serviceProvider.travelCost,
+            waivesTravelOnHire: serviceProvider.waivesTravelOnHire,
+          },
         },
-      },
-      client: {
-        coords: undefined,
-        addressString: clientAddressString,
-      },
-      basePrice: providerServiceLink?.basePrice ?? null,
-    })
+        client: {
+          coords: undefined,
+          addressString: clientAddressString,
+        },
+        basePrice: basePriceValue,
+      })
 
-    const estimatedPrice = travelQuote.estimatedTotal ?? providerServiceLink?.basePrice ?? null
+      if (!travelQuote.success) {
+        return NextResponse.json({
+          success: false,
+          error: 'Não foi possível calcular o deslocamento',
+          details: travelQuote,
+        }, { status: 400 })
+      }
+    }
+
+    const travelCostValue = chargesTravel ? travelQuote?.travelCost ?? 0 : 0
+    const quoteFeeAmount = requestType === 'QUOTE' ? (providerServiceLink?.quoteFee ?? 0) : 0
+    const subtotal = (basePriceValue ?? 0) + travelCostValue
+    const hasPriceInfo = basePriceValue != null || travelCostValue > 0 || quoteFeeAmount > 0
+    const estimatedPrice = hasPriceInfo ? Math.round((subtotal + quoteFeeAmount) * 100) / 100 : null
 
     // For now, we'll create a temporary user or use a guest booking system
     // In a real implementation, we'd get the user from the session
@@ -160,9 +199,6 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Define request type (QUOTE by default; SCHEDULING when preferred date/time provided)
-    const requestType = (validatedData.preferredDate || validatedData.preferredTime) ? 'SCHEDULING' : 'QUOTE'
-
     // Load provider schedule settings
     const settingsKey = `provider_schedule_settings:${serviceProvider.userId}`
     const settingsRec = await prisma.systemSettings.findUnique({ where: { key: settingsKey } })
@@ -180,7 +216,7 @@ export async function POST(request: NextRequest) {
       nextDay.setDate(nextDay.getDate() + 1)
 
       // Enforce min/max advance
-      const selectedDate = new Date(`${validatedData.preferredDate}T${validatedData.preferredTime}`)
+      const selectedDate = selectedDateTime ?? new Date(`${validatedData.preferredDate}T${validatedData.preferredTime}`)
       const now = new Date()
       const diffMs = selectedDate.getTime() - now.getTime()
       if (minAdvanceHours > 0 && diffMs < minAdvanceHours * 3600_000) {
@@ -245,13 +281,14 @@ export async function POST(request: NextRequest) {
           : 'PENDING',
         expiresAt: requestType === 'SCHEDULING' && !autoAccept ? holdExpiresAt : null,
         estimatedPrice,
-        travelCost: travelQuote.travelCost,
-        basePriceSnapshot: providerServiceLink?.basePrice ?? null,
-        travelDistanceKm: travelQuote.success ? travelQuote.distanceKm ?? null : null,
-        travelDurationMinutes: travelQuote.success ? travelQuote.durationMinutes ?? null : null,
-        travelRatePerKmSnapshot: serviceProvider.travelRatePerKm ?? null,
-        travelMinimumFeeSnapshot: serviceProvider.travelMinimumFee ?? null,
-        travelFixedFeeSnapshot: serviceProvider.travelCost ?? null
+        travelCost: travelCostValue,
+        basePriceSnapshot: basePriceValue,
+        travelDistanceKm: chargesTravel && travelQuote?.success ? travelQuote.distanceKm ?? null : null,
+        travelDurationMinutes: chargesTravel && travelQuote?.success ? travelQuote.durationMinutes ?? null : null,
+        travelRatePerKmSnapshot: chargesTravel ? serviceProvider.travelRatePerKm ?? null : null,
+        travelMinimumFeeSnapshot: chargesTravel ? serviceProvider.travelMinimumFee ?? null : null,
+        travelFixedFeeSnapshot: chargesTravel ? serviceProvider.travelCost ?? null : null,
+        schedulingFee: requestType === 'QUOTE' ? quoteFeeAmount : null,
       },
       include: {
         service: {
@@ -297,6 +334,22 @@ export async function POST(request: NextRequest) {
       userEmail: serviceProvider.user.email
     })
 
+    const travelResponse: TravelCalculationResult = travelQuote ?? {
+      success: true,
+      travelCost: 0,
+      travelCostBreakdown: {
+        perKmPortion: 0,
+        fixedFee: 0,
+        minimumFee: 0,
+        appliedMinimum: false,
+        travelRatePerKm: null,
+        waivesTravelOnHire: serviceProvider.waivesTravelOnHire ?? null,
+      },
+      estimatedTotal: hasPriceInfo ? Math.round((subtotal + quoteFeeAmount) * 100) / 100 : null,
+      usedFallback: false,
+      warnings: [],
+    }
+
     // Create notification record (provider side)
     await prisma.notification.create({
       data: {
@@ -314,8 +367,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       booking,
-      travel: travelQuote,
-      warnings: travelQuote.warnings,
+      travel: travelResponse,
+      warnings: travelResponse.warnings,
       message: 'Solicitação criada com sucesso! O profissional será notificado.'
     })
 

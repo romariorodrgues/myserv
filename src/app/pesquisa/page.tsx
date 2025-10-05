@@ -63,8 +63,11 @@ interface SearchResultService {
   serviceRadiusKm?: number | null
   available: boolean
   offersScheduling: boolean
+  offersQuoting?: boolean
   providesHomeService?: boolean
   providesLocalService?: boolean
+  chargesTravel?: boolean
+  quoteFee?: number | null
   travel?: {
     chargesTravel: boolean
     travelRatePerKm?: number | null

@@ -269,7 +269,7 @@ function ProviderDashboardContent() {
       <div className="space-y-6 p-4">
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {[...Array(4)].map((_, i) => (
               <div key={i} className="bg-gray-200 rounded-lg h-24"></div>
             ))}
@@ -301,17 +301,17 @@ function ProviderDashboardContent() {
   if (underReview && activeTab !== 'settings') {
     return (
       <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold tracking-tight">Dashboard do Prestador</h1>
-            <p className="text-muted-foreground">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-navy">Dashboard do Prestador</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Olá, {currentSession?.user?.name || 'Prestador'}! Seu cadastro está em análise.
             </p>
           </div>
         </div>
 
         <div className="border-b">
-          <nav className="-mb-px flex space-x-8 overflow-x-auto">
+          <nav className="flex flex-wrap gap-2 sm:gap-4 overflow-x-auto pb-1">
             {tabs.map((tab) => {
               const Icon = tab.icon
               const isActiveTab = activeTab === tab.id
@@ -319,7 +319,7 @@ function ProviderDashboardContent() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                  className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                  className={`flex items-center justify-center gap-2 min-w-[130px] px-2 py-2 border-b-2 font-medium text-sm transition-colors rounded-t-md ${
                     isActiveTab
                       ? 'border-primary text-primary'
                       : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
@@ -358,10 +358,10 @@ function ProviderDashboardContent() {
     <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
  
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard do Prestador</h1>
-          <p className="text-muted-foreground">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="space-y-1">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-navy">Dashboard do Prestador</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Olá, {currentSession?.user?.name || 'Prestador'}! Gerencie seus serviços e agendamentos
           </p>
         </div>
@@ -385,14 +385,14 @@ function ProviderDashboardContent() {
 
       {/* Navigation Tabs */}
       <div className="border-b">
-        <nav className="-mb-px flex space-x-8 overflow-x-auto">
+        <nav className="flex flex-wrap gap-2 sm:gap-4 overflow-x-auto pb-1">
       {tabs.map((tab) => {
             const Icon = tab.icon
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center space-x-2 py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+                className={`flex items-center justify-center gap-2 min-w-[130px] px-2 py-2 border-b-2 font-medium text-sm transition-colors rounded-t-md ${
                   activeTab === tab.id
                     ? 'border-primary text-primary'
                     : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
@@ -489,23 +489,23 @@ function ProviderDashboardContent() {
               <CardTitle>Ações Rápidas</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('schedule')}>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('schedule')}>
                   <Calendar className="h-6 w-6 mb-2" />
                   Gerenciar Agenda
                 </Button>
 
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('pricing')}>
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('pricing')}>
                   <DollarSign className="h-6 w-6 mb-2" />
                   Gerenciar Serviços
                 </Button>
 
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('history')}>
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('history')}>
                   <History className="h-6 w-6 mb-2" />
                   Ver Histórico
                 </Button>
 
-                <Button className="h-20 flex-col" variant="outline" onClick={() => setActiveTab('metrics')}>
+                <Button className="h-24 flex-col justify-center text-center" variant="outline" onClick={() => setActiveTab('metrics')}>
                   <BarChart3 className="h-6 w-6 mb-2" />
                   Ver Métricas
                 </Button>

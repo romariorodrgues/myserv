@@ -151,37 +151,37 @@ export default function CascadingCategoryPicker({ value, onChange, className = '
       </div>
 
       {/* Colunas */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        {levels.map((list, idx) => (
-          <div key={idx} className="rounded-lg border bg-white p-2">
-            <div className="flex flex-col gap-2">
-              {list.map((c) => {
-                const active = path[idx]?.id === c.id
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => selectNode(c, idx)}
-                    className={`flex items-center justify-between rounded-md border px-3 py-2 text-left transition
-                      ${active ? 'border-brand-cyan ring-1 ring-brand-cyan bg-brand-cyan/5' : 'border-transparent hover:bg-gray-50'}
-                    `}
-                  >
-                    <span className="flex items-center gap-2">
-                      {c.isLeaf ? (
-                        <Leaf className="h-4 w-4 text-emerald-600" />
-                      ) : (
-                        <Folder className="h-4 w-4 text-gray-500" />
-                      )}
-                      <span className="text-sm">{c.name}</span>
-                    </span>
-                    <Badge variant="secondary">{c.serviceCount}</Badge>
-                  </button>
-                )
-              })}
-              {list.length === 0 && <div className="text-sm text-gray-500 p-2">Sem itens</div>}
-              {loading && <div className="text-sm text-gray-400 p-2">Carregando...</div>}
+      <div className="overflow-x-auto pb-2">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          {levels.map((list, idx) => (
+            <div key={idx} className="min-w-[220px] flex-1 rounded-lg border bg-white p-3 shadow-sm">
+              <div className="flex flex-col gap-2">
+                {list.map((c) => {
+                  const active = path[idx]?.id === c.id
+                  return (
+                    <button
+                      key={c.id}
+                      onClick={() => selectNode(c, idx)}
+                      className={`flex items-center justify-between rounded-md border px-3 py-2 text-left transition ${active ? 'border-brand-cyan ring-1 ring-brand-cyan bg-brand-cyan/5' : 'border-gray-200 hover:border-brand-cyan/40 hover:bg-brand-cyan/5'}`}
+                    >
+                      <span className="flex items-center gap-2">
+                        {c.isLeaf ? (
+                          <Leaf className="h-4 w-4 text-emerald-600" />
+                        ) : (
+                          <Folder className="h-4 w-4 text-gray-500" />
+                        )}
+                        <span className="text-sm text-gray-700">{c.name}</span>
+                      </span>
+                      <Badge variant="secondary">{c.serviceCount}</Badge>
+                    </button>
+                  )}
+                })}
+                {list.length === 0 && <div className="text-sm text-gray-500 p-2">Sem itens</div>}
+                {loading && <div className="text-sm text-gray-400 p-2">Carregando...</div>}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )

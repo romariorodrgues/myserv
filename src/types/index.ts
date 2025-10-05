@@ -270,8 +270,11 @@ export interface ServiceProviderService {
   description?: string
   isActive: boolean
   offersScheduling?: boolean
+  offersQuoting?: boolean
   providesHomeService?: boolean
   providesLocalService?: boolean
+  chargesTravel?: boolean
+  quoteFee?: number
   service: Service
 }
 

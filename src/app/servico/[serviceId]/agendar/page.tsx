@@ -33,8 +33,6 @@ export default function AgendarPage() {
   const [selectedTime, setSelectedTime] = useState<string>('')
   const [successMsg, setSuccessMsg] = useState<string>('')
 
-  const canProceed = useMemo(() => !!selectedDate && !!selectedTime, [selectedDate, selectedTime])
-
   useEffect(() => {
     if (!providerId) { setLoading(false); return }
     ;(async () => {
@@ -57,10 +55,41 @@ export default function AgendarPage() {
     return (day?.isWorkingDay ? day.timeSlots : []) || []
   }, [schedule, selectedDate])
 
+  const availableSlots = useMemo(() => {
+    return slotsForSelectedDate
+      .filter(s => s.isAvailable)
+      .filter(s => {
+        if (!selectedDate) return true
+        const slotDateTime = new Date(`${selectedDate}T${s.startTime}`)
+        if (Number.isNaN(slotDateTime.getTime())) return false
+        return slotDateTime.getTime() > Date.now()
+      })
+  }, [slotsForSelectedDate, selectedDate])
+
+  const canProceed = useMemo(() => !!selectedDate && !!selectedTime && availableSlots.some(s => s.startTime === selectedTime), [availableSlots, selectedDate, selectedTime])
+
+  useEffect(() => {
+    if (!selectedTime) return
+    const stillAvailable = availableSlots.some((slot) => slot.startTime === selectedTime)
+    if (!stillAvailable) {
+      setSelectedTime('')
+    }
+  }, [availableSlots, selectedTime])
+
   const createAppointment = async () => {
     if (!session?.user?.id) { alert('Faça login como cliente para agendar.'); return }
     if (!providerId) { alert('Prestador inválido'); return }
     if (!canProceed) { alert('Selecione data e horário'); return }
+
+    const slotDateTime = new Date(`${selectedDate}T${selectedTime}`)
+    if (Number.isNaN(slotDateTime.getTime())) {
+      alert('Horário selecionado inválido. Escolha outra opção.')
+      return
+    }
+    if (slotDateTime.getTime() <= Date.now()) {
+      alert('Não é possível agendar para um horário que já passou. Escolha outro horário.')
+      return
+    }
 
     try {
       setSubmitting(true)
@@ -154,11 +183,11 @@ export default function AgendarPage() {
 
                 <div>
                   <div className="text-sm text-gray-600 mb-2">Horários Disponíveis ({DAYS[new Date(selectedDate).getDay()]})</div>
-                  {slotsForSelectedDate.length === 0 ? (
+                  {availableSlots.length === 0 ? (
                     <div className="text-gray-500">Sem horários disponíveis para esta data.</div>
                   ) : (
                     <div className="flex flex-wrap gap-2">
-                      {slotsForSelectedDate.filter(s => s.isAvailable).map((s, idx) => (
+                      {availableSlots.map((s, idx) => (
                         <button
                           key={`${s.startTime}-${idx}`}
                           onClick={() => setSelectedTime(s.startTime)}

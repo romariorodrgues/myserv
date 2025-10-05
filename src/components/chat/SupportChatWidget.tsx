@@ -1,12 +1,13 @@
 'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react'
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import clsx from 'clsx'
 import { 
   MessageCircle, 
   X, 
@@ -273,13 +274,37 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
   ).length : 0
 
   // Botão flutuante
-  if (!isOpen) {
-    const buttonPosition = isDesktop
-      ? 'bottom-6 right-6'
-      : 'bottom-24 right-4'
+  const floatingButtonClasses = useMemo(() => {
+    if (isDesktop) {
+      return 'right-4 bottom-4 sm:right-6 sm:bottom-6 xl:right-10 xl:bottom-10'
+    }
+    return 'left-4 right-4 bottom-20 sm:bottom-24'
+  }, [isDesktop])
 
+  const minimizedContainerClasses = useMemo(() => {
+    if (isDesktop) {
+      return 'right-4 bottom-4 sm:right-6 sm:bottom-6 xl:right-10 xl:bottom-10'
+    }
+    return 'left-4 right-4 bottom-20 sm:bottom-24'
+  }, [isDesktop])
+
+  const openContainerClasses = useMemo(() => {
+    if (isDesktop) {
+      return 'right-4 bottom-4 sm:right-6 sm:bottom-6 xl:right-10 xl:bottom-10'
+    }
+    return 'left-4 right-4 bottom-20 sm:bottom-24 w-full'
+  }, [isDesktop])
+
+  const widgetSizeClasses = useMemo(() => {
+    if (isDesktop) {
+      return 'w-[min(22rem,calc(100vw-3rem))] max-h-[calc(100vh-120px)] h-[min(600px,calc(100vh-140px))]'
+    }
+    return 'w-full max-w-md mx-auto h-[min(75vh,calc(100vh-140px))] max-h-[calc(100vh-120px)]'
+  }, [isDesktop])
+
+  if (!isOpen) {
     return (
-      <div className={`fixed ${buttonPosition} z-50`}>
+      <div className={clsx('fixed z-[1200]', floatingButtonClasses)}>
         <div className="relative">
           <Button
             onClick={() => setIsOpen(true)}
@@ -288,6 +313,8 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
               unreadChatsCount > 0 ? 'animate-pulse' : ''
             }`}
             title="Chat de Suporte"
+            style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
+            aria-label="Abrir chat de suporte"
           >
             <MessageCircle className="h-6 w-6 text-white" />
           </Button>
@@ -305,12 +332,8 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
 
   // Widget minimizado
   if (isMinimized) {
-    const minimizedPosition = isDesktop
-      ? 'bottom-6 right-6'
-      : 'bottom-24 right-4 left-4'
-
     return (
-      <div className={`fixed ${minimizedPosition} z-50`}>
+      <div className={clsx('fixed z-[1200]', minimizedContainerClasses)}>
         <Card className={`shadow-xl border border-brand-cyan/20 bg-white/95 backdrop-blur-sm ${
           isDesktop ? 'w-80' : 'w-full max-w-md mx-auto'
         }`}>
@@ -341,15 +364,11 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
   }
 
   // Widget completo
-  const openPosition = isDesktop
-    ? 'bottom-6 right-6'
-    : 'bottom-24 right-4 left-4'
-
   return (
-    <div className={`fixed ${openPosition} z-50`}>
+    <div className={clsx('fixed z-[1200]', openContainerClasses)}>
       <Card
         className={`shadow-2xl flex flex-col border border-brand-cyan/20 bg-white/95 backdrop-blur-sm ${
-          isDesktop ? 'w-96 h-[600px]' : 'w-full max-w-md mx-auto h-[75vh]'
+          isDesktop ? widgetSizeClasses : clsx(widgetSizeClasses, 'max-w-md')
         }`}
       >
         <CardHeader className="flex flex-row items-center justify-between pb-2 bg-gradient-to-r from-brand-navy to-brand-cyan text-white rounded-t-lg">

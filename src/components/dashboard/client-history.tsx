@@ -385,114 +385,118 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredRequests.map((request) => (
-              <div key={request.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                <div className="flex flex-col lg:flex-row lg:items-start justify-between space-y-3 lg:space-y-0">
-                  <div className="flex-1 space-y-2">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h3 className="font-medium text-lg">{request.service.name}</h3>
-                        <p className="text-sm text-gray-600">{request.service.category}</p>
+            {filteredRequests.map((request) => {
+              const canReview = request.status === 'COMPLETED' && !request.rating
+              const canCancel = request.status === 'PENDING'
+              const hasActions = canReview || canCancel
+
+              return (
+                <div key={request.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                  <div className="flex flex-col lg:flex-row lg:items-start justify-between space-y-3 lg:space-y-0">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="font-medium text-lg">{request.service.name}</h3>
+                          <p className="text-sm text-gray-600">{request.service.category}</p>
+                        </div>
+                        {getStatusBadge(request.status)}
                       </div>
-                      {getStatusBadge(request.status)}
-                    </div>
-                    
-                    <p className="text-gray-700 text-sm">{request.description}</p>
-                    
-                    <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-sm text-gray-600">
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="w-4 h-4" />
-                        <span>{request.city}, {request.state}</span>
-                      </div>
-                      
-                      <div className="flex items-center space-x-1">
-                        <Calendar className="w-4 h-4" />
-                        <span>Criado em {formatDate(request.createdAt)}</span>
-                      </div>
-                      
-                      {request.preferredDate && (
+
+                      <p className="text-gray-700 text-sm">{request.description}</p>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-sm text-gray-600">
                         <div className="flex items-center space-x-1">
-                          <Clock className="w-4 h-4" />
-                          <span>Agendado para {formatDate(request.preferredDate)}</span>
+                          <MapPin className="w-4 h-4" />
+                          <span>{request.city}, {request.state}</span>
                         </div>
-                      )}
-                    </div>
-                    
-                    <div className="flex items-center space-x-4">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
-                          {request.serviceProvider.user.profileImage ? (
-                            <Image
-                              src={request.serviceProvider.user.profileImage}
-                              alt={request.serviceProvider.user.name}
-                              width={32}
-                              height={32}
-                              className="rounded-full"
-                            />
-                          ) : (
-                            <User className="w-4 h-4 text-gray-500" />
-                          )}
-                        </div>
-                        <span className="text-sm font-medium">{request.serviceProvider.user.name}</span>
-                      </div>
-                      
-                      {request.serviceProvider.rating && (
+
                         <div className="flex items-center space-x-1">
-                          <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                          <span className="text-sm">{request.serviceProvider.rating}</span>
-                          <span className="text-sm text-gray-500">({request.serviceProvider.reviewCount})</span>
+                          <Calendar className="w-4 h-4" />
+                          <span>Criado em {formatDate(request.createdAt)}</span>
                         </div>
-                      )}
-                      
-                      {request.price && (
-                        <div className="text-sm font-medium text-green-600">
-                          R$ {request.price.toFixed(2)}
-                        </div>
-                      )}
-                    </div>
-                    
-                    {request.rating && request.review && (
-                      <div className="bg-gray-50 rounded-lg p-3 mt-3">
-                        <div className="flex items-center space-x-2 mb-2">
-                          <span className="text-sm font-medium">Sua avaliação:</span>
+
+                        {request.preferredDate && (
                           <div className="flex items-center space-x-1">
-                            {[...Array(5)].map((_, i) => (
-                              <Star
-                                key={i}
-                                className={`w-4 h-4 ${
-                                  i < request.rating! ? 'text-yellow-400 fill-current' : 'text-gray-300'
-                                }`}
-                              />
-                            ))}
+                            <Clock className="w-4 h-4" />
+                            <span>Agendado para {formatDate(request.preferredDate)}</span>
                           </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center space-x-4">
+                        <div className="flex items-center space-x-2">
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center overflow-hidden">
+                            {request.serviceProvider.user.profileImage ? (
+                              <Image
+                                src={request.serviceProvider.user.profileImage}
+                                alt={request.serviceProvider.user.name}
+                                width={32}
+                                height={32}
+                                className="rounded-full"
+                              />
+                            ) : (
+                              <User className="w-4 h-4 text-gray-500" />
+                            )}
+                          </div>
+                          <span className="text-sm font-medium">{request.serviceProvider.user.name}</span>
                         </div>
-                        <p className="text-sm text-gray-700">{request.review}</p>
+
+                        {request.serviceProvider.rating && (
+                          <div className="flex items-center space-x-1">
+                            <Star className="w-4 h-4 text-yellow-400 fill-current" />
+                            <span className="text-sm">{request.serviceProvider.rating}</span>
+                            <span className="text-sm text-gray-500">({request.serviceProvider.reviewCount})</span>
+                          </div>
+                        )}
+
+                        {request.price && (
+                          <div className="text-sm font-medium text-green-600">
+                            R$ {request.price.toFixed(2)}
+                          </div>
+                        )}
+                      </div>
+
+                      {request.rating && request.review && (
+                        <div className="bg-gray-50 rounded-lg p-3 mt-3">
+                          <div className="flex items-center space-x-2 mb-2">
+                            <span className="text-sm font-medium">Sua avaliação:</span>
+                            <div className="flex items-center space-x-1">
+                              {[...Array(5)].map((_, i) => (
+                                <Star
+                                  key={i}
+                                  className={`w-4 h-4 ${
+                                    i < request.rating! ? 'text-yellow-400 fill-current' : 'text-gray-300'
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                          </div>
+                          <p className="text-sm text-gray-700">{request.review}</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {hasActions && (
+                      <div className="flex flex-col space-y-2 lg:ml-4">
+                        {canReview && (
+                          <a href={`/dashboard/cliente?tab=history&reviewBookingId=${request.id}`}>
+                            <Button size="sm" variant="outline">
+                              Avaliar Serviço
+                            </Button>
+                          </a>
+                        )}
+
+                        {canCancel && (
+                          <Button size="sm" variant="outline">
+                            Cancelar
+                          </Button>
+                        )}
                       </div>
                     )}
-                  </div>
-                  
-                  <div className="flex flex-col space-y-2 lg:ml-4">
-                    {request.status === 'COMPLETED' && !request.rating && (
-                      <a href={`/dashboard/cliente?tab=history&reviewBookingId=${request.id}`}>
-                        <Button size="sm" variant="outline">
-                          Avaliar Serviço
-                        </Button>
-                      </a>
-                    )}
-                    
-                    {request.status === 'PENDING' && (
-                      <Button size="sm" variant="outline">
-                        Cancelar
-                      </Button>
-                    )}
-                    
-                    <Button size="sm" variant="ghost">
-                      Ver Detalhes
-                    </Button>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </CardContent>
