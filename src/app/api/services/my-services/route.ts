@@ -134,6 +134,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Selecione uma subcategoria folha' }, { status: 400 })
     }
 
+    const categoryAllowsScheduling = cat.allowScheduling ?? true
+
     // garante Service canônico (um por leaf)
     const selectSvc = {
       id: true, name: true, categoryId: true, description: true, isActive: true
@@ -188,7 +190,7 @@ export async function POST(req: NextRequest) {
         unit: input.unit,
         description: input.description ?? null,
         isActive: input.isActive ?? true,
-        offersScheduling: cat.allowScheduling && !!input.offersScheduling,
+        offersScheduling: categoryAllowsScheduling ? !!input.offersScheduling : false,
         offersQuoting: requestedQuoting ?? true,
         ...homeServiceData,
         ...localServiceData,
@@ -202,7 +204,7 @@ export async function POST(req: NextRequest) {
         unit: input.unit,
         description: input.description ?? null,
         isActive: input.isActive ?? true,
-        offersScheduling: cat.allowScheduling && !!input.offersScheduling,
+        offersScheduling: categoryAllowsScheduling ? !!input.offersScheduling : false,
         offersQuoting: requestedQuoting ?? true,
         providesHomeService: requestedHomeService ?? false,
         providesLocalService: requestedLocalService ?? true,
@@ -235,7 +237,7 @@ export async function POST(req: NextRequest) {
         quoteFee: link.quoteFee,
         category: link.service.category,
         categoryId: service.categoryId,
-        allowScheduling: link.service.category.allowScheduling,
+        allowScheduling: link.service.category.allowScheduling ?? true,
         createdAt: link.createdAt
       }
     }, { status: 201 })
