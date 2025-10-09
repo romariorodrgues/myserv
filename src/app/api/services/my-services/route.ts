@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     // valida categoria folha
     const cat = await prisma.serviceCategory.findUnique({
       where: { id: input.leafCategoryId },
-      select: { id: true, name: true, isLeaf: true, isActive: true }
+      select: { id: true, name: true, isLeaf: true, isActive: true, allowScheduling: true }
     })
     if (!cat || !cat.isActive) {
       return NextResponse.json({ success: false, error: 'Categoria inválida/inativa' }, { status: 400 })
