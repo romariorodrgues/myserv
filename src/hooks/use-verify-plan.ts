@@ -13,14 +13,22 @@ function useVerifyPlan(): useVerifyPlanResponse {
   const { data: subscription } = useQuery<SubscriptionResponse | null>({
     queryKey: ["subscription"],
     queryFn: async () => {
-      const { data } = await axios.get<
-        any,
-        AxiosResponse<SubscriptionResponse>,
-        any
-      >("/api/payments/subscribe");
+      try {
+        const { data } = await axios.get<
+          any,
+          AxiosResponse<SubscriptionResponse>,
+          any
+        >("/api/payments/subscribe");
 
-      return data;
+        return data;
+      } catch (error: any) {
+        if (axios.isAxiosError(error) && error.response?.status === 401) {
+          return null;
+        }
+        throw error;
+      }
     },
+    retry: false,
   });
 
   const isExpired = useMemo(() => !subscription, [subscription]);

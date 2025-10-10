@@ -93,6 +93,13 @@ function ProviderDashboardContent() {
   const [avgRating, setAvgRating] = useState<number>(0)
   const [totalReviews, setTotalReviews] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
+  const scheduleSubParam = searchParams.get('sub')
+  const scheduleInitialTab = (['schedule', 'appointments', 'settings'] as const).includes((scheduleSubParam as any))
+    ? (scheduleSubParam as 'schedule' | 'appointments' | 'settings')
+    : 'appointments'
+  const rawScheduleDate = searchParams.get('date')
+  const scheduleDateParam = rawScheduleDate && /^\d{4}-\d{2}-\d{2}$/.test(rawScheduleDate) ? rawScheduleDate : undefined
+  const providerScheduleKey = `${scheduleInitialTab}-${scheduleDateParam ?? 'all'}`
   const { data: bookings, isLoading, isFetching, refetch: refetchBookings } = useQuery<ProviderBooking[]>({
     queryKey: ['bookings'],
     initialData: [],
@@ -855,7 +862,12 @@ function ProviderDashboardContent() {
       )}
 
       {activeTab === 'schedule' && currentSession?.user?.id && (
-        <ProviderSchedule providerId={currentSession.user.id} />
+        <ProviderSchedule
+          key={providerScheduleKey}
+          providerId={currentSession.user.id}
+          initialTab={scheduleInitialTab}
+          initialDate={scheduleDateParam}
+        />
       )}
 
       {activeTab === 'history' && currentSession?.user?.id && (

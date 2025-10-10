@@ -76,11 +76,14 @@ export async function GET(request: NextRequest) {
       const amount = (approved?.amount || 0) - (refunded?.amount || 0)
       const paymentStatus = approved ? 'PAID' : (r.payments.some(p => p.status === 'PENDING' || p.status === 'PROCESSING') ? 'PENDING' : (refunded ? 'CANCELLED' : 'PENDING'))
       const method = approved ? approved.paymentMethod : undefined
-      const methodMap: Record<string, 'CREDIT'|'DEBIT'|'PIX'|'CASH'> = {
+      const methodMap: Record<string, 'CREDIT'|'DEBIT'|'PIX'|'CASH'|'TRANSFER'|'OTHER'> = {
         CREDIT_CARD: 'CREDIT',
         DEBIT_CARD: 'DEBIT',
         PIX: 'PIX',
         BOLETO: 'CASH',
+        CASH: 'CASH',
+        OTHER: 'OTHER',
+        BANK_TRANSFER: 'TRANSFER',
       }
       return {
         id: r.id,
@@ -91,7 +94,7 @@ export async function GET(request: NextRequest) {
         city: r.service?.category ? '' : '',
         state: '',
         duration: undefined,
-        price: amount,
+        price: r.finalPrice ?? amount,
         rating: r.review?.rating || undefined,
         review: r.review?.comment || undefined,
         service: {
@@ -99,6 +102,8 @@ export async function GET(request: NextRequest) {
           name: r.service?.name || 'Serviço',
           category: r.service?.category?.name || '',
         },
+        cancellationReason: r.cancellationReason || undefined,
+        cancelledBy: r.cancelledBy || undefined,
         client: {
           id: r.client.id,
           name: r.client.name,
@@ -108,7 +113,7 @@ export async function GET(request: NextRequest) {
           ratingCount: ratingMap.get(r.client.id)?.count ?? 0,
         },
         payment: {
-          method: method ? methodMap[method] || 'PIX' : 'PIX',
+          method: method ? methodMap[method] || 'PIX' : (r.paymentMethod ? methodMap[r.paymentMethod] || 'PIX' : 'PIX'),
           status: paymentStatus,
           fee: undefined,
         },

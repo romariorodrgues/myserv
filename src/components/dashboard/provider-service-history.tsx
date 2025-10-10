@@ -25,6 +25,8 @@ interface ServiceHistory {
   price: number
   rating?: number
   review?: string
+  cancellationReason?: string
+  cancelledBy?: string
   service: {
     id: string
     name: string
@@ -39,7 +41,7 @@ interface ServiceHistory {
     ratingCount?: number
   }
   payment: {
-    method: 'CREDIT' | 'DEBIT' | 'PIX' | 'CASH'
+    method: 'CREDIT' | 'DEBIT' | 'PIX' | 'CASH' | 'TRANSFER' | 'OTHER'
     status: 'PAID' | 'PENDING' | 'CANCELLED'
     fee?: number
   }
@@ -75,7 +77,14 @@ const paymentMethodConfig = {
   CREDIT: 'Cartão de Crédito',
   DEBIT: 'Cartão de Débito',
   PIX: 'PIX',
-  CASH: 'Dinheiro'
+  CASH: 'Dinheiro',
+  TRANSFER: 'Transferência bancária',
+  OTHER: 'Outro'
+}
+
+const cancelledByLabel: Record<string, string> = {
+  PROVIDER: 'Prestador',
+  CLIENT: 'Cliente',
 }
 
 export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryProps) {
@@ -482,6 +491,15 @@ export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryPro
                       </div>
                       
                       <p className="text-gray-700 text-sm">{item.description}</p>
+
+                      {item.status === 'CANCELLED' && item.cancellationReason && (
+                        <div className="bg-red-50 border border-red-100 text-red-700 rounded-lg p-3 text-sm">
+                          <p><strong>Motivo do cancelamento:</strong> {item.cancellationReason}</p>
+                          {item.cancelledBy && (
+                            <p className="mt-1 text-red-600/80">Cancelado por: {cancelledByLabel[item.cancelledBy] || item.cancelledBy}</p>
+                          )}
+                        </div>
+                      )}
                       
                       <div className="flex flex-col sm:flex-row sm:items-center space-y-1 sm:space-y-0 sm:space-x-4 text-sm text-gray-600">
                         <div className="flex items-center space-x-1">
@@ -560,7 +578,7 @@ export function ProviderServiceHistory({ providerId }: ProviderServiceHistoryPro
                       </div>
                       
                       <div className="text-sm text-gray-500">
-                        <div>{paymentMethodConfig[item.payment.method]}</div>
+                        <div>{paymentMethodConfig[item.payment.method] || 'Pagamento'}</div>
                         <div className={`font-medium ${
                           item.payment.status === 'PAID' ? 'text-green-600' : 
                           item.payment.status === 'PENDING' ? 'text-yellow-600' : 'text-red-600'

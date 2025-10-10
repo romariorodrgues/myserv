@@ -12,11 +12,13 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import Image from 'next/image'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 
 interface ServiceRequest {
   id: string
-  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED'
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED' | 'HOLD'
   description: string
   preferredDate: string | null
   createdAt: string
@@ -27,6 +29,10 @@ interface ServiceRequest {
   rating?: number
   review?: string
   price?: number
+  finalPrice?: number
+  paymentMethod?: string
+  cancellationReason?: string
+  cancelledBy?: string
   service: {
     id: string
     name: string
@@ -56,6 +62,15 @@ const statusConfig = {
   CANCELLED: { label: 'Cancelado', color: 'bg-gray-100 text-gray-800', icon: Clock }
 }
 
+const paymentMethodLabels: Record<string, string> = {
+  PIX: 'PIX',
+  CASH: 'Dinheiro',
+  CREDIT_CARD: 'Cartão de Crédito',
+  DEBIT_CARD: 'Cartão de Débito',
+  BANK_TRANSFER: 'Transferência bancária',
+  OTHER: 'Outro',
+}
+
 export function ClientHistory({ clientId }: ClientHistoryProps) {
   const [requests, setRequests] = useState<ServiceRequest[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,6 +81,7 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [filterMenuOpen, setFilterMenuOpen] = useState(false)
   const [statusMenuOpen, setStatusMenuOpen] = useState(false)
+  const [cancelModal, setCancelModal] = useState<{ id: string; reason: string; loading: boolean } | null>(null)
 
   useEffect(() => {
   if (clientId) {
@@ -199,6 +215,39 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
     setFilteredRequests(filtered)
   }
 
+  const openCancelModalFor = (request: ServiceRequest) => {
+    setCancelModal({ id: request.id, reason: '', loading: false })
+  }
+
+  const submitCancellation = async () => {
+    if (!cancelModal) return
+    if (!cancelModal.reason || cancelModal.reason.trim().length < 5) {
+      toast.error('Conte-nos o motivo do cancelamento (mínimo 5 caracteres).')
+      return
+    }
+    try {
+      setCancelModal({ ...cancelModal, loading: true })
+      const res = await fetch(`/api/bookings/${cancelModal.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          status: 'CANCELLED',
+          cancelReason: cancelModal.reason.trim(),
+          cancelledBy: 'CLIENT',
+        })
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Não foi possível cancelar o pedido.')
+      toast.success('Pedido cancelado com sucesso.')
+      setCancelModal(null)
+      await fetchServiceHistory()
+    } catch (error: any) {
+      console.error(error)
+      toast.error(error?.message || 'Erro ao cancelar o pedido. Tente novamente.')
+      setCancelModal((current) => current ? { ...current, loading: false } : current)
+    }
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('pt-BR', {
       day: '2-digit',
@@ -242,6 +291,7 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
   }
 
   return (
+    <>
     <Card>
       <CardHeader>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between space-y-4 sm:space-y-0">
@@ -387,8 +437,10 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
           <div className="space-y-4">
             {filteredRequests.map((request) => {
               const canReview = request.status === 'COMPLETED' && !request.rating
-              const canCancel = request.status === 'PENDING'
+              const canCancel = request.status === 'PENDING' || request.status === 'ACCEPTED' || request.status === 'HOLD'
               const hasActions = canReview || canCancel
+              const displayPrice = request.finalPrice ?? request.price
+              const paymentLabel = request.paymentMethod ? (paymentMethodLabels[request.paymentMethod] || request.paymentMethod) : null
 
               return (
                 <div key={request.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -449,12 +501,24 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
                           </div>
                         )}
 
-                        {request.price && (
+                        {displayPrice != null && (
                           <div className="text-sm font-medium text-green-600">
-                            R$ {request.price.toFixed(2)}
+                            R$ {displayPrice.toFixed(2)}
                           </div>
                         )}
                       </div>
+
+                      {paymentLabel && request.status === 'COMPLETED' && (
+                        <div className="text-xs text-gray-500">Pagamento: {paymentLabel}</div>
+                      )}
+
+                      {request.status === 'CANCELLED' && request.cancellationReason && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                          <p className="text-sm text-gray-700">
+                            <strong>Motivo do cancelamento:</strong> {request.cancellationReason}
+                          </p>
+                        </div>
+                      )}
 
                       {request.rating && request.review && (
                         <div className="bg-gray-50 rounded-lg p-3 mt-3">
@@ -487,7 +551,7 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
                         )}
 
                         {canCancel && (
-                          <Button size="sm" variant="outline">
+                          <Button size="sm" variant="outline" onClick={() => openCancelModalFor(request)}>
                             Cancelar
                           </Button>
                         )}
@@ -501,5 +565,31 @@ export function ClientHistory({ clientId }: ClientHistoryProps) {
         )}
       </CardContent>
     </Card>
+
+    {cancelModal && (
+      <div className="fixed inset-0 z-[1300] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-brand-navy">Cancelar pedido</h3>
+            <p className="text-sm text-gray-600">Conte ao profissional o motivo do cancelamento.</p>
+          </div>
+          <Textarea
+            placeholder="Escreva o motivo do cancelamento"
+            value={cancelModal.reason}
+            onChange={(e) => setCancelModal((current) => current ? { ...current, reason: e.target.value } : current)}
+            rows={4}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCancelModal(null)} disabled={cancelModal.loading}>
+              Voltar
+            </Button>
+            <Button onClick={submitCancellation} disabled={cancelModal.loading}>
+              {cancelModal.loading ? 'Cancelando...' : 'Confirmar cancelamento'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }

@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
       city: '',
       state: '',
       price: r.finalPrice ?? r.estimatedPrice ?? undefined,
+      finalPrice: r.finalPrice ?? undefined,
+      paymentMethod: r.paymentMethod ?? undefined,
+      cancellationReason: r.cancellationReason ?? undefined,
+      cancelledBy: r.cancelledBy ?? undefined,
       service: {
         id: r.serviceId,
         name: r.service.name,

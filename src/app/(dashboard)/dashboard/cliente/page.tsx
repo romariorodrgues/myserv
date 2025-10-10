@@ -7,7 +7,7 @@
 
 import { LucideIcon } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
@@ -20,7 +20,6 @@ import { ClientFavorites } from '@/components/dashboard/client-favorites'
 import { ClientProfileSettings } from '@/components/dashboard/client-profile-settings'
 import { BookingWhatsAppContact } from '@/components/whatsapp/booking-whatsapp-contact'
 import { ClientReviewModal } from '@/components/dashboard/client-review-modal'
-import { redirect } from 'next/navigation'
 import { TermsConsentPrompt } from '@/components/legal/terms-consent'
 import { SupportChatWidgetWrapper } from '@/components/chat/SupportChatWidgetWrapper'
 
@@ -50,8 +49,11 @@ interface Booking {
 }
 
 function ClientDashboardContent() {
-  const { data: session } = useSession()
+  const { data: session, status } = useSession()
+  const router = useRouter()
   const searchParams = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const reviewBookingParam = searchParams.get('reviewBookingId')
   const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabOption>('overview')
@@ -66,9 +68,12 @@ function ClientDashboardContent() {
   { id: 'favorites', label: 'Favoritos', icon: Heart },
   { id: 'settings', label: 'Configurações', icon: Settings }
 ]
-if (!session) {
-    redirect('/entrar') // redireciona para a página de login correta
-  }
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.replace('/entrar')
+    }
+  }, [status, router])
+
   const fetchBookings = useCallback(async () => {
     if (!session?.user?.id) return []
     const response = await fetch(`/api/bookings/with-payments?clientId=${session.user.id}`)
@@ -102,27 +107,56 @@ if (!session) {
   }, [session?.user?.id])
 
   useEffect(() => {
-    // Check URL params for active tab
-    const tab = searchParams.get('tab')
-    if (tab && ['overview', 'history', 'favorites', 'settings'].includes(tab)) {
-      setActiveTab(tab as TabOption)
+    if (tabParam && ['overview', 'history', 'favorites', 'settings'].includes(tabParam)) {
+      setActiveTab(tabParam as TabOption)
     }
-    
-    ;(async () => {
+  }, [tabParam])
+
+  useEffect(() => {
+    if (reviewBookingParam) {
+      setReviewBookingId(reviewBookingParam)
+    }
+  }, [reviewBookingParam])
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+
+    let cancelled = false
+    const execute = async () => {
       setLoading(true)
       try {
         const data = await fetchBookings()
-        setBookings(data)
+        if (!cancelled) setBookings(data)
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
-      fetchPendingReviews()
-    })()
+      if (!cancelled) fetchPendingReviews()
+    }
 
-    // If notification pushed a reviewBookingId, open the modal
-    const rId = searchParams.get('reviewBookingId')
-    if (rId) setReviewBookingId(rId)
-  }, [searchParams, fetchBookings, fetchPendingReviews])
+    execute()
+
+    return () => {
+      cancelled = true
+    }
+  }, [session?.user?.id, fetchBookings, fetchPendingReviews])
+
+  if (status === 'loading') {
+    return (
+      <div className="space-y-6">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-1/3 mb-4"></div>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-gray-200 rounded-lg h-32"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    )
+  }
+  if (status !== 'authenticated') {
+    return null
+  }
 
   const getStatusIcon = (status: Booking['status']) => {
     switch (status) {
@@ -140,16 +174,19 @@ if (!session) {
   }
 
   const getStatusBadge = (status: Booking['status']) => {
-    const statusConfig = {
-      PENDING: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
-      ACCEPTED: { label: 'Aceito', className: 'bg-green-100 text-green-800' },
-      REJECTED: { label: 'Rejeitado', className: 'bg-red-100 text-red-800' },
-      COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' }
-    }
+  const statusConfig: Record<string, { label: string; className: string }> = {
+    PENDING: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' },
+    ACCEPTED: { label: 'Aceito', className: 'bg-green-100 text-green-800' },
+    REJECTED: { label: 'Rejeitado', className: 'bg-red-100 text-red-800' },
+    COMPLETED: { label: 'Concluído', className: 'bg-blue-100 text-blue-800' },
+    CANCELLED: { label: 'Cancelado', className: 'bg-gray-200 text-gray-700' },
+    HOLD: { label: 'Pendente', className: 'bg-yellow-100 text-yellow-800' }
+  }
     
+    const cfg = statusConfig[status] ?? { label: status, className: 'bg-gray-200 text-gray-700' }
     return (
-      <Badge className={statusConfig[status].className}>
-        {statusConfig[status].label}
+      <Badge className={cfg.className}>
+        {cfg.label}
       </Badge>
     )
   }

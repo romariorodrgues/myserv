@@ -96,20 +96,26 @@ export default function AgendarPage() {
       // Recupera os dados preenchidos na página anterior
       let pending: any = null
       try { const raw = sessionStorage.getItem('pendingBooking'); if (raw) pending = JSON.parse(raw) } catch {}
-      const payload = pending ? {
+      if (!pending) {
+        alert('Finalize o preenchimento das informações do pedido antes de escolher o horário.')
+        router.push(`/servico/${serviceId}/solicitar?providerId=${providerId}`)
+        return
+      }
+
+      const payload = {
         ...pending,
         preferredDate: selectedDate,
         preferredTime: selectedTime,
-      } : {
-        serviceId,
-        providerId,
-        description: '',
-        preferredDate: selectedDate,
-        preferredTime: selectedTime,
-        clientName: '',
-        clientPhone: '',
-        clientEmail: session.user.email || '',
-        address: '', city: '', state: '', zipCode: ''
+      }
+
+      if (!payload.description || payload.description.trim().length < 10) {
+        alert('Descreva o serviço com pelo menos 10 caracteres antes de confirmar o pedido.')
+        return
+      }
+
+      if (!payload.clientPhone || payload.clientPhone.trim().length < 10) {
+        alert('Informe um telefone válido para que o profissional possa entrar em contato.')
+        return
       }
 
       const res = await fetch('/api/bookings', {

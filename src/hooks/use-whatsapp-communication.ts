@@ -1,17 +1,18 @@
 /**
  * WhatsApp Communication Hook for MyServ platform
  * Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
- * 
- * Hook to manage WhatsApp communication logic between clients and providers
+ *
+ * Ensures contact between cliente e prestador só é liberado
+ * após o desbloqueio do lead (pagamento avulso) ou assinatura ativa.
  */
 
 import { useMemo } from 'react'
-import { 
-  generateClientMessage, 
+import {
+  generateClientMessage,
   generateProviderMessage,
-  type WhatsAppContactData 
+  type WhatsAppContactData,
 } from '@/lib/whatsapp-utils'
-import { SubscriptionResponse } from '@/app/api/payments/subscribe/route'
+import type { SubscriptionResponse } from '@/app/api/payments/subscribe/route'
 
 interface Booking {
   id: string
@@ -40,106 +41,135 @@ interface UseWhatsAppCommunicationProps {
   subscription: SubscriptionResponse | null | undefined
 }
 
-export function useWhatsAppCommunication({ booking, userType, subscription }: UseWhatsAppCommunicationProps) {
-  const canCommunicate = useMemo(() => {
-    return (
-      (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') ||
-      booking.status === 'COMPLETED' 
-      || (subscription && subscription.plan.name === 'Premium')
-    )
-  }, [booking.status, booking.payment?.status, subscription])
+function hasActiveSubscription(subscription?: SubscriptionResponse | null) {
+  if (!subscription) return false
+  if (subscription.status !== 'ACTIVE') return false
+  if (!subscription.endDate) return true
+  return new Date(subscription.endDate) >= new Date()
+}
 
-  const contactData = useMemo(() => {
+export function useWhatsAppCommunication({
+  booking,
+  userType,
+  subscription,
+}: UseWhatsAppCommunicationProps) {
+  const unlockedByPlan = hasActiveSubscription(subscription)
+  const unlockedByLead = booking.payment?.status === 'APPROVED'
+  const leadUnlocked = unlockedByPlan || unlockedByLead
+
+  const hasPhoneNumber = useMemo(() => {
+    return userType === 'CLIENT'
+      ? Boolean(booking.serviceProvider?.user.phone)
+      : Boolean(booking.client?.phone)
+  }, [booking.client, booking.serviceProvider, userType])
+
+  const canCommunicate = useMemo(() => {
+    if (!hasPhoneNumber) return false
+
+    if (userType === 'CLIENT') {
+      // Cliente só fala após o prestador aceitar e liberar o contato
+      if (booking.status !== 'ACCEPTED' && booking.status !== 'COMPLETED') return false
+      return leadUnlocked
+    }
+
+    // Prestador
+    if (booking.status === 'REJECTED') return false
+    if (booking.status === 'PENDING') return false
+    return leadUnlocked
+  }, [booking.status, leadUnlocked, hasPhoneNumber, userType])
+
+  const contactData = useMemo<WhatsAppContactData | null>(() => {
     if (!canCommunicate) return null
 
-    if (userType === 'CLIENT' && booking.serviceProvider) {
-      // Client wants to contact provider
+    if (userType === 'CLIENT' && booking.serviceProvider?.user.phone) {
       const provider = booking.serviceProvider.user
-      if (!provider.phone) return null
-      
       return {
         name: provider.name,
         phone: provider.phone,
         serviceName: booking.service.name,
         bookingId: booking.id,
-        message: generateClientMessage(provider.name, booking.service.name, booking.id)
-      } as WhatsAppContactData
+        message: generateClientMessage(provider.name, booking.service.name, booking.id),
+      }
     }
 
-    if (userType === 'SERVICE_PROVIDER' && booking.client) {
-      // Provider wants to contact client
+    if (userType === 'SERVICE_PROVIDER' && booking.client?.phone) {
       const client = booking.client
-      if (!client.phone) return null
-      
       return {
         name: client.name,
         phone: client.phone,
         serviceName: booking.service.name,
         bookingId: booking.id,
-        message: generateProviderMessage(client.name, booking.service.name, booking.id)
-      } as WhatsAppContactData
+        message: generateProviderMessage(client.name, booking.service.name, booking.id),
+      }
     }
 
     return null
-  }, [canCommunicate, userType, booking])
+  }, [booking, canCommunicate, userType])
 
   const communicationStatus = useMemo(() => {
     if (booking.status === 'PENDING') {
       return {
         canCommunicate: false,
-        reason: 'Aguardando aceite do profissional'
+        reason:
+          userType === 'CLIENT'
+            ? 'Aguardando o prestador aceitar o pedido'
+            : 'Aceite o pedido para desbloquear o contato',
       }
     }
 
     if (booking.status === 'REJECTED') {
       return {
         canCommunicate: false,
-        reason: 'Solicitação foi rejeitada'
+        reason: 'Solicitação foi rejeitada',
       }
     }
-
-    if (booking.status === 'ACCEPTED' && booking.payment?.status !== 'APPROVED') {
-      return {
-        canCommunicate: false,
-        reason: 'Aguardando confirmação do pagamento'
-      }
-    }
-
-    // Check if phone number is available
-    const hasPhoneNumber = userType === 'CLIENT' 
-      ? Boolean(booking.serviceProvider?.user.phone)
-      : Boolean(booking.client?.phone)
 
     if (!hasPhoneNumber) {
       return {
         canCommunicate: false,
-        reason: 'Número de telefone não disponível'
+        reason: 'Número de telefone não disponível',
       }
     }
 
-    if (booking.status === 'ACCEPTED' && booking.payment?.status === 'APPROVED') {
+    if (!leadUnlocked) {
+      if (userType === 'CLIENT') {
+        return {
+          canCommunicate: false,
+          reason: 'O prestador precisa liberar o contato',
+        }
+      }
+
+      return {
+        canCommunicate: false,
+        reason: unlockedByPlan
+          ? 'Plano profissional inativo. Renove para liberar os contatos.'
+          : 'Libere este cliente para visualizar o contato',
+      }
+    }
+
+    if (booking.status === 'ACCEPTED') {
       return {
         canCommunicate: true,
-        reason: 'Pagamento confirmado - comunicação liberada'
+        reason: 'Solicitação aceita - comunicação liberada',
       }
     }
 
     if (booking.status === 'COMPLETED') {
       return {
         canCommunicate: true,
-        reason: 'Serviço concluído - comunicação disponível'
+        reason: 'Serviço concluído - comunicação disponível',
       }
     }
 
     return {
       canCommunicate: false,
-      reason: 'Status não permite comunicação'
+      reason: 'Status não permite comunicação',
     }
-  }, [booking.status, booking.payment?.status, booking.serviceProvider, booking.client, userType])
+  }, [booking.status, hasPhoneNumber, leadUnlocked, unlockedByPlan, userType])
 
   return {
     canCommunicate,
     contactData,
-    communicationStatus
+    communicationStatus,
   }
 }

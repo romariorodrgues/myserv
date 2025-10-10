@@ -355,18 +355,38 @@ export function useNotificationCount(): { count: number; loading: boolean } {
       return
     }
 
+    let active = true
     const fetchCount = async () => {
       try {
         const response = await fetch('/api/notifications/count')
         const data = await response.json()
 
+        if (!active) return
+
+        if (response.status === 401) {
+          setCount(0)
+          clearInterval(intervalId ?? undefined)
+          setIntervalId(null)
+          return
+        }
+
+        if (!response.ok) {
+          console.error('Fetch notification count error:', data?.error || response.statusText)
+          clearInterval(intervalId ?? undefined)
+          setIntervalId(null)
+          return
+        }
+
         if (data.success) {
           setCount(data.data.unreadCount)
         }
       } catch (error) {
+        if (!active) return
         console.error('Fetch notification count error:', error)
+        clearInterval(intervalId ?? undefined)
+        setIntervalId(null)
       } finally {
-        setLoading(false)
+        if (active) setLoading(false)
       }
     }
 
@@ -393,6 +413,7 @@ export function useNotificationCount(): { count: number; loading: boolean } {
     start()
     document.addEventListener('visibilitychange', onVisibility)
     return () => {
+      active = false
       document.removeEventListener('visibilitychange', onVisibility)
       stop()
     }

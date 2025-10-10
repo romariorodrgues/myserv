@@ -216,6 +216,10 @@ model ServiceRequest {
   schedulingFee  Float?
   isVisitVirtual Boolean   @default(false)
   expiresAt      DateTime?
+  cancellationReason String?
+  cancelledBy        String?
+  cancelledAt        DateTime?
+  paymentMethod      String?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   payments       Payment[]

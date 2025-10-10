@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
       createdAt: booking.createdAt.toISOString(),
       estimatedPrice: booking.estimatedPrice,
       finalPrice: booking.finalPrice,
+      paymentMethod: booking.paymentMethod,
       travelCost: booking.travelCost,
       basePriceSnapshot: booking.basePriceSnapshot,
       travelDistanceKm: booking.travelDistanceKm,
@@ -143,6 +144,8 @@ export async function GET(request: NextRequest) {
       providerReviewRating: booking.providerReviewRating ?? null,
       providerReviewComment: booking.providerReviewComment ?? null,
       providerReviewGivenAt: booking.providerReviewGivenAt?.toISOString?.() ?? null,
+      cancellationReason: booking.cancellationReason ?? null,
+      cancelledBy: booking.cancelledBy ?? null,
       payment:
         booking.payments.length > 0 ?
           {

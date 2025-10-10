@@ -1,8 +1,6 @@
 /**
  * Booking WhatsApp Contact component for MyServ platform
  * Author: Romário Rodrigues <romariorodrigues.dev@gmail.com>
- * 
- * Component that displays WhatsApp contact button within booking cards
  */
 
 'use client'
@@ -12,10 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { WhatsAppButton } from '@/components/whatsapp/whatsapp-button'
 import { useWhatsAppCommunication } from '@/hooks/use-whatsapp-communication'
 import { MessageCircle, User, Phone, CheckCircle2, Clock, XCircle, LockKeyholeOpen } from 'lucide-react'
-import { Button } from '../ui/button'
+import { Button } from '@/components/ui/button'
+import useVerifyPlan from '@/hooks/use-verify-plan'
 import { useMutation } from '@tanstack/react-query'
 import axios from 'axios'
-import useVerifyPlan from '@/hooks/use-verify-plan'
 
 interface Booking {
   id: string
@@ -47,47 +45,59 @@ interface BookingWhatsAppContactProps {
 export function BookingWhatsAppContact({
   booking,
   userType,
-  variant = 'compact'
+  variant = 'compact',
 }: BookingWhatsAppContactProps) {
-  const { subscription } = useVerifyPlan();
+  const verifyPlan = useVerifyPlan()
+  const subscription = userType === 'SERVICE_PROVIDER' ? verifyPlan.subscription : null
+  const plan = userType === 'SERVICE_PROVIDER' ? verifyPlan.plan : 'Start'
 
   const { canCommunicate, contactData, communicationStatus } = useWhatsAppCommunication({
     booking,
     userType,
-    subscription
+    subscription,
   })
 
-  const createPreferenceMutation = useMutation({
+  const unlockLeadMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await axios.post('/api/payments', { bookingId: booking.id, amount: 19.90, gateway: 'mercadopago' })
+      const { data } = await axios.post('/api/payments', {
+        bookingId: booking.id,
+        amount: 19.9,
+        gateway: 'mercadopago',
+        type: 'LEAD_UNLOCK',
+      })
       return data
     },
     onSuccess: (data) => {
-      window.open(data.checkout.initPoint);
+      if (data?.checkout?.initPoint) {
+        window.open(data.checkout.initPoint, '_blank', 'noopener,noreferrer')
+      }
     },
-    onError: (error) => {
-      console.error('Error creating payment preference:', error)
-    }
   })
 
-  if (!canCommunicate) {
+  const renderLockedStateForProvider = () => {
+    const actionLabel = plan === 'Premium' ? 'Renovar plano' : 'Liberar contato'
+    const showAction = userType === 'SERVICE_PROVIDER'
+
     if (variant === 'compact') {
       return (
         <div className="space-y-4 text-sm text-muted-foreground">
-          <div className='flex items-center gap-1'>
+          <div className="flex items-center gap-1">
             <MessageCircle className="w-4 h-4" />
             <span>{communicationStatus.reason}</span>
           </div>
-          <div>
-            <Button onClick={() => createPreferenceMutation.mutate()} variant="secondary" className='gap-2'>
-              {createPreferenceMutation.isPending ? <span>Redirecionando...</span> : (
-                <>
-                  <LockKeyholeOpen size={16} />
-                  <span>Liberar contato</span>
-                </>
-              )}
-            </Button>
-          </div>
+          {showAction && (
+            <div>
+              <Button
+                variant="secondary"
+                className="gap-2"
+                onClick={() => unlockLeadMutation.mutate()}
+                disabled={unlockLeadMutation.isPending}
+              >
+                <LockKeyholeOpen size={16} />
+                <span>{unlockLeadMutation.isPending ? 'Gerando checkout...' : actionLabel}</span>
+              </Button>
+            </div>
+          )}
         </div>
       )
     }
@@ -99,35 +109,72 @@ export function BookingWhatsAppContact({
             <div className="flex-shrink-0">
               {booking.status === 'PENDING' && <Clock className="w-5 h-5 text-yellow-500" />}
               {booking.status === 'REJECTED' && <XCircle className="w-5 h-5 text-red-500" />}
-              {booking.status === 'ACCEPTED' && booking.payment?.status !== 'APPROVED' && (
-                <Clock className="w-5 h-5 text-yellow-500" />
-              )}
             </div>
             <div className="flex-1">
-              <p className="text-sm font-medium text-muted-foreground">
-                Comunicação via WhatsApp
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {communicationStatus.reason}
-              </p>
+              <p className="text-sm font-medium text-muted-foreground">Comunicação via WhatsApp</p>
+              <p className="text-xs text-muted-foreground">{communicationStatus.reason}</p>
             </div>
+            {showAction && (
+              <Button
+                variant="secondary"
+                className="gap-2"
+                onClick={() => unlockLeadMutation.mutate()}
+                disabled={unlockLeadMutation.isPending}
+              >
+                <LockKeyholeOpen size={16} />
+                <span>{unlockLeadMutation.isPending ? 'Gerando checkout...' : actionLabel}</span>
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
     )
   }
 
+  if (!canCommunicate) {
+    if (userType === 'CLIENT') {
+      if (variant === 'compact') {
+        return (
+          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+            <MessageCircle className="w-4 h-4" />
+            <span>{communicationStatus.reason}</span>
+          </div>
+        )
+      }
+
+      return (
+        <Card className="border-dashed border-gray-300">
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex-shrink-0">
+                {booking.status === 'PENDING' && <Clock className="w-5 h-5 text-yellow-500" />}
+                {booking.status === 'REJECTED' && <XCircle className="w-5 h-5 text-red-500" />}
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-medium text-muted-foreground">Comunicação via WhatsApp</p>
+                <p className="text-xs text-muted-foreground">{communicationStatus.reason}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
+
+    return renderLockedStateForProvider()
+  }
+
   if (!contactData) {
     return null
   }
 
-  const contactName = userType === 'CLIENT'
-    ? booking.serviceProvider?.user.name
-    : booking.client?.name
-
-  const contactPhone = userType === 'CLIENT'
-    ? booking.serviceProvider?.user.phone
-    : booking.client?.phone
+  const contactName =
+    userType === 'CLIENT'
+      ? booking.serviceProvider?.user.name
+      : booking.client?.name
+  const contactPhone =
+    userType === 'CLIENT'
+      ? booking.serviceProvider?.user.phone
+      : booking.client?.phone
 
   if (variant === 'compact') {
     return (
@@ -136,12 +183,7 @@ export function BookingWhatsAppContact({
           <CheckCircle2 className="w-4 h-4 text-green-600" />
           <span className="text-sm text-green-800">Comunicação liberada</span>
         </div>
-        <WhatsAppButton
-          contact={contactData}
-          size="sm"
-          variant="default"
-          showPhone={false}
-        >
+        <WhatsAppButton contact={contactData} size="sm" variant="default" showPhone={false}>
           Conversar
         </WhatsAppButton>
       </div>
@@ -180,12 +222,7 @@ export function BookingWhatsAppContact({
           </div>
 
           <div className="flex-shrink-0 ml-4">
-            <WhatsAppButton
-              contact={contactData}
-              size="default"
-              variant="default"
-              showPhone={false}
-            >
+            <WhatsAppButton contact={contactData} size="default" variant="default" showPhone={false}>
               Iniciar Conversa
             </WhatsAppButton>
           </div>
@@ -194,9 +231,8 @@ export function BookingWhatsAppContact({
         <div className="mt-3 pt-3 border-t border-green-200">
           <p className="text-xs text-green-600">
             {booking.status === 'COMPLETED'
-              ? 'Serviço concluído - Entre em contato para dúvidas ou avaliação'
-              : 'Pagamento confirmado - Converse diretamente para alinhar detalhes'
-            }
+              ? 'Serviço concluído - mantenha o contato com seu cliente.'
+              : 'Solicitação aceita - alinhe os detalhes diretamente pelo WhatsApp.'}
           </p>
         </div>
       </CardContent>

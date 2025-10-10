@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
           service: { select: { name: true } },
           payments: { select: { status: true, userId: true }, orderBy: { createdAt: 'desc' } },
         },
-        orderBy: { scheduledDate: 'asc' }
+        orderBy: [{ updatedAt: 'desc' }, { scheduledDate: 'desc' }],
       })
 
       // assinatura ativa do prestador
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
           id: appointment.id,
           date: appointment.scheduledDate?.toISOString().split('T')[0],
           startTime: appointment.scheduledTime || '09:00',
-          endTime: '10:00',
+          endTime: null,
           status: appointment.status,
           type: appointment.requestType,
           client: unlocked ? {
@@ -125,6 +125,12 @@ export async function GET(request: NextRequest) {
           },
           notes: appointment.description,
           unlocked,
+          finalPrice: appointment.finalPrice,
+          paymentMethod: appointment.paymentMethod,
+          cancellationReason: appointment.cancellationReason,
+          cancelledBy: appointment.cancelledBy,
+          estimatedPrice: appointment.estimatedPrice,
+          updatedAt: appointment.updatedAt.toISOString(),
         }
       })
 

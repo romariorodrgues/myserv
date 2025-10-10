@@ -257,16 +257,8 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     }
   }, [openChatById, session?.user?.id, status])
 
-  // Se não estiver autenticado, não renderizar
-  if (status !== 'authenticated' || !session?.user?.id) {
-    return null
-  }
-
-  // Verificar tipo de usuário - só mostrar para CLIENTE e PRESTADOR, não para ADMIN
+  const isAuthenticated = status === 'authenticated' && !!session?.user?.id
   const userType = (session.user as any)?.userType
-  if (userType === 'ADMIN') {
-    return null // Admins usam o dashboard específico
-  }
 
   // Contar chats não resolvidos
   const unreadChatsCount = Array.isArray(chats) ? chats.filter(chat => 
@@ -301,6 +293,15 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     }
     return 'w-full max-w-md mx-auto h-[min(75vh,calc(100vh-140px))] max-h-[calc(100vh-120px)]'
   }, [isDesktop])
+
+  // Se não estiver autenticado, não renderizar
+  if (!isAuthenticated) {
+    return null
+  }
+
+  if (userType === 'ADMIN') {
+    return null // Admins usam o dashboard específico
+  }
 
   if (!isOpen) {
     return (

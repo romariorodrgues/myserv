@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { z } from 'zod'
 
 async function syncProviderSchedulingFlag(serviceProviderId: string) {
@@ -82,7 +83,8 @@ export async function GET() {
     })
   } catch (error) {
     console.error('Erro ao buscar serviços do prestador:', error)
-    return NextResponse.json({ success: false, error: 'Erro interno do servidor' }, { status: 500 })
+    const message = error instanceof Error ? error.message : 'Erro desconhecido'
+    return NextResponse.json({ success: false, error: 'Erro interno do servidor', message }, { status: 500 })
   }
 }
 
@@ -110,6 +112,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const input = upsertSchema.parse(await req.json())
+    console.debug('[services/my-services] payload recebido', input)
 
     // prestador logado
     let sp = await prisma.serviceProvider.findUnique({
@@ -237,12 +240,18 @@ export async function POST(req: NextRequest) {
         quoteFee: link.quoteFee,
         category: link.service.category,
         categoryId: service.categoryId,
-        allowScheduling: link.service.category.allowScheduling ?? true,
+        allowScheduling: link.service.category?.allowScheduling ?? true,
         createdAt: link.createdAt
       }
     }, { status: 201 })
   } catch (error) {
     console.error('Erro ao salvar serviço do prestador:', error)
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      return NextResponse.json({ success: false, error: error.message, code: error.code }, { status: 409 })
+    }
+    if (error instanceof Prisma.PrismaClientValidationError) {
+      return NextResponse.json({ success: false, error: error.message }, { status: 400 })
+    }
     if (error instanceof z.ZodError) {
       return NextResponse.json({ success: false, error: 'Dados inválidos', details: error.errors }, { status: 400 })
     }

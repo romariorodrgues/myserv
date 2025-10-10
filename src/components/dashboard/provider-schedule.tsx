@@ -6,7 +6,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Calendar, Clock, Plus, Edit, Trash2, Save, X, Users, AlertCircle, CheckCircle } from 'lucide-react'
+import { Calendar, Clock, Plus, Trash2, Save, X, Users, AlertCircle, CheckCircle, MessageCircle } from 'lucide-react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -33,7 +33,7 @@ interface Appointment {
   id: string
   date: string
   startTime: string
-  endTime: string
+  endTime: string | null
   status: 'ACCEPTED' | 'PENDING' | 'CANCELLED' | 'COMPLETED' | 'REJECTED'
   type?: 'SCHEDULING' | 'QUOTE'
   client: {
@@ -45,6 +45,12 @@ interface Appointment {
     duration: number // in minutes
   }
   notes?: string
+  finalPrice?: number | null
+  paymentMethod?: string | null
+  cancellationReason?: string | null
+  cancelledBy?: string | null
+  estimatedPrice?: number | null
+  updatedAt?: string
 }
 
 interface ProviderScheduleProps {
@@ -67,17 +73,38 @@ const DEFAULT_TIME_SLOTS = [
   { startTime: '17:00', endTime: '18:00' }
 ]
 
+const formatDisplayDate = (dateString?: string | null) => {
+  if (!dateString) return 'Data a definir'
+  const base = new Date(`${dateString}T00:00:00`)
+  if (Number.isNaN(base.getTime())) return 'Data a definir'
+  return base.toLocaleDateString('pt-BR', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
+}
+
+const PAYMENT_OPTIONS: Array<{ value: 'PIX' | 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'OTHER'; label: string }> = [
+  { value: 'PIX', label: 'PIX' },
+  { value: 'CASH', label: 'Dinheiro' },
+  { value: 'CREDIT_CARD', label: 'Cartão de Crédito' },
+  { value: 'DEBIT_CARD', label: 'Cartão de Débito' },
+  { value: 'BANK_TRANSFER', label: 'Transferência bancária' },
+  { value: 'OTHER', label: 'Outro' },
+]
+
 export function ProviderSchedule({ providerId, initialTab, initialDate }: ProviderScheduleProps & { initialTab?: 'schedule'|'appointments'|'settings'; initialDate?: string }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments' | 'settings'>(initialTab || 'schedule')
+  const [activeTab, setActiveTab] = useState<'schedule' | 'appointments' | 'settings'>(initialTab ?? 'appointments')
   const [selectedDate, setSelectedDate] = useState(initialDate || new Date().toISOString().split('T')[0])
   const [showTimeSlotForm, setShowTimeSlotForm] = useState<number | null>(null)
   
   // Schedule data
   const [schedule, setSchedule] = useState<ScheduleDay[]>([])
   const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [showAllDates, setShowAllDates] = useState(false)
+  const [useSpecificDate, setUseSpecificDate] = useState(Boolean(initialDate))
   const [apptStatusFilter, setApptStatusFilter] = useState<'ALL'|'PENDING'|'ACCEPTED'>('ALL')
   
   // Form data
@@ -94,6 +121,8 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
   const [welcomeMessage, setWelcomeMessage] = useState('')
   const [confirmationMessage, setConfirmationMessage] = useState('')
   const [schedMap, setSchedMap] = useState<Record<string, { date: string; time: string }>>({})
+  const [cancelModal, setCancelModal] = useState<{ id: string; reason: string; loading: boolean } | null>(null)
+  const [completeModal, setCompleteModal] = useState<{ id: string; amount: string; method: 'PIX' | 'CASH' | 'CREDIT_CARD' | 'DEBIT_CARD' | 'BANK_TRANSFER' | 'OTHER'; loading: boolean } | null>(null)
 
   useEffect(() => {
     initializeSchedule()
@@ -101,10 +130,16 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
     fetchSettings()
   }, [providerId])
 
+  useEffect(() => {
+    if (initialTab && ['schedule', 'appointments', 'settings'].includes(initialTab)) {
+      setActiveTab(initialTab)
+    }
+  }, [initialTab])
+
   // Recarrega agendamentos ao trocar a data
   useEffect(() => {
     if (activeTab === 'appointments') fetchAppointments()
-  }, [selectedDate, activeTab, showAllDates])
+  }, [selectedDate, activeTab, useSpecificDate])
 
   const initializeSchedule = () => {
     // Initialize with default working days (Monday to Friday)
@@ -126,7 +161,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
   const fetchAppointments = async () => {
     try {
       const qs = new URLSearchParams({ providerId: providerId || '', type: 'appointments' })
-      if (!showAllDates && selectedDate) qs.set('date', selectedDate)
+      if (useSpecificDate && selectedDate) qs.set('date', selectedDate)
       const response = await fetch(`/api/schedule?${qs.toString()}`)
       if (response.ok) {
         const data = await response.json()
@@ -351,8 +386,10 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
     }
   }
 
-  const getAppointmentsForDate = (date: string) => {
-    const list = showAllDates ? appointments : appointments.filter(apt => apt.date === date)
+  const getAppointmentsForDate = () => {
+    const list = useSpecificDate && selectedDate
+      ? appointments.filter(apt => apt.date === selectedDate)
+      : appointments
     return list.filter((apt) => {
       if (apptStatusFilter === 'ALL') return true
       if (apptStatusFilter === 'PENDING') return apt.status === 'PENDING' || apt.status === 'HOLD'
@@ -361,16 +398,34 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
   }
 
   // Ações: aceitar/recusar/concluir
-  const updateAppointmentStatus = async (id: string, status: 'ACCEPTED' | 'REJECTED' | 'COMPLETED') => {
+  const updateAppointmentStatus = async (
+    id: string,
+    status: 'ACCEPTED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED',
+    extraPayload: Record<string, unknown> = {}
+  ) => {
     try {
-      const res = await fetch(`/api/bookings/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) })
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, ...extraPayload })
+      })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao atualizar')
-      toast.success(status === 'ACCEPTED' ? 'Agendamento aceito' : status === 'REJECTED' ? 'Agendamento recusado' : 'Serviço marcado como concluído')
+      const successMessage =
+        status === 'ACCEPTED'
+          ? 'Agendamento aceito'
+          : status === 'REJECTED'
+            ? 'Agendamento recusado'
+            : status === 'CANCELLED'
+              ? 'Agendamento cancelado'
+              : 'Serviço marcado como concluído'
+      toast.success(successMessage)
       await fetchAppointments()
+      return true
     } catch (e) {
       console.error(e)
       toast.error('Erro ao atualizar agendamento')
+      return false
     }
   }
 
@@ -392,6 +447,54 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
     )
   }
 
+  const openCancelModalFor = (appointment: Appointment) => {
+    setCancelModal({ id: appointment.id, reason: '', loading: false })
+  }
+
+  const submitCancellation = async () => {
+    if (!cancelModal) return
+    if (!cancelModal.reason || cancelModal.reason.trim().length < 5) {
+      toast.error('Informe um motivo com pelo menos 5 caracteres.')
+      return
+    }
+    setCancelModal((current) => current ? { ...current, loading: true } : current)
+    const success = await updateAppointmentStatus(cancelModal.id, 'CANCELLED', {
+      cancelReason: cancelModal.reason.trim(),
+      cancelledBy: 'PROVIDER',
+    })
+    setCancelModal(success ? null : { ...cancelModal, loading: false })
+  }
+
+  const openCompletionModalFor = (appointment: Appointment) => {
+    const defaultMethod = (appointment.paymentMethod as any) || 'PIX'
+    const defaultAmount = appointment.finalPrice ?? appointment.estimatedPrice ?? 0
+    setCompleteModal({
+      id: appointment.id,
+      method: ['PIX', 'CASH', 'CREDIT_CARD', 'DEBIT_CARD', 'BANK_TRANSFER', 'OTHER'].includes(defaultMethod)
+        ? (defaultMethod as any)
+        : 'PIX',
+      amount: defaultAmount ? String(defaultAmount) : '',
+      loading: false,
+    })
+  }
+
+  const submitCompletion = async () => {
+    if (!completeModal) return
+    const numericAmount = Number(completeModal.amount)
+    if (!Number.isFinite(numericAmount) || numericAmount < 0) {
+      toast.error('Informe um valor recebido válido.')
+      return
+    }
+    setCompleteModal((current) => current ? { ...current, loading: true } : current)
+    const success = await updateAppointmentStatus(completeModal.id, 'COMPLETED', {
+      payment: {
+        method: completeModal.method,
+        amount: numericAmount,
+      },
+    })
+    setCompleteModal(success ? null : { ...completeModal, loading: false })
+  }
+
   if (loading) {
     return (
       <Card>
@@ -410,6 +513,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
   }
 
   return (
+    <>
     <div className="space-y-6">
       {/* Tab Navigation */}
       <Card>
@@ -583,20 +687,26 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
               
               <div className="flex flex-wrap items-center gap-3">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="date-filter">Data:</Label>
-                  <Input
-                    id="date-filter"
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    className="w-auto"
-                    disabled={showAllDates}
-                  />
+                  <Switch checked={useSpecificDate} onCheckedChange={(checked) => {
+                    setUseSpecificDate(checked)
+                    if (!checked) {
+                      setSelectedDate(new Date().toISOString().split('T')[0])
+                    }
+                  }} />
+                  <span className="text-sm text-gray-600">Escolher data específica</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Switch checked={showAllDates} onCheckedChange={setShowAllDates} />
-                  <span className="text-sm text-gray-600">Sem data específica</span>
-                </div>
+                {useSpecificDate && (
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="date-filter">Data:</Label>
+                    <Input
+                      id="date-filter"
+                      type="date"
+                      value={selectedDate}
+                      onChange={(e) => setSelectedDate(e.target.value)}
+                      className="w-auto"
+                    />
+                  </div>
+                )}
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant={apptStatusFilter === 'ALL' ? 'default' : 'outline'} onClick={() => setApptStatusFilter('ALL')}>Todos</Button>
                   <Button size="sm" variant={apptStatusFilter === 'PENDING' ? 'default' : 'outline'} onClick={() => setApptStatusFilter('PENDING')}>Pendentes</Button>
@@ -607,15 +717,25 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {getAppointmentsForDate(selectedDate).length === 0 ? (
+              {getAppointmentsForDate().length === 0 ? (
                 <div className="text-center py-8">
                   <Calendar className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                   <p className="text-gray-500">Nenhum agendamento encontrado</p>
                 </div>
               ) : (
-                getAppointmentsForDate(selectedDate).map((appointment) => (
-                  <div key={appointment.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
-                    <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
+                getAppointmentsForDate().map((appointment) => {
+                  const isQuotePending = appointment.type === 'QUOTE' && (appointment.status === 'PENDING' || appointment.status === 'HOLD')
+                  const showTimeRange = Boolean(appointment.startTime && appointment.endTime && !isQuotePending)
+                  const scheduleDateLabel = isQuotePending ? 'Data a definir' : formatDisplayDate(appointment.date)
+                  const cleanPhone = appointment.client.phone?.replace(/\D/g, '') || ''
+                  const whatsappNumber = cleanPhone
+                    ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`)
+                    : ''
+                  const whatsappMessage = encodeURIComponent(`Olá, ${appointment.client.name}! Recebi seu pedido na MyServ e gostaria de combinar os detalhes.`)
+
+                  return (
+                    <div key={appointment.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                      <div className="flex flex-col lg:flex-row lg:items-center justify-between space-y-3 lg:space-y-0">
                       <div className="flex-1">
                         <div className="flex flex-col sm:flex-row sm:items-center sm:space-x-3 space-y-1 sm:space-y-0 mb-2">
                           <h3 className="font-medium text-lg">{appointment.service.name}</h3>
@@ -628,9 +748,20 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                         <div className="space-y-1 text-sm text-gray-600">
                           <div className="flex items-center space-x-4">
                             <span className="flex items-center space-x-1">
-                              <Clock className="w-4 h-4" />
-                              <span>{appointment.startTime} - {appointment.endTime}</span>
+                              <Calendar className="w-4 h-4" />
+                              <span>{scheduleDateLabel}</span>
                             </span>
+                            {showTimeRange ? (
+                              <span className="flex items-center space-x-1">
+                                <Clock className="w-4 h-4" />
+                                <span>{appointment.startTime} - {appointment.endTime}</span>
+                              </span>
+                            ) : appointment.startTime ? (
+                              <span className="flex items-center space-x-1">
+                                <Clock className="w-4 h-4" />
+                                <span>{appointment.startTime}</span>
+                              </span>
+                            ) : null}
                             <span className="flex items-center space-x-1">
                               <Users className="w-4 h-4" />
                               <span>{appointment.client.name}</span>
@@ -718,20 +849,39 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                         )}
                         
                         {appointment.status === 'ACCEPTED' && (
-                          <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'COMPLETED')}>
+                          <Button size="sm" variant="outline" onClick={() => openCompletionModalFor(appointment)}>
                             <CheckCircle className="w-4 h-4 mr-1" />
                             Marcar como Concluído
                           </Button>
                         )}
-                        
-                        <Button size="sm" variant="ghost">
-                          <Edit className="w-4 h-4 mr-1" />
-                          Editar
-                        </Button>
+
+                        {appointment.status === 'ACCEPTED' && whatsappNumber && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => window.open(`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`, '_blank')}
+                          >
+                            <MessageCircle className="w-4 h-4 mr-1" />
+                            Falar no WhatsApp
+                          </Button>
+                        )}
+
+                        {appointment.status === 'ACCEPTED' && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openCancelModalFor(appointment)}
+                          >
+                            <X className="w-4 h-4 mr-1" />
+                            Cancelar
+                          </Button>
+                        )}
+
                       </div>
                     </div>
                   </div>
-                ))
+                )
+                })
               )}
             </div>
           </CardContent>
@@ -886,5 +1036,76 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
         </Card>
       )}
     </div>
+
+    {cancelModal && (
+      <div className="fixed inset-0 z-[1300] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-brand-navy">Cancelar agendamento</h3>
+            <p className="text-sm text-gray-600">Informe o motivo do cancelamento. O cliente receberá esta mensagem.</p>
+          </div>
+          <Textarea
+            placeholder="Descreva o motivo do cancelamento"
+            value={cancelModal.reason}
+            onChange={(e) => setCancelModal((current) => current ? { ...current, reason: e.target.value } : current)}
+            rows={4}
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCancelModal(null)} disabled={cancelModal.loading}>
+              Voltar
+            </Button>
+            <Button onClick={submitCancellation} disabled={cancelModal.loading}>
+              {cancelModal.loading ? 'Cancelando...' : 'Confirmar cancelamento'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {completeModal && (
+      <div className="fixed inset-0 z-[1300] bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 space-y-4">
+          <div>
+            <h3 className="text-lg font-semibold text-brand-navy">Concluir e registrar pagamento</h3>
+            <p className="text-sm text-gray-600">Informe o valor recebido e o método de pagamento para atualizar suas métricas.</p>
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label htmlFor="payment-method">Método de pagamento</Label>
+              <select
+                id="payment-method"
+                value={completeModal.method}
+                onChange={(e) => setCompleteModal((current) => current ? { ...current, method: e.target.value as typeof completeModal.method } : current)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-brand-cyan"
+              >
+                {PAYMENT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="payment-amount">Valor recebido (R$)</Label>
+              <Input
+                id="payment-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={completeModal.amount}
+                onChange={(e) => setCompleteModal((current) => current ? { ...current, amount: e.target.value } : current)}
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setCompleteModal(null)} disabled={completeModal.loading}>
+              Voltar
+            </Button>
+            <Button onClick={submitCompletion} disabled={completeModal.loading}>
+              {completeModal.loading ? 'Salvando...' : 'Confirmar conclusão'}
+            </Button>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
