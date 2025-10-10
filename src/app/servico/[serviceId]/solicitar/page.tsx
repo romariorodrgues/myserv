@@ -7,7 +7,7 @@
 
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import Image from 'next/image'
@@ -98,6 +98,27 @@ interface TravelQuote {
   warnings: string[]
 }
 
+const MIN_DESCRIPTION_LENGTH = 10
+const MIN_NAME_LENGTH = 2
+const MIN_PHONE_DIGITS = 10
+const MIN_ADDRESS_LENGTH = 5
+const MIN_CITY_LENGTH = 2
+const MIN_STATE_LENGTH = 2
+const MIN_ZIP_DIGITS = 8
+
+type FormFieldError =
+  | 'description'
+  | 'clientName'
+  | 'clientPhone'
+  | 'clientEmail'
+  | 'address'
+  | 'city'
+  | 'state'
+  | 'zipCode'
+  | 'selectedProvider'
+
+type FieldErrors = Partial<Record<FormFieldError, string>>
+
 export default function ServiceRequestPage() {
   const params = useParams()
   const router = useRouter()
@@ -150,6 +171,64 @@ export default function ServiceRequestPage() {
   const providerOffersLocalService = selectedProviderData?.providesLocalService ?? true
   const serviceChargesTravel = selectedProviderData?.chargesTravel ?? selectedProviderData?.serviceProvider.chargesTravel ?? false
   const quoteFeeValue = selectedProviderData?.quoteFee ?? 0
+
+  const fieldErrors = useMemo<FieldErrors>(() => {
+    const errors: FieldErrors = {}
+    const description = bookingData.description.trim()
+    const descriptionLength = description.length
+    if (descriptionLength < MIN_DESCRIPTION_LENGTH) {
+      errors.description = `Descreva o serviço com pelo menos ${MIN_DESCRIPTION_LENGTH} caracteres (${descriptionLength}/${MIN_DESCRIPTION_LENGTH}).`
+    }
+
+    const clientName = bookingData.clientName.trim()
+    if (clientName.length < MIN_NAME_LENGTH) {
+      errors.clientName = 'Informe seu nome completo.'
+    }
+
+    const phoneDigits = bookingData.clientPhone.replace(/\D/g, '')
+    if (phoneDigits.length < MIN_PHONE_DIGITS) {
+      errors.clientPhone = 'Informe um telefone com DDD.'
+    }
+
+    const email = bookingData.clientEmail.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.clientEmail = 'Informe um email válido.'
+    }
+
+    const address = bookingData.address.trim()
+    if (address.length < MIN_ADDRESS_LENGTH) {
+      errors.address = 'Informe o endereço completo.'
+    }
+
+    const city = bookingData.city.trim()
+    if (city.length < MIN_CITY_LENGTH) {
+      errors.city = 'Informe a cidade.'
+    }
+
+    const state = bookingData.state.trim()
+    if (state.length < MIN_STATE_LENGTH) {
+      errors.state = 'Informe o estado.'
+    }
+
+    const zipDigits = bookingData.zipCode.replace(/\D/g, '')
+    if (zipDigits.length < MIN_ZIP_DIGITS) {
+      errors.zipCode = 'Informe um CEP válido.'
+    }
+
+    if (!selectedProvider) {
+      errors.selectedProvider = 'Selecione um profissional.'
+    }
+
+    return errors
+  }, [bookingData, selectedProvider])
+
+  const isFormValid = useMemo(() => Object.keys(fieldErrors).length === 0, [fieldErrors])
+  const descriptionLength = bookingData.description.trim().length
+  const descriptionError = fieldErrors.description
+  const descriptionHelperMessage = descriptionError
+    ? descriptionError
+    : `Mínimo de ${MIN_DESCRIPTION_LENGTH} caracteres (${descriptionLength}/${MIN_DESCRIPTION_LENGTH}).`
+  const firstErrorMessage = useMemo(() => Object.values(fieldErrors).find(Boolean) || null, [fieldErrors])
 
   const fetchUserProfile = useCallback(async () => {
     if (!session?.user?.id) return
@@ -420,26 +499,6 @@ export default function ServiceRequestPage() {
     }))
   }
 
-  const isFormValid = () => {
-    // Campos obrigatórios básicos
-    const basicFields = [
-      bookingData.description.trim(),
-      bookingData.clientName.trim(),
-      bookingData.clientPhone.trim(),
-      bookingData.clientEmail.trim(),
-      bookingData.address.trim(),
-      bookingData.city.trim(),
-      bookingData.state.trim(),
-      bookingData.zipCode.trim(),
-      selectedProvider
-    ]
-
-    // Se NÃO tem agendamento, pode exigir preferência de data/hora (opcional manter)
-    // Quando tem agenda, não exigimos esses campos na tela de solicitar.
-
-    return basicFields.every(field => field && field.length > 0)
-  }
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
@@ -448,8 +507,8 @@ export default function ServiceRequestPage() {
       return
     }
 
-    if (!isFormValid()) {
-      alert('Por favor, preencha todos os campos obrigatórios')
+    if (!isFormValid) {
+      alert(firstErrorMessage || 'Por favor, verifique os campos obrigatórios.')
       return
     }
 
@@ -487,7 +546,7 @@ export default function ServiceRequestPage() {
       const res = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data?.error || 'Falha ao criar solicitação')
-      setSuccessMsg('Orçamento enviado! O profissional será notificado para entrar em contato com você.')
+      setSuccessMsg('Solicitação de orçamento enviada! O profissional será notificado para entrar em contato com você.')
     } catch (error) {
       console.error('Error submitting booking:', error)
       alert('Erro ao enviar solicitação')
@@ -629,12 +688,19 @@ export default function ServiceRequestPage() {
                   </label>
                   <textarea
                     required
+                    minLength={MIN_DESCRIPTION_LENGTH}
                     rows={4}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    aria-invalid={Boolean(descriptionError)}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${
+                      descriptionError ? 'border-red-500 focus:ring-red-500' : 'border-gray-300 focus:ring-blue-500'
+                    }`}
                     placeholder="Descreva detalhadamente o serviço que você precisa..."
                     value={bookingData.description}
                     onChange={(e) => handleInputChange('description', e.target.value)}
                   />
+                  <p className={`mt-2 text-xs ${descriptionError ? 'text-red-600' : 'text-gray-500'}`}>
+                    {descriptionHelperMessage}
+                  </p>
                 </div>
 
                 {/* Date and Time - Show only if provider DOES NOT have scheduling */}
@@ -843,11 +909,10 @@ export default function ServiceRequestPage() {
                 </div>
 
                 <div className="flex flex-col gap-4 pt-6 border-t">
-                  {!isFormValid() && selectedProvider && (
+                  {!isFormValid && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
                       <p className="text-sm text-yellow-800">
-                        <strong>Atenção:</strong> Preencha todos os campos obrigatórios para continuar.
-                        {!selectedProvider && " Selecione um profissional."}
+                        <strong>Atenção:</strong> {firstErrorMessage ?? 'Preencha todos os campos obrigatórios para continuar.'}
                       </p>
                     </div>
                   )}
@@ -856,7 +921,7 @@ export default function ServiceRequestPage() {
                     {selectedProvider && providerSupportsScheduling ? (
                       <Button
                         type="button"
-                        disabled={!isFormValid() || submitting}
+                        disabled={!isFormValid || submitting}
                         onClick={() => {
                           try {
                             const payload = {
@@ -885,7 +950,7 @@ export default function ServiceRequestPage() {
                     {providerSupportsQuoting ? (
                       <Button
                         type="submit"
-                        disabled={submitting || !isFormValid()}
+                        disabled={submitting || !isFormValid}
                         className="px-8 py-2"
                       >
                         {submitting ? 'Enviando…' : 'Solicitar Orçamento'}
