@@ -3,11 +3,13 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { sanitizeUnitId } from '@/lib/service-units'
+import { getServiceUnitIds } from '@/server/service-units'
 
 const updateSchema = z.object({
   serviceId: z.string().uuid(), // ID do Service vinculado ao ServiceProviderService
   basePrice: z.number(),
-  unit: z.enum(['HOUR', 'FIXED', 'SQUARE_METER', 'ROOM', 'CUSTOM']),
+  unit: z.string().min(1),
   description: z.union([z.string().min(3), z.literal('')]).optional(),
   isActive: z.boolean()
 })
@@ -32,6 +34,16 @@ export async function PUT(req: NextRequest) {
 
   const { serviceId, basePrice, unit, description, isActive } = parsed.data
 
+  const allowedUnitIds = await getServiceUnitIds()
+  const sanitizedUnit = sanitizeUnitId(unit)
+
+  if (!allowedUnitIds.includes(sanitizedUnit)) {
+    return NextResponse.json(
+      { error: 'Unidade de cobrança inválida' },
+      { status: 400 },
+    )
+  }
+
   try {
     const provider = await prisma.serviceProvider.findUnique({
       where: { userId: session.user.id },
@@ -51,7 +63,7 @@ export async function PUT(req: NextRequest) {
       },
       data: {
         basePrice,
-        unit,
+        unit: sanitizedUnit,
         description,
         isActive
       }

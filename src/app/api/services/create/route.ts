@@ -3,13 +3,15 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { z } from 'zod'
+import { sanitizeUnitId } from '@/lib/service-units'
+import { getServiceUnitIds } from '@/server/service-units'
 
 const serviceSchema = z.object({
   name: z.string().min(3),
   description: z.string().min(10), // usado internamente no modelo Service
   categoryId: z.string().uuid(),
   basePrice: z.number().min(0),
-  unit: z.enum(['HOUR', 'FIXED', 'SQUARE_METER', 'ROOM', 'CUSTOM']),
+  unit: z.string().min(1),
   providerDescription: z.string().min(5), // visível para o cliente
 })
 
@@ -23,6 +25,16 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const data = serviceSchema.parse(body)
+
+    const allowedUnitIds = await getServiceUnitIds()
+    const sanitizedUnit = sanitizeUnitId(data.unit)
+
+    if (!allowedUnitIds.includes(sanitizedUnit)) {
+      return NextResponse.json(
+        { success: false, error: 'Unidade de cobrança inválida.' },
+        { status: 400 },
+      )
+    }
 
     // Regras de elegibilidade por categoria
     const category = await prisma.serviceCategory.findUnique({ where: { id: data.categoryId } })
@@ -90,7 +102,7 @@ export async function POST(request: NextRequest) {
         serviceId: service.id,
         serviceProviderId: provider.id,
         basePrice: data.basePrice,
-        unit: data.unit,
+        unit: sanitizedUnit,
         description: data.providerDescription,
         isActive: true
       },

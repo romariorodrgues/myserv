@@ -11,6 +11,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  DEFAULT_SERVICE_UNITS,
+  sanitizeUnitId,
+  type ServiceUnit,
+} from '@/lib/service-units'
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState({
@@ -37,9 +42,12 @@ export default function AdminSettingsPage() {
     termsUpdatedAt: '',
     privacyUpdatedAt: '',
   })
-  const [initialLegal, setInitialLegal] = useState({ terms: '', privacy: '' })
-  const [legalLoading, setLegalLoading] = useState(true)
-  const [savingLegal, setSavingLegal] = useState(false)
+const [initialLegal, setInitialLegal] = useState({ terms: '', privacy: '' })
+const [legalLoading, setLegalLoading] = useState(true)
+const [savingLegal, setSavingLegal] = useState(false)
+  const [serviceUnits, setServiceUnits] = useState<ServiceUnit[]>(DEFAULT_SERVICE_UNITS)
+  const [unitsLoading, setUnitsLoading] = useState(true)
+  const [unitsSaving, setUnitsSaving] = useState(false)
 
   useEffect(() => {
     // Carrega system settings para contatos
@@ -61,6 +69,31 @@ export default function AdminSettingsPage() {
       } catch { /* noop */ }
     }
     load()
+  }, [])
+
+  useEffect(() => {
+    const loadUnits = async () => {
+      try {
+        setUnitsLoading(true)
+        const res = await fetch('/api/service-units', { cache: 'no-store' })
+        if (!res.ok) {
+          setServiceUnits(DEFAULT_SERVICE_UNITS)
+          return
+        }
+        const data = await res.json()
+        if (Array.isArray(data.units) && data.units.length > 0) {
+          setServiceUnits(data.units)
+        } else {
+          setServiceUnits(DEFAULT_SERVICE_UNITS)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar unidades', error)
+        setServiceUnits(DEFAULT_SERVICE_UNITS)
+      } finally {
+        setUnitsLoading(false)
+      }
+    }
+    loadUnits()
   }, [])
 
   useEffect(() => {
@@ -111,6 +144,7 @@ export default function AdminSettingsPage() {
       })
       alert('Configurações salvas com sucesso!')
     } catch (error) {
+      console.error('Erro ao salvar configurações', error)
       alert('Erro ao salvar configurações')
     }
   }
@@ -159,6 +193,53 @@ export default function AdminSettingsPage() {
     const date = new Date(value)
     if (Number.isNaN(date.getTime())) return '—'
     return date.toLocaleString('pt-BR')
+  }
+
+  const updateUnitField = (index: number, field: 'id' | 'label', value: string) => {
+    setServiceUnits((current) =>
+      current.map((unit, idx) =>
+        idx === index
+          ? {
+              ...unit,
+              [field]: field === 'id' ? sanitizeUnitId(value) : value,
+            }
+          : unit
+      )
+    )
+  }
+
+  const addUnit = () => {
+    setServiceUnits((current) => [...current, { id: '', label: '' }])
+  }
+
+  const removeUnit = (index: number) => {
+    setServiceUnits((current) => current.filter((_, idx) => idx !== index))
+  }
+
+  const handleSaveUnits = async () => {
+    try {
+      setUnitsSaving(true)
+      const response = await fetch('/api/service-units', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ units: serviceUnits }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data.success) {
+        throw new Error(data?.error || 'Erro ao salvar unidades')
+      }
+      if (Array.isArray(data.units) && data.units.length > 0) {
+        setServiceUnits(data.units)
+      } else {
+        setServiceUnits(DEFAULT_SERVICE_UNITS)
+      }
+      alert('Unidades atualizadas com sucesso!')
+    } catch (error) {
+      console.error('Erro ao salvar unidades', error)
+      alert('Erro ao salvar unidades')
+    } finally {
+      setUnitsSaving(false)
+    }
   }
 
   return (
@@ -414,6 +495,60 @@ export default function AdminSettingsPage() {
                   <label className="block text-sm font-medium mb-1">Plano Mensal Profissional (R$)</label>
                   <Input value={settings.planMonthlyPrice} onChange={(e) => setSettings(p => ({...p, planMonthlyPrice: e.target.value}))} />
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Service Units */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Unidades de cobrança</CardTitle>
+              <CardDescription>Liste as unidades disponíveis para os prestadores ao definir preços de serviço.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {unitsLoading ? (
+                <p className="text-sm text-gray-500">Carregando unidades...</p>
+              ) : (
+                <div className="space-y-3">
+                  {serviceUnits.map((unit, index) => (
+                    <div key={index} className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
+                      <div className="md:col-span-2">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Identificador</label>
+                        <Input
+                          placeholder="EX: HOUR"
+                          value={unit.id}
+                          onChange={(e) => updateUnitField(index, 'id', e.target.value)}
+                        />
+                        <p className="text-[11px] text-gray-500 mt-1">Somente letras, números, sublinhado (_) ou hífen (-).</p>
+                      </div>
+                      <div className="md:col-span-3">
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Rótulo exibido</label>
+                        <Input
+                          placeholder="Por hora"
+                          value={unit.label}
+                          onChange={(e) => updateUnitField(index, 'label', e.target.value)}
+                        />
+                      </div>
+                      <div className="md:col-span-5 flex justify-end">
+                        {serviceUnits.length > 1 && (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => removeUnit(index)}>
+                            Remover
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  <div>
+                    <Button type="button" variant="outline" onClick={addUnit}>
+                      Adicionar unidade
+                    </Button>
+                  </div>
+                </div>
+              )}
+              <div className="flex justify-end">
+                <Button type="button" onClick={handleSaveUnits} disabled={unitsSaving || unitsLoading}>
+                  {unitsSaving ? 'Salvando...' : 'Salvar unidades'}
+                </Button>
               </div>
             </CardContent>
           </Card>

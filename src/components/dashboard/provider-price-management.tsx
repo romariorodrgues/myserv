@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 import { toast } from 'sonner'
 import CascadingCategoryPicker, { type CascCat } from '@/components/categories/cascading-category-picker'
+import { DEFAULT_SERVICE_UNITS, type ServiceUnit } from '@/lib/service-units'
 
 interface ServicePrice {
   id: string
@@ -27,7 +28,7 @@ interface ServicePrice {
   categoryId: string 
   description?: string
   basePrice: number
-  unit: 'HOUR' | 'FIXED' | 'SQUARE_METER' | 'ROOM' | 'CUSTOM'
+  unit: string
   // customUnit?: string
   // minPrice?: number
   // maxPrice?: number
@@ -71,20 +72,6 @@ interface PriceTemplate {
   unit: string
 }
 
-const UNIT_LABELS = {
-  HOUR: 'Por hora',
-  FIXED: 'Preço fixo',
-  SQUARE_METER: 'Por m²',
-  ROOM: 'Por cômodo',
-  CUSTOM: 'Personalizado'
-}
-export enum ServiceUnit {
-  FIXED = 'FIXED',
-  HOUR = 'HOUR',
-  SQUARE_METER = 'SQUARE_METER',
-  ROOM = 'ROOM',
-  CUSTOM = 'CUSTOM'
-}
 const POPULAR_TEMPLATES: PriceTemplate[] = [
   { id: '1', name: 'Limpeza Residencial', category: 'Limpeza', basePrice: 120, unit: 'FIXED' },
   { id: '2', name: 'Limpeza Comercial', category: 'Limpeza', basePrice: 25, unit: 'SQUARE_METER' },
@@ -101,6 +88,8 @@ export function ProviderPriceManagement() {
   const [showTemplates, setShowTemplates] = useState(false)
   const [showAddService, setShowAddService] = useState(false)
   const [categories, setCategories] = useState<Array<{id: string; name: string}>>([])
+  const [unitOptions, setUnitOptions] = useState<ServiceUnit[]>(DEFAULT_SERVICE_UNITS)
+  const [unitsLoading, setUnitsLoading] = useState(false)
 
   const [leafCategoryId, setLeafCategoryId] = useState<string | null>(null)
   const [selectedLeaf, setSelectedLeaf] = useState<CascCat | null>(null)
@@ -109,7 +98,7 @@ const [newService, setNewService] = useState({
   name: '',
   description: '',
   basePrice: 0,
-  unit: ServiceUnit.FIXED,
+  unit: DEFAULT_SERVICE_UNITS[0]?.id ?? 'FIXED',
   categoryId: '',
   isActive: true,
   isPromotional: false,
@@ -182,6 +171,46 @@ type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
       setLoading(false)
     }
   }, [])
+
+  useEffect(() => {
+    const loadUnits = async () => {
+      try {
+        setUnitsLoading(true)
+        const res = await fetch('/api/service-units', { cache: 'no-store' })
+        if (!res.ok) {
+          setUnitOptions(DEFAULT_SERVICE_UNITS)
+          return
+        }
+        const data = await res.json()
+        if (Array.isArray(data.units) && data.units.length > 0) {
+          setUnitOptions(data.units)
+        } else {
+          setUnitOptions(DEFAULT_SERVICE_UNITS)
+        }
+      } catch (error) {
+        console.error('Erro ao carregar unidades de cobrança:', error)
+        setUnitOptions(DEFAULT_SERVICE_UNITS)
+      } finally {
+        setUnitsLoading(false)
+      }
+    }
+
+    loadUnits()
+  }, [])
+
+  useEffect(() => {
+    if (!unitOptions.length) return
+    setNewService(prev => (
+      unitOptions.some(option => option.id === prev.unit)
+        ? prev
+        : { ...prev, unit: unitOptions[0].id }
+    ))
+  }, [unitOptions])
+
+  const getUnitLabel = useCallback(
+    (id: string) => unitOptions.find((option) => option.id === id)?.label ?? id,
+    [unitOptions]
+  )
 
 useEffect(() => {
   
@@ -355,11 +384,15 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       return
     }
 
+    const unitId = unitOptions.some((option) => option.id === template.unit)
+      ? template.unit
+      : unitOptions[0]?.id ?? template.unit
+
     setNewService({
       name: template.name,
       description: '',
       basePrice: template.basePrice,
-      unit: template.unit as ServiceUnit,
+      unit: unitId,
       categoryId: matchedCategory.id,
       isActive: true,
       isPromotional: false,
@@ -535,20 +568,23 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <Label htmlFor="service-unit">Unidade de Cobrança</Label>
-                  <select
-                    id="service-unit"
-                    value={newService.unit || 'FIXED'}
-                    onChange={(e) => setNewService(prev => ({ ...prev, unit: e.target.value as any }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    {Object.entries(UNIT_LABELS).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
+        <div className="space-y-2">
+          <Label htmlFor="service-unit">Unidade de Cobrança</Label>
+          <select
+            id="service-unit"
+            value={newService.unit || 'FIXED'}
+            onChange={(e) => setNewService(prev => ({ ...prev, unit: e.target.value }))}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={unitsLoading || unitOptions.length === 0}
+          >
+            {unitOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
+              </option>
                     ))}
                   </select>
-                </div>
-              </div>
+        </div>
+      </div>
               
               <div className="space-y-2">
                 <Label htmlFor="service-description">Descrição</Label>
@@ -709,6 +745,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     onCancel={() => setEditingService(null)}
                     saving={saving}
                     categories={categories}
+                    unitOptions={unitOptions}
                   />
                 ) : (
                   <div className="space-y-4">
@@ -766,7 +803,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                             <p className="text-lg font-semibold">
                               R$ {(service.basePrice ?? 0).toFixed(2)}
                               <span className="text-sm text-gray-500 ml-1">
-                                {UNIT_LABELS[service.unit]}
+                                {getUnitLabel(service.unit)}
                                 {/* {service.unit === 'CUSTOM' && service.customUnit && ` (${service.customUnit})`} */}
                               </span>
                             </p>
@@ -778,7 +815,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                               <p className="text-lg font-semibold text-red-600">
                                 R$ {(service.promotionalPrice ?? 0).toFixed(2)}
                                 <span className="text-sm text-gray-500 ml-1">
-                                  {UNIT_LABELS[service.unit]}
+                                  {getUnitLabel(service.unit)}
                                 </span>
                               </p>
                               {service.promotionalEndDate && (
@@ -919,7 +956,7 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                   <p className="text-lg font-semibold mt-2">
                     R$ {(template.basePrice??0).toFixed(2)}
                     <span className="text-sm text-gray-500 ml-1">
-                      {UNIT_LABELS[template.unit as keyof typeof UNIT_LABELS]}
+                      {getUnitLabel(template.unit)}
                     </span>
                   </p>
                 </div>
@@ -939,12 +976,22 @@ interface ServiceEditFormProps {
   onCancel: () => void
   saving: boolean
   categories: { id: string; name: string }[]
+  unitOptions: Array<{ id: string; label: string }>
 }
 
 
-function ServiceEditForm({ service, onSave, onCancel, saving, categories }: ServiceEditFormProps) {
+function ServiceEditForm({ service, onSave, onCancel, saving, categories, unitOptions }: ServiceEditFormProps) {
   const [editedService, setEditedService] = useState<ServicePrice>({ ...service })
   const [editedLeafId, setEditedLeafId] = useState<string | null>(service.categoryId || null)
+
+  useEffect(() => {
+    if (!unitOptions.length) return
+    setEditedService((prev) =>
+      unitOptions.some((option) => option.id === prev.unit)
+        ? prev
+        : { ...prev, unit: unitOptions[0].id }
+    )
+  }, [unitOptions])
 
   const handleSave = () => {
     const next = { ...editedService }
@@ -1036,9 +1083,9 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories }: Serv
             }
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            {Object.entries(UNIT_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>
-                {label}
+            {unitOptions.map((option) => (
+              <option key={option.id} value={option.id}>
+                {option.label}
               </option>
             ))}
           </select>
