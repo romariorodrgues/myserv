@@ -594,12 +594,15 @@ function PesquisaPage() {
     if (quote) {
       const travelCost = quote.travelCost
       const hasEstimatedTotal = typeof quote.estimatedTotal === 'number' && Number.isFinite(quote.estimatedTotal)
-      const fallbackTotal = !hasEstimatedTotal && service.basePrice != null
-        ? service.basePrice + travelCost
+      const basePriceApplies = service.offersScheduling && service.basePrice != null
+      const fallbackTotal = !hasEstimatedTotal && basePriceApplies
+        ? service.basePrice! + travelCost
         : null
       const servicePortion = hasEstimatedTotal
         ? Math.max((quote.estimatedTotal ?? 0) - travelCost, 0)
-        : service.basePrice ?? null
+        : basePriceApplies
+          ? service.basePrice
+          : null
       const totalLabel = hasEstimatedTotal
         ? `Serviço + deslocamento: ${formatCurrency(quote.estimatedTotal!)}`
         : fallbackTotal != null

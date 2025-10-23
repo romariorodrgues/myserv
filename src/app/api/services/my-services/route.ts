@@ -66,7 +66,7 @@ export async function GET() {
         serviceProviderServiceId: s.id,   // ID do vínculo
         name: s.service.name,
         description: s.description ?? s.service.description ?? '',
-        basePrice: s.basePrice,
+        basePrice: s.offersScheduling ? s.basePrice : null,
         unit: s.unit,
         isActive: s.isActive,
         offersScheduling: s.offersScheduling,
@@ -139,6 +139,12 @@ export async function POST(req: NextRequest) {
 
     const categoryAllowsScheduling = cat.allowScheduling ?? true
 
+    const requestedScheduling = categoryAllowsScheduling ? !!input.offersScheduling : false
+    const normalizedBasePrice =
+      requestedScheduling && typeof input.basePrice === 'number'
+        ? input.basePrice
+        : null
+
     // garante Service canônico (um por leaf)
     const selectSvc = {
       id: true, name: true, categoryId: true, description: true, isActive: true
@@ -189,11 +195,11 @@ export async function POST(req: NextRequest) {
         }
       },
       update: {
-        basePrice: input.basePrice ?? null,
+        basePrice: normalizedBasePrice,
         unit: input.unit,
         description: input.description ?? null,
         isActive: input.isActive ?? true,
-        offersScheduling: categoryAllowsScheduling ? !!input.offersScheduling : false,
+        offersScheduling: requestedScheduling,
         offersQuoting: requestedQuoting ?? true,
         ...homeServiceData,
         ...localServiceData,
@@ -203,11 +209,11 @@ export async function POST(req: NextRequest) {
       create: {
         serviceProviderId: sp.id,
         serviceId: service.id,
-        basePrice: input.basePrice ?? null,
+        basePrice: normalizedBasePrice,
         unit: input.unit,
         description: input.description ?? null,
         isActive: input.isActive ?? true,
-        offersScheduling: categoryAllowsScheduling ? !!input.offersScheduling : false,
+        offersScheduling: requestedScheduling,
         offersQuoting: requestedQuoting ?? true,
         providesHomeService: requestedHomeService ?? false,
         providesLocalService: requestedLocalService ?? true,
@@ -329,7 +335,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   try {
-    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService, providesLocalService, offersQuoting, chargesTravel, quoteFee } = await req.json()
+    const payload = await req.json()
+    const { serviceProviderServiceId, basePrice, unit, description, isActive, leafCategoryId, offersScheduling, providesHomeService, providesLocalService, offersQuoting, chargesTravel, quoteFee } = payload
+    const basePriceProvided = Object.prototype.hasOwnProperty.call(payload, 'basePrice')
 
     const requestedScheduling = typeof offersScheduling === 'boolean' ? offersScheduling : undefined
     const requestedHomeService = typeof providesHomeService === 'boolean' ? providesHomeService : undefined
@@ -365,6 +373,8 @@ export async function PATCH(req: NextRequest) {
         ? { quoteFee: requestedQuoteFee }
         : {}
 
+    const basePriceData = basePriceProvided ? { basePrice: basePrice ?? null } : {}
+
     // Se veio uma nova folha, mover para o serviço canônico da nova categoria
     if (typeof leafCategoryId === 'string') {
       const cat = await prisma.serviceCategory.findUnique({ where: { id: leafCategoryId }, select: { id: true, isLeaf: true, isActive: true, name: true, allowScheduling: true } })
@@ -397,7 +407,7 @@ export async function PATCH(req: NextRequest) {
           await prisma.serviceProviderService.update({
             where: { id: existing.id },
             data: {
-              ...(basePrice != null && { basePrice }),
+              ...basePriceData,
               ...(unit && { unit }),
               ...(typeof description === 'string' ? { description } : {}),
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
@@ -415,7 +425,7 @@ export async function PATCH(req: NextRequest) {
             where: { id: serviceProviderServiceId },
             data: {
               serviceId: target.id,
-              ...(basePrice != null && { basePrice }),
+              ...basePriceData,
               ...(unit && { unit }),
               ...(typeof description === 'string' ? { description } : {}),
               ...(typeof isActive === 'boolean' ? { isActive } : {}),
@@ -433,7 +443,7 @@ export async function PATCH(req: NextRequest) {
         await prisma.serviceProviderService.update({
           where: { id: serviceProviderServiceId },
           data: {
-            ...(basePrice != null && { basePrice }),
+            ...basePriceData,
             ...(unit && { unit }),
             ...(typeof description === 'string' ? { description } : {}),
             ...(typeof isActive === 'boolean' ? { isActive } : {}),
@@ -456,7 +466,7 @@ export async function PATCH(req: NextRequest) {
       await prisma.serviceProviderService.update({
         where: { id: serviceProviderServiceId },
         data: {
-          ...(basePrice != null && { basePrice }),
+          ...basePriceData,
           ...(unit && { unit }),
           ...(typeof description === 'string' ? { description } : {}),
           ...(typeof isActive === 'boolean' ? { isActive } : {}),

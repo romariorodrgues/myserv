@@ -87,13 +87,16 @@ export async function GET(request: NextRequest) {
       id: ps.serviceId,
       name: ps.service.name,
       category: ps.service.category.name,
-      basePrice: ps.basePrice ?? undefined
+      basePrice: ps.offersScheduling ? ps.basePrice ?? undefined : undefined,
+      offersScheduling: ps.offersScheduling ?? false,
+      quoteFee: ps.quoteFee ?? 0,
+      chargesTravel: ps.chargesTravel ?? fav.serviceProvider.chargesTravel ?? false,
     })),
     description: '', // Preencha se quiser
     priceRange: '', // Preencha se quiser
     isVerified: false, // ou ajuste se tiver lógica
     isHighlighted: false, // ou ajuste se tiver lógica
-    availableScheduling: false, // ou ajuste se tiver lógica
+    availableScheduling: fav.serviceProvider.services.some(ps => ps.offersScheduling),
     rating: 4.8,
     reviewCount: 125,
     availability: {

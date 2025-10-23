@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { ArrowLeft, Calendar, Clock, MapPin, Phone, Mail, User, LogIn, Loader2 } from 'lucide-react'
 import { cdnImageUrl } from '@/lib/cdn'
+import { formatCurrency } from '@/lib/utils'
 
 interface Service {
   id: string
@@ -163,6 +164,13 @@ export default function ServiceRequestPage() {
   const travelDebounceRef = useRef<NodeJS.Timeout | null>(null)
   const [showTravelDetails, setShowTravelDetails] = useState(false)
   const [serviceDeliveryMode, setServiceDeliveryMode] = useState<'HOME' | 'LOCAL'>('LOCAL')
+  const [deliveryModeManuallySet, setDeliveryModeManuallySet] = useState(false)
+  const lastLoadedProviderProfileIdRef = useRef<string | null>(null)
+
+  const handleDeliveryModeChange = (mode: 'HOME' | 'LOCAL') => {
+    setDeliveryModeManuallySet(true)
+    setServiceDeliveryMode(mode)
+  }
 
   const selectedProviderData = service?.providers.find((p) => p.id === selectedProvider)
   const providerSupportsScheduling = selectedProviderData?.offersScheduling ?? selectedProviderData?.serviceProvider.hasScheduling ?? false
@@ -305,29 +313,41 @@ export default function ServiceRequestPage() {
   useEffect(() => {
     const loadProviderProfile = async () => {
       const chosen = service?.providers?.find((p: any) => p.id === selectedProvider)
+      if (!chosen) return
+
       // fallback imediato com dados mínimos do serviço
-      if (chosen && !providerProfile) {
-        setProviderProfile({
+      setProviderProfile((prev) => {
+        if (prev?.id === chosen.serviceProvider.id) {
+          return prev
+        }
+
+        return {
           id: chosen.serviceProvider.id,
           name: chosen.serviceProvider.user.name,
           profileImage: chosen.serviceProvider.user.profileImage,
-          basePrice: chosen.basePrice,
-          description: chosen.description,
+          basePrice: typeof chosen.basePrice === 'number' ? chosen.basePrice : undefined,
+          description: chosen.description ?? undefined,
           city: undefined,
           state: undefined,
           stats: { averageRating: 0, totalReviews: 0 },
-        })
+        }
+      })
+
+      const profileId = selectedProviderProfileId || chosen.serviceProvider.id
+      if (!profileId) return
+
+      if (lastLoadedProviderProfileIdRef.current === profileId) {
+        return
       }
 
       try {
-        const profileId = selectedProviderProfileId || chosen?.serviceProvider.id
-        if (!profileId) return
         const res = await fetch(`/api/service-providers/${profileId}`)
         if (!res.ok) return
         const data = await res.json()
         if (!data.success) return
         const sp = data.data
-        setProviderProfile((prev) => ({
+        lastLoadedProviderProfileIdRef.current = profileId
+        setProviderProfile({
           id: sp.id,
           name: sp.user.name,
           profileImage: sp.user.profileImage,
@@ -337,15 +357,16 @@ export default function ServiceRequestPage() {
             averageRating: Number(sp.statistics?.averageRating || 0),
             totalReviews: Number(sp.statistics?.totalReviews || 0),
           },
-          basePrice: chosen?.basePrice ?? prev?.basePrice,
-          description: chosen?.description ?? prev?.description,
-        }))
+          basePrice: typeof chosen?.basePrice === 'number' ? chosen.basePrice : undefined,
+          description: chosen?.description ?? sp.user.description ?? undefined,
+        })
       } catch {
+        lastLoadedProviderProfileIdRef.current = null
         // ignora; fallback já cobre
       }
     }
     loadProviderProfile()
-  }, [selectedProvider, selectedProviderProfileId, service, providerProfile])
+  }, [selectedProvider, selectedProviderProfileId, service])
 
   // Sempre que o provider selecionado mudar, sincroniza no bookingData.providerId
   useEffect(() => {
@@ -353,12 +374,17 @@ export default function ServiceRequestPage() {
     const selected = service.providers.find((p) => p.id === selectedProvider)
     if (selected) {
       setBookingData((prev) => ({ ...prev, providerId: selected.serviceProvider.id }))
+      setDeliveryModeManuallySet(false)
     }
   }, [selectedProvider, service])
 
   useEffect(() => {
     if (!selectedProviderData) {
       setServiceDeliveryMode('LOCAL')
+      return
+    }
+
+    if (deliveryModeManuallySet) {
       return
     }
 
@@ -372,8 +398,13 @@ export default function ServiceRequestPage() {
       return
     }
 
+    if (providerOffersHomeService && serviceChargesTravel) {
+      setServiceDeliveryMode('HOME')
+      return
+    }
+
     setServiceDeliveryMode((prev) => (prev === 'HOME' || prev === 'LOCAL' ? prev : 'LOCAL'))
-  }, [selectedProviderData, providerOffersHomeService, providerOffersLocalService])
+  }, [selectedProviderData, providerOffersHomeService, providerOffersLocalService, serviceChargesTravel, deliveryModeManuallySet])
 
   useEffect(() => {
     let isActive = true
@@ -758,7 +789,7 @@ export default function ServiceRequestPage() {
                           name="delivery-mode"
                           value="LOCAL"
                           checked={serviceDeliveryMode === 'LOCAL'}
-                          onChange={() => setServiceDeliveryMode('LOCAL')}
+                          onChange={() => handleDeliveryModeChange('LOCAL')}
                           className="sr-only"
                         />
                         <span className="leading-tight">
@@ -779,7 +810,7 @@ export default function ServiceRequestPage() {
                           name="delivery-mode"
                           value="HOME"
                           checked={serviceDeliveryMode === 'HOME'}
-                          onChange={() => setServiceDeliveryMode('HOME')}
+                          onChange={() => handleDeliveryModeChange('HOME')}
                           className="sr-only"
                         />
                         <span className="leading-tight">
@@ -989,16 +1020,28 @@ export default function ServiceRequestPage() {
                   const price = (providerProfile?.basePrice ?? chosen?.basePrice)
                   const desc = providerProfile?.description ?? chosen?.description
 
-                  const basePriceValue = typeof price === 'number' && Number.isFinite(price) ? price : null
+                  const basePriceApplies = providerSupportsScheduling && typeof price === 'number' && Number.isFinite(price)
+                  const basePriceValue = basePriceApplies ? price : null
                   const showHomeBreakdown = serviceDeliveryMode === 'HOME' && providerOffersHomeService
+                  const computedTravelCost = travelQuote && typeof travelQuote.travelCost === 'number' && Number.isFinite(travelQuote.travelCost)
+                    ? travelQuote.travelCost
+                    : null
                   const effectiveTravelCost = showHomeBreakdown
                     ? serviceChargesTravel
-                      ? travelQuote?.travelCost ?? null
+                      ? computedTravelCost
                       : 0
                     : null
-                  const quoteFeeDisplay = providerSupportsQuoting && quoteFeeValue > 0 ? quoteFeeValue : 0
-                  const subtotalValue = (basePriceValue ?? 0) + (effectiveTravelCost ?? 0)
-                  const totalEstimate = subtotalValue + quoteFeeDisplay
+                  const travelApplies = showHomeBreakdown && serviceChargesTravel
+                  const travelCostResolved = !travelApplies || typeof effectiveTravelCost === 'number'
+                  const quoteFeeAmount = providerSupportsQuoting ? Math.max(0, quoteFeeValue ?? 0) : null
+                  const travelAmount = travelApplies && travelCostResolved ? (effectiveTravelCost ?? 0) : 0
+                  const subtotalValue = (basePriceValue ?? 0) + travelAmount
+                  const totalEstimate = subtotalValue + (quoteFeeAmount ?? 0)
+                  const totalKnownCharges = (basePriceValue ?? 0) + (quoteFeeAmount ?? 0)
+                  const totalReady = !travelApplies || travelCostResolved
+                  const displayedTotalValue = totalReady ? totalEstimate : totalKnownCharges
+                  const totalNeedsAddress = travelApplies && !travelCostResolved
+                  const shouldShowTotalRow = basePriceValue != null || quoteFeeAmount != null || showHomeBreakdown
                   const distanceLabel = travelQuote?.distanceText || (travelQuote?.distanceKm != null
                     ? `${travelQuote.distanceKm.toFixed(1)} km`
                     : null)
@@ -1088,20 +1131,31 @@ export default function ServiceRequestPage() {
                             </div>
                           )}
 
-                          {quoteFeeDisplay > 0 && providerSupportsQuoting && (
+                          {quoteFeeAmount != null && (
                             <div className="flex items-center justify-between">
                               <span>Taxa de orçamento</span>
-                              <span>R$ {quoteFeeDisplay.toFixed(2)}</span>
+                              <span>
+                                {quoteFeeAmount > 0 ? `R$ ${quoteFeeAmount.toFixed(2)}` : 'Grátis'}
+                              </span>
                             </div>
                           )}
 
-                          {(basePriceValue != null || (showHomeBreakdown && (serviceChargesTravel ? effectiveTravelCost != null : true)) || (quoteFeeDisplay > 0 && providerSupportsQuoting)) && (
-                            <div className="flex items-center justify-between font-semibold text-brand-navy border-t pt-2">
-                              <span>Total estimado</span>
-                              <span>
-                                {travelLoading && serviceChargesTravel ? '—' : `R$ ${totalEstimate.toFixed(2)}`}
-                              </span>
-                            </div>
+                          {shouldShowTotalRow && (
+                            <>
+                              <div className="flex items-center justify-between font-semibold text-brand-navy border-t pt-2">
+                                <span>Total estimado</span>
+                                <span>
+                                  {travelLoading && serviceChargesTravel
+                                    ? 'Calculando...'
+                                    : `${formatCurrency(displayedTotalValue)}${totalNeedsAddress ? ' + deslocamento' : ''}`}
+                                </span>
+                              </div>
+                              {totalNeedsAddress && (
+                                <p className="text-xs text-gray-500">
+                                  Informe o endereço para calcular a taxa de deslocamento.
+                                </p>
+                              )}
+                            </>
                           )}
                         </div>
 

@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
+import { formatCurrency } from '@/lib/utils'
 
 interface Favorite {
   id: string
@@ -22,7 +23,10 @@ interface Favorite {
   location: string
   rating: number
   reviewCount: number
-  basePrice: number
+  basePrice: number | null
+  offersScheduling: boolean
+  quoteFee: number | null
+  chargesTravel?: boolean
   available: boolean
   image?: string
   createdAt: string
@@ -43,12 +47,103 @@ export default function FavoritosPage() {
     }
   }, [session])
 
+  const normalizeFavorite = (item: any): Favorite | null => {
+    if (!item) return null
+
+    if ('serviceProvider' in item && item.serviceProvider) {
+      const provider = item.serviceProvider
+      const providerUser = provider.user ?? {}
+      const providerServices = Array.isArray(provider.services) ? provider.services : []
+      const servicesNames = providerServices
+        .map((svc: any) => svc?.name)
+        .filter((name: any): name is string => typeof name === 'string' && name.length > 0)
+      const schedulingService = providerServices.find((svc: any) => svc?.offersScheduling)
+      const primaryService = schedulingService ?? providerServices[0] ?? null
+      const basePrice = schedulingService?.basePrice ?? null
+      const offersScheduling = providerServices.some((svc: any) => !!svc?.offersScheduling)
+      const quoteFeeSource = schedulingService ?? primaryService ?? null
+      const quoteFee = typeof (quoteFeeSource?.quoteFee) === 'number' ? quoteFeeSource.quoteFee : null
+      const chargesTravel = typeof (primaryService?.chargesTravel) === 'boolean'
+        ? primaryService.chargesTravel
+        : providerServices.some((svc: any) => !!svc?.chargesTravel)
+
+      const locationParts = [
+        provider.location?.city,
+        provider.location?.state
+      ].filter((part) => typeof part === 'string' && part.length > 0)
+
+      const providerId = provider.id ?? item.id ?? providerUser.id
+      if (!providerId) {
+        return null
+      }
+
+      const categoryName = typeof primaryService?.category === 'string' && primaryService.category.length > 0
+        ? primaryService.category
+        : (servicesNames[0] ?? 'Serviços')
+
+      return {
+        id: item.id ?? `${providerId}-${primaryService?.id ?? 'favorite'}`,
+        providerId,
+        name: providerUser.name ?? provider.name ?? 'Profissional',
+        services: servicesNames.length > 0 ? servicesNames : primaryService?.name ? [primaryService.name] : [],
+        category: categoryName,
+        location: locationParts.join(', '),
+        rating: typeof provider.rating === 'number' ? provider.rating : 0,
+        reviewCount: typeof provider.reviewCount === 'number' ? provider.reviewCount : 0,
+        basePrice,
+        offersScheduling,
+        quoteFee,
+        chargesTravel,
+        available: provider.availableScheduling ?? true,
+        image: providerUser.profileImage ?? undefined,
+        createdAt: item.addedAt ? new Date(item.addedAt).toISOString() : new Date().toISOString(),
+      }
+    }
+
+    const servicesNames = Array.isArray(item.services)
+      ? item.services.filter((svc: any): svc is string => typeof svc === 'string')
+      : []
+    const providerId = item.providerId ?? item.id
+    if (!providerId) {
+      return null
+    }
+
+    const basePriceValue = typeof item.basePrice === 'number' ? item.basePrice : null
+    const quoteFeeValue = typeof item.quoteFee === 'number' ? item.quoteFee : null
+
+    return {
+      id: item.id ?? `${providerId}-favorite`,
+      providerId,
+      name: item.name ?? 'Profissional',
+      services: servicesNames,
+      category: typeof item.category === 'string' && item.category.length > 0 ? item.category : 'Serviços',
+      location: item.location ?? '',
+      rating: typeof item.rating === 'number' ? item.rating : 0,
+      reviewCount: typeof item.reviewCount === 'number' ? item.reviewCount : 0,
+      basePrice: basePriceValue,
+      offersScheduling: item.offersScheduling ?? (basePriceValue != null),
+      quoteFee: quoteFeeValue,
+      chargesTravel: item.chargesTravel ?? false,
+      available: item.available ?? true,
+      image: item.image ?? undefined,
+      createdAt: item.createdAt ?? new Date().toISOString(),
+    }
+  }
+
   const fetchFavorites = async () => {
     try {
       const response = await fetch('/api/favorites')
       if (response.ok) {
         const data = await response.json()
-        setFavorites(data.favorites || [])
+        const rawList = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.favorites)
+            ? data.favorites
+            : []
+        const normalized = rawList
+          .map(normalizeFavorite)
+          .filter((fav): fav is Favorite => !!fav && typeof fav.providerId === 'string')
+        setFavorites(normalized)
       } else {
         console.error('Failed to fetch favorites')
       }
@@ -180,7 +275,9 @@ export default function FavoritosPage() {
                           </h3>
                           <p className="text-gray-600">{favorite.category}</p>
                           <p className="text-sm text-gray-500">
-                            {favorite.services.join(', ')}
+                            {favorite.services.length > 0
+                              ? favorite.services.join(', ')
+                              : 'Serviço sob orçamento'}
                           </p>
                         </div>
                         <Button
@@ -216,12 +313,26 @@ export default function FavoritosPage() {
 
                       {/* Price and Actions */}
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-brand-navy">
-                          {favorite.basePrice > 0 
-                            ? `A partir de R$ ${favorite.basePrice.toFixed(2)}`
-                            : 'Sob consulta'
-                          }
-                        </span>
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-brand-navy">
+                            {favorite.offersScheduling && favorite.basePrice != null
+                              ? `A partir de ${formatCurrency(favorite.basePrice)}`
+                              : 'Valor definido após orçamento'
+                            }
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {favorite.offersScheduling
+                              ? 'Agende direto com o profissional.'
+                              : favorite.quoteFee != null
+                                ? favorite.quoteFee > 0
+                                  ? `Taxa de orçamento: ${formatCurrency(favorite.quoteFee)}`
+                                  : 'Orçamento grátis.'
+                                : 'Solicite um orçamento para combinar valores.'}
+                          </span>
+                          {!favorite.offersScheduling && favorite.chargesTravel && (
+                            <span className="text-xs text-gray-500">Deslocamento pode ser cobrado.</span>
+                          )}
+                        </div>
                         <div className="flex gap-2">
                           {/* <Button variant="outline" size="sm">
                             <Phone className="h-4 w-4 mr-2" />

@@ -136,7 +136,8 @@ export async function POST(request: NextRequest) {
     }
 
     const providerServiceLink = serviceProvider.services?.[0]
-    const basePriceValue = providerServiceLink?.basePrice ?? null
+    const providerSupportsScheduling = providerServiceLink?.offersScheduling ?? serviceProvider.hasScheduling ?? false
+    const basePriceValue = providerSupportsScheduling ? (providerServiceLink?.basePrice ?? null) : null
     const chargesTravel = fulfillmentMode === 'HOME'
       ? (providerServiceLink?.chargesTravel ?? serviceProvider.chargesTravel)
       : false

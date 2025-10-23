@@ -318,6 +318,7 @@ if (input.leafCategoryId) {
       const averageRating = stats?.average ?? 0
       const reviewsCount = stats?.count ?? 0
       const basePriceNumber = normalizeDecimal(ps.basePrice)
+      const basePriceForScheduling = ps.offersScheduling ? basePriceNumber : null
 
       return {
         id: ps.id,
@@ -346,7 +347,7 @@ if (input.leafCategoryId) {
         longitude: providerAddress?.longitude ?? null,
         rating: averageRating,
         reviewCount: reviewsCount,
-        basePrice: basePriceNumber ?? null,
+        basePrice: basePriceForScheduling,
         distance: dist,
         serviceRadiusKm: providerRadius,
         available: true,

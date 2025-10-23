@@ -27,7 +27,7 @@ interface ServicePrice {
   category: string
   categoryId: string 
   description?: string
-  basePrice: number
+  basePrice: number | null
   unit: string
   // customUnit?: string
   // minPrice?: number
@@ -94,26 +94,29 @@ export function ProviderPriceManagement() {
   const [leafCategoryId, setLeafCategoryId] = useState<string | null>(null)
   const [selectedLeaf, setSelectedLeaf] = useState<CascCat | null>(null)
 
-const [newService, setNewService] = useState({
-  name: '',
-  description: '',
-  basePrice: 0,
-  unit: DEFAULT_SERVICE_UNITS[0]?.id ?? 'FIXED',
-  categoryId: '',
-  isActive: true,
-  isPromotional: false,
-  offersScheduling: false,
-  offersQuoting: true,
-  providesHomeService: false,
-  providesLocalService: true,
-  chargesTravel: false,
-  quoteFee: 0,
-  // customUnit: '',
-  promotionalPrice: 0,
-  promotionalEndDate: '',
-  variations: [],
-  addOns: [],
-})
+  const [newService, setNewService] = useState({
+    name: '',
+    description: '',
+    basePrice: 0,
+    unit: DEFAULT_SERVICE_UNITS[0]?.id ?? 'FIXED',
+    categoryId: '',
+    isActive: true,
+    isPromotional: false,
+    offersScheduling: false,
+    offersQuoting: true,
+    providesHomeService: false,
+    providesLocalService: true,
+    chargesTravel: false,
+    quoteFee: 0,
+    // customUnit: '',
+    promotionalPrice: 0,
+    promotionalEndDate: '',
+    variations: [],
+    addOns: [],
+  })
+
+  const leafAllowsScheduling = selectedLeaf?.allowScheduling ?? true
+  const newServiceSchedulingEnabled = leafAllowsScheduling && !!newService.offersScheduling
 
 
 type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
@@ -123,7 +126,7 @@ type APIService = Omit<ServicePrice, 'category' | 'categoryId'> & {
 
 
   // Busca os serviços reais do prestador
-   const fetchServices = useCallback(async () => {
+  const fetchServices = useCallback(async () => {
     setLoading(true)
     try {
       const res = await fetch('/api/services/my-services')
@@ -240,7 +243,7 @@ const handleUpdateService = async (service: ServicePrice) => {
     const body: any = {
       // ⚠️ usamos SEMPRE o ID do vínculo (ServiceProviderService)
       serviceProviderServiceId: service.serviceProviderServiceId,
-      basePrice: service.basePrice,
+      basePrice: service.offersScheduling ? service.basePrice : null,
       unit: service.unit,
       description: typeof service.description === 'string' ? service.description : undefined,
       isActive: service.isActive,
@@ -287,14 +290,16 @@ const handleUpdateService = async (service: ServicePrice) => {
   try {
     setSaving(true);
 
+    const basePricePayload = newService.offersScheduling && Number.isFinite(Number(newService.basePrice))
+      ? Number(newService.basePrice)
+      : undefined
+
     const res = await fetch('/api/services/my-services', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         leafCategoryId,
-        basePrice: Number.isFinite(Number(newService.basePrice))
-  ? Number(newService.basePrice)
-  : undefined,
+        basePrice: basePricePayload,
         unit: newService.unit,                         // string/enum que você usa na UI
         description: newService.description || undefined,
         isActive: newService.isActive, // opcional
@@ -397,13 +402,16 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
       isActive: true,
       isPromotional: false,
       offersScheduling: false,
+      offersQuoting: true,
       providesHomeService: false,
       providesLocalService: true,
+      chargesTravel: false,
       // customUnit: '',
       promotionalPrice: 0,
       promotionalEndDate: '',
       variations: [],
       addOns: [],
+      quoteFee: 0,
     })
 
 
@@ -428,8 +436,8 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
     if (!service.competitorPrices || service.competitorPrices.length === 0) return null
     
     const avgCompetitorPrice = service.competitorPrices.reduce((sum, comp) => sum + comp.price, 0) / service.competitorPrices.length
-    const myPrice = service.isPromotional && service.promotionalPrice ? service.promotionalPrice : service.basePrice
-    const difference = ((myPrice - avgCompetitorPrice) / avgCompetitorPrice) * 100
+    const myPriceBase = (service.isPromotional && service.promotionalPrice ? service.promotionalPrice : service.basePrice) ?? 0
+    const difference = ((myPriceBase - avgCompetitorPrice) / avgCompetitorPrice) * 100
     
     return {
       avgPrice: avgCompetitorPrice,
@@ -562,10 +570,16 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
                     type="number"
                     min="0"
                     step="0.01"
-                    value={newService.basePrice || ''}
+                    value={newServiceSchedulingEnabled ? newService.basePrice || '' : ''}
                     onChange={(e) => setNewService(prev => ({ ...prev, basePrice: parseFloat(e.target.value) || 0 }))}
-                    placeholder="0.00"
+                    placeholder={newServiceSchedulingEnabled ? '0.00' : 'Disponível com agendamento'}
+                    disabled={!newServiceSchedulingEnabled}
                   />
+                  {!leafAllowsScheduling ? (
+                    <p className="text-xs text-gray-500">Esta categoria aceita apenas solicitações de orçamento; o preço base não será exibido.</p>
+                  ) : !newServiceSchedulingEnabled ? (
+                    <p className="text-xs text-gray-500">Ative o agendamento para definir um preço base.</p>
+                  ) : null}
                 </div>
                 
         <div className="space-y-2">
@@ -616,9 +630,12 @@ const toggleServiceStatus = async (serviceProviderServiceId: string) => {
 
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center">
                   <Switch
-                    checked={selectedLeaf?.allowScheduling ? newService.offersScheduling : false}
-                    onCheckedChange={(checked: boolean) => setNewService(prev => ({ ...prev, offersScheduling: checked }))}
-                    disabled={!selectedLeaf?.allowScheduling}
+                    checked={leafAllowsScheduling ? newService.offersScheduling : false}
+                    onCheckedChange={(checked: boolean) => setNewService(prev => ({
+                      ...prev,
+                      offersScheduling: leafAllowsScheduling ? checked : false,
+                    }))}
+                    disabled={!leafAllowsScheduling}
                     className="shrink-0"
                   />
                   <div className="space-y-1">
@@ -1016,6 +1033,7 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories, unitOp
   }
 
   const allowsScheduling = editedService.allowScheduling ?? true
+  const schedulingEnabled = allowsScheduling && !!editedService.offersScheduling
 
   const handleToggleHomeService = (checked: boolean) => {
     setEditedService(prev => ({
@@ -1064,14 +1082,21 @@ function ServiceEditForm({ service, onSave, onCancel, saving, categories, unitOp
             type="number"
             min="0"
             step="0.01"
-            value={editedService.basePrice}
+            value={schedulingEnabled ? editedService.basePrice ?? '' : ''}
             onChange={(e) =>
               setEditedService(prev => ({
                 ...prev,
                 basePrice: parseFloat(e.target.value) || 0
               }))
             }
+            placeholder={schedulingEnabled ? '0.00' : 'Disponível com agendamento'}
+            disabled={!schedulingEnabled}
           />
+          {!allowsScheduling ? (
+            <p className="text-xs text-gray-500">Categoria sem agendamento: o preço base será combinado no orçamento.</p>
+          ) : !schedulingEnabled ? (
+            <p className="text-xs text-gray-500">Ative o agendamento para definir um preço base.</p>
+          ) : null}
         </div>
 
         <div className="space-y-2">
