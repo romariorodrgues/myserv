@@ -297,11 +297,8 @@ function PesquisaPage() {
     await executeSearch(next, undefined, 1)
   }
 
-  const handleSelectCategory = (leafId: string | null, path: CascCat[]) => {
-    if (leafId && path.length) {
-      const label = path.map((item) => item.name).join(' › ')
-      setSearchTerm(label)
-    }
+  const handleSelectCategory = (_leafId: string | null, _path: CascCat[]) => {
+    // Apenas delega para handleFiltersUpdate via picker; nenhuma ação extra aqui
   }
 
   const applyLocation = async (data: {

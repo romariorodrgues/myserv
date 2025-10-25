@@ -17,6 +17,7 @@ import { Card } from '@/components/ui/card'
 import { ArrowLeft, Calendar, Clock, MapPin, Phone, Mail, User, LogIn, Loader2 } from 'lucide-react'
 import { cdnImageUrl } from '@/lib/cdn'
 import { formatCurrency } from '@/lib/utils'
+import AddressAutocompleteInput from '@/components/forms/address-autocomplete-input'
 
 interface Service {
   id: string
@@ -75,6 +76,9 @@ interface BookingData {
   city: string
   state: string
   zipCode: string
+  addressVerified: boolean
+  clientLatitude: number | null
+  clientLongitude: number | null
 }
 
 interface TravelQuote {
@@ -156,7 +160,10 @@ export default function ServiceRequestPage() {
     address: '',
     city: '',
     state: '',
-    zipCode: ''
+    zipCode: '',
+    addressVerified: false,
+    clientLatitude: null,
+    clientLongitude: null,
   })
   const [travelQuote, setTravelQuote] = useState<TravelQuote | null>(null)
   const [travelLoading, setTravelLoading] = useState(false)
@@ -165,6 +172,7 @@ export default function ServiceRequestPage() {
   const [showTravelDetails, setShowTravelDetails] = useState(false)
   const [serviceDeliveryMode, setServiceDeliveryMode] = useState<'HOME' | 'LOCAL'>('LOCAL')
   const [deliveryModeManuallySet, setDeliveryModeManuallySet] = useState(false)
+  const [requestMode, setRequestMode] = useState<'SCHEDULING' | 'QUOTE'>('QUOTE')
   const lastLoadedProviderProfileIdRef = useRef<string | null>(null)
 
   const handleDeliveryModeChange = (mode: 'HOME' | 'LOCAL') => {
@@ -172,6 +180,26 @@ export default function ServiceRequestPage() {
     setServiceDeliveryMode(mode)
   }
 
+  const handleAddressResolved = (resolved: {
+    addressLine: string
+    formatted: string
+    city?: string
+    state?: string
+    postalCode?: string
+    latitude?: number
+    longitude?: number
+  }) => {
+    setBookingData((prev) => ({
+      ...prev,
+      address: resolved.addressLine || resolved.formatted || prev.address,
+      city: resolved.city ?? prev.city,
+      state: resolved.state ?? prev.state,
+      zipCode: resolved.postalCode ?? prev.zipCode,
+      addressVerified: true,
+      clientLatitude: typeof resolved.latitude === 'number' ? resolved.latitude : prev.clientLatitude,
+      clientLongitude: typeof resolved.longitude === 'number' ? resolved.longitude : prev.clientLongitude,
+    }))
+  }
   const selectedProviderData = service?.providers.find((p) => p.id === selectedProvider)
   const providerSupportsScheduling = selectedProviderData?.offersScheduling ?? selectedProviderData?.serviceProvider.hasScheduling ?? false
   const providerSupportsQuoting = selectedProviderData?.offersQuoting ?? selectedProviderData?.serviceProvider.hasQuoting ?? true
@@ -179,6 +207,26 @@ export default function ServiceRequestPage() {
   const providerOffersLocalService = selectedProviderData?.providesLocalService ?? true
   const serviceChargesTravel = selectedProviderData?.chargesTravel ?? selectedProviderData?.serviceProvider.chargesTravel ?? false
   const quoteFeeValue = selectedProviderData?.quoteFee ?? 0
+  const showRequestModeToggle = providerSupportsScheduling && providerSupportsQuoting
+  const activeRequestMode = showRequestModeToggle
+    ? requestMode
+    : providerSupportsScheduling
+      ? 'SCHEDULING'
+      : 'QUOTE'
+  const requestModeIsScheduling = activeRequestMode === 'SCHEDULING'
+  const requestModeIsQuote = activeRequestMode === 'QUOTE'
+
+  useEffect(() => {
+    if (!selectedProviderData) return
+    if (showRequestModeToggle) return
+    setRequestMode(providerSupportsScheduling ? 'SCHEDULING' : 'QUOTE')
+  }, [providerSupportsScheduling, showRequestModeToggle, selectedProviderData])
+
+  useEffect(() => {
+    if (activeRequestMode === 'SCHEDULING' && successMsg) {
+      setSuccessMsg('')
+    }
+  }, [activeRequestMode, successMsg])
 
   const fieldErrors = useMemo<FieldErrors>(() => {
     const errors: FieldErrors = {}
@@ -206,6 +254,10 @@ export default function ServiceRequestPage() {
     const address = bookingData.address.trim()
     if (address.length < MIN_ADDRESS_LENGTH) {
       errors.address = 'Informe o endereço completo.'
+    }
+
+    if (bookingData.address && !bookingData.addressVerified) {
+      errors.address = 'Selecione um endereço válido nas sugestões.'
     }
 
     const city = bookingData.city.trim()
@@ -375,6 +427,14 @@ export default function ServiceRequestPage() {
     if (selected) {
       setBookingData((prev) => ({ ...prev, providerId: selected.serviceProvider.id }))
       setDeliveryModeManuallySet(false)
+      lastLoadedProviderProfileIdRef.current = null
+      if (selected.offersScheduling && selected.offersQuoting !== false) {
+        setRequestMode('SCHEDULING')
+      } else if (selected.offersScheduling) {
+        setRequestMode('SCHEDULING')
+      } else {
+        setRequestMode('QUOTE')
+      }
     }
   }, [selectedProvider, service])
 
@@ -439,14 +499,18 @@ export default function ServiceRequestPage() {
     }
 
     const hasAddressInfo =
-      bookingData.address.trim().length > 4 &&
-      bookingData.city.trim().length > 0 &&
-      bookingData.state.trim().length > 0
+      bookingData.addressVerified &&
+      bookingData.clientLatitude != null &&
+      bookingData.clientLongitude != null
 
     if (!hasAddressInfo) {
       setTravelQuote(null)
-      if (!bookingData.address && !bookingData.city && !bookingData.state) {
+      if (!bookingData.address) {
         setTravelError(null)
+      } else if (!bookingData.addressVerified) {
+        setTravelError('Selecione um endereço válido nas sugestões.')
+      } else {
+        setTravelError('Não foi possível localizar o endereço informado.')
       }
       setTravelLoading(false)
       return
@@ -472,6 +536,8 @@ export default function ServiceRequestPage() {
             clientCity: bookingData.city,
             clientState: bookingData.state,
             clientZipCode: bookingData.zipCode || undefined,
+            clientLat: bookingData.clientLatitude ?? undefined,
+            clientLng: bookingData.clientLongitude ?? undefined,
           }),
         })
 
@@ -514,7 +580,20 @@ export default function ServiceRequestPage() {
       }
       setTravelLoading(false)
     }
-  }, [selectedProviderProfileId, bookingData.address, bookingData.city, bookingData.state, bookingData.zipCode, serviceId, providerOffersHomeService, serviceDeliveryMode, serviceChargesTravel])
+  }, [
+    selectedProviderProfileId,
+    bookingData.address,
+    bookingData.city,
+    bookingData.state,
+    bookingData.zipCode,
+    bookingData.addressVerified,
+    bookingData.clientLatitude,
+    bookingData.clientLongitude,
+    serviceId,
+    providerOffersHomeService,
+    serviceDeliveryMode,
+    serviceChargesTravel
+  ])
 
   useEffect(() => {
     fetchService()
@@ -524,10 +603,20 @@ export default function ServiceRequestPage() {
   }, [fetchService, fetchUserProfile, session?.user?.id])
 
   const handleInputChange = (field: keyof BookingData, value: string) => {
-    setBookingData(prev => ({
-      ...prev,
-      [field]: value
-    }))
+    setBookingData(prev => {
+      const next = {
+        ...prev,
+        [field]: value
+      }
+
+      if (field === 'address') {
+        next.addressVerified = false
+        next.clientLatitude = null
+        next.clientLongitude = null
+      }
+
+      return next
+    })
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -543,6 +632,45 @@ export default function ServiceRequestPage() {
       return
     }
 
+    const providerProfileId = selectedProviderProfileId || service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.id
+    if (!providerProfileId) {
+      alert('Não foi possível identificar o prestador. Tente novamente.')
+      return
+    }
+
+    if (!bookingData.addressVerified || bookingData.clientLatitude == null || bookingData.clientLongitude == null) {
+      alert('Selecione um endereço válido utilizando as sugestões.')
+      return
+    }
+
+    if (activeRequestMode === 'SCHEDULING') {
+      if (!providerSupportsScheduling) {
+        alert('Este profissional não possui agenda disponível.')
+        return
+      }
+
+      try {
+        const payload = {
+          serviceId,
+          providerId: providerProfileId,
+          description: bookingData.description,
+          clientName: bookingData.clientName,
+          clientPhone: bookingData.clientPhone,
+          clientEmail: bookingData.clientEmail,
+          address: bookingData.address,
+          city: bookingData.city,
+          state: bookingData.state,
+          zipCode: bookingData.zipCode,
+          fulfillmentMode: serviceDeliveryMode,
+          clientLatitude: bookingData.clientLatitude,
+          clientLongitude: bookingData.clientLongitude,
+        }
+        sessionStorage.setItem('pendingBooking', JSON.stringify(payload))
+      } catch {}
+      router.push(`/servico/${serviceId}/agendar?providerId=${providerProfileId}`)
+      return
+    }
+
     if (!providerSupportsQuoting) {
       alert('Este profissional não aceita solicitações de orçamento. Utilize a agenda para agendar um horário.')
       return
@@ -551,14 +679,6 @@ export default function ServiceRequestPage() {
     setSubmitting(true)
 
     try {
-      // Se o prestador tem agenda: botão separado já leva para a agenda.
-      // Aqui, o submit vira "Solicitar Orçamento" (QUOTE) — sem data/hora.
-      const providerProfileId = selectedProviderProfileId || service?.providers.find(p => p.id === selectedProvider)?.serviceProvider.id
-      if (!providerProfileId) {
-        alert('Não foi possível identificar o prestador. Tente novamente.')
-        return
-      }
-
       const payload = {
         serviceId,
         providerId: providerProfileId,
@@ -571,7 +691,8 @@ export default function ServiceRequestPage() {
         state: bookingData.state,
         zipCode: bookingData.zipCode,
         fulfillmentMode: serviceDeliveryMode,
-        // Não enviar preferredDate/Time para criar QUOTE
+        clientLatitude: bookingData.clientLatitude,
+        clientLongitude: bookingData.clientLongitude,
       } as any
 
       const res = await fetch('/api/bookings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
@@ -734,8 +855,8 @@ export default function ServiceRequestPage() {
                   </p>
                 </div>
 
-                {/* Date and Time - Show only if provider DOES NOT have scheduling */}
-                {selectedProviderData && !providerSupportsScheduling && (
+                {/* Date and Time - Show when solicitando orçamento */}
+                {selectedProviderData && requestModeIsQuote && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -763,13 +884,63 @@ export default function ServiceRequestPage() {
                   </div>
                 )}
 
-                {/* Quote Request Message - Show only if provider has quoting */}
-                {selectedProviderData && providerSupportsQuoting && !providerSupportsScheduling && (
+                {/* Quote Request Message */}
+                {selectedProviderData && providerSupportsQuoting && requestModeIsQuote && (
                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                     <h3 className="font-medium text-blue-900 mb-2">Solicitação de Orçamento</h3>
                     <p className="text-sm text-blue-700">
                       Este profissional trabalha com orçamentos personalizados. Após enviar sua solicitação, você receberá um orçamento detalhado.
                     </p>
+                  </div>
+                )}
+
+                {/* Request type selection */}
+                {showRequestModeToggle && (
+                  <div className="border-t pt-6">
+                    <h3 className="text-lg font-medium mb-4">Como deseja continuar?</h3>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <label
+                        className={`flex flex-1 items-center gap-3 rounded-lg border px-4 py-3 text-sm transition hover:border-blue-400 hover:bg-blue-50 ${
+                          requestModeIsScheduling ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="request-mode"
+                          value="SCHEDULING"
+                          checked={requestModeIsScheduling}
+                          onChange={() => setRequestMode('SCHEDULING')}
+                          className="sr-only"
+                        />
+                        <span className="leading-tight">
+                          Agendar diretamente
+                          <span className="block text-xs text-gray-500">
+                            Escolha um horário disponível na agenda do profissional.
+                          </span>
+                        </span>
+                      </label>
+
+                      <label
+                        className={`flex flex-1 items-center gap-3 rounded-lg border px-4 py-3 text-sm transition hover:border-blue-400 hover:bg-blue-50 ${
+                          requestModeIsQuote ? 'border-blue-500 bg-blue-50' : 'border-gray-200 bg-white'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="request-mode"
+                          value="QUOTE"
+                          checked={requestModeIsQuote}
+                          onChange={() => setRequestMode('QUOTE')}
+                          className="sr-only"
+                        />
+                        <span className="leading-tight">
+                          Solicitar orçamento
+                          <span className="block text-xs text-gray-500">
+                            Receba uma proposta antes de confirmar o serviço.
+                          </span>
+                        </span>
+                      </label>
+                    </div>
                   </div>
                 )}
 
@@ -890,27 +1061,24 @@ export default function ServiceRequestPage() {
                     Endereço do Serviço
                   </h3>
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Endereço Completo *
-                      </label>
-                      <Input
-                        required
-                        value={bookingData.address}
-                        onChange={(e) => handleInputChange('address', e.target.value)}
-                        placeholder="Rua, número, complemento"
-                      />
-                    </div>
+                    <AddressAutocompleteInput
+                      label="Endereço completo *"
+                      value={bookingData.address}
+                      onChange={(value) => handleInputChange('address', value)}
+                      onResolved={handleAddressResolved}
+                      error={fieldErrors.address ?? null}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
                           Cidade *
                         </label>
                         <Input
+                          readOnly
                           required
                           value={bookingData.city}
-                          onChange={(e) => handleInputChange('city', e.target.value)}
                           placeholder="São Paulo"
+                          className="bg-gray-50"
                         />
                       </div>
                       <div>
@@ -918,10 +1086,11 @@ export default function ServiceRequestPage() {
                           Estado *
                         </label>
                         <Input
+                          readOnly
                           required
                           value={bookingData.state}
-                          onChange={(e) => handleInputChange('state', e.target.value)}
                           placeholder="SP"
+                          className="bg-gray-50"
                         />
                       </div>
                       <div>
@@ -929,10 +1098,11 @@ export default function ServiceRequestPage() {
                           CEP *
                         </label>
                         <Input
+                          readOnly
                           required
                           value={bookingData.zipCode}
-                          onChange={(e) => handleInputChange('zipCode', e.target.value)}
                           placeholder="00000-000"
+                          className="bg-gray-50"
                         />
                       </div>
                     </div>
@@ -948,52 +1118,17 @@ export default function ServiceRequestPage() {
                     </div>
                   )}
                   
-                  <div className="flex justify-end gap-2">
-                    {selectedProvider && providerSupportsScheduling ? (
-                      <Button
-                        type="button"
-                        disabled={!isFormValid || submitting}
-                        onClick={() => {
-                          try {
-                            const payload = {
-                              serviceId,
-                              providerId: selectedProviderProfileId,
-                              description: bookingData.description,
-                              clientName: bookingData.clientName,
-                              clientPhone: bookingData.clientPhone,
-                              clientEmail: bookingData.clientEmail,
-                              address: bookingData.address,
-                              city: bookingData.city,
-                              state: bookingData.state,
-                              zipCode: bookingData.zipCode,
-                              fulfillmentMode: serviceDeliveryMode,
-                            }
-                            sessionStorage.setItem('pendingBooking', JSON.stringify(payload))
-                          } catch {}
-                          router.push(`/servico/${serviceId}/agendar?providerId=${selectedProviderProfileId}`)
-                        }}
-                        className="px-8 py-2"
-                      >
-                        Escolher Data na Agenda
-                      </Button>
-                    ) : null}
-
-                    {providerSupportsQuoting ? (
-                      <Button
-                        type="submit"
-                        disabled={submitting || !isFormValid}
-                        className="px-8 py-2"
-                      >
-                        {submitting ? 'Enviando…' : 'Solicitar Orçamento'}
-                      </Button>
-                    ) : (
-                      <span className="text-sm text-gray-500">
-                        Este serviço não aceita pedidos de orçamento.
-                      </span>
-                    )}
+                  <div className="flex justify-end">
+                    <Button
+                      type="submit"
+                      disabled={!isFormValid || (requestModeIsQuote && submitting)}
+                      className="px-8 py-2"
+                    >
+                      {requestModeIsScheduling ? 'Escolher Data na Agenda' : (submitting ? 'Enviando…' : 'Solicitar Orçamento')}
+                    </Button>
                   </div>
 
-                  {successMsg && (
+                  {successMsg && requestModeIsQuote && (
                     <div className="bg-green-50 border border-green-200 text-green-800 rounded-lg p-3">
                       {successMsg}
                     </div>
@@ -1020,7 +1155,7 @@ export default function ServiceRequestPage() {
                   const price = (providerProfile?.basePrice ?? chosen?.basePrice)
                   const desc = providerProfile?.description ?? chosen?.description
 
-                  const basePriceApplies = providerSupportsScheduling && typeof price === 'number' && Number.isFinite(price)
+                  const basePriceApplies = requestModeIsScheduling && typeof price === 'number' && Number.isFinite(price)
                   const basePriceValue = basePriceApplies ? price : null
                   const showHomeBreakdown = serviceDeliveryMode === 'HOME' && providerOffersHomeService
                   const computedTravelCost = travelQuote && typeof travelQuote.travelCost === 'number' && Number.isFinite(travelQuote.travelCost)
@@ -1033,7 +1168,7 @@ export default function ServiceRequestPage() {
                     : null
                   const travelApplies = showHomeBreakdown && serviceChargesTravel
                   const travelCostResolved = !travelApplies || typeof effectiveTravelCost === 'number'
-                  const quoteFeeAmount = providerSupportsQuoting ? Math.max(0, quoteFeeValue ?? 0) : null
+                  const quoteFeeAmount = requestModeIsQuote && providerSupportsQuoting ? Math.max(0, quoteFeeValue ?? 0) : null
                   const travelAmount = travelApplies && travelCostResolved ? (effectiveTravelCost ?? 0) : 0
                   const subtotalValue = (basePriceValue ?? 0) + travelAmount
                   const totalEstimate = subtotalValue + (quoteFeeAmount ?? 0)
@@ -1111,8 +1246,8 @@ export default function ServiceRequestPage() {
 
                           {showHomeBreakdown && (
                             <div className="flex items-center justify-between">
-                              <span>Deslocamento</span>
-                              <span>
+                              <span>Taxa de deslocamento</span>
+                              <span className="flex flex-col items-end">
                                 {serviceChargesTravel ? (
                                   travelLoading
                                     ? 'Calculando...'
@@ -1125,7 +1260,7 @@ export default function ServiceRequestPage() {
                                   'Grátis'
                                 )}
                                 {!travelLoading && serviceChargesTravel && distanceLabel && effectiveTravelCost != null && (
-                                  <span className="text-xs text-gray-500 ml-2">({distanceLabel})</span>
+                                  <span className="text-xs text-gray-500">({distanceLabel})</span>
                                 )}
                               </span>
                             </div>

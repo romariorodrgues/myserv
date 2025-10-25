@@ -26,6 +26,8 @@ const createBookingSchema = z.object({
   city: z.string().min(2, 'Cidade é obrigatória'),
   state: z.string().min(2, 'Estado é obrigatório'),
   zipCode: z.string().min(8, 'CEP deve ter 8 caracteres'),
+  clientLatitude: z.number().optional(),
+  clientLongitude: z.number().optional(),
   fulfillmentMode: z.enum(['HOME', 'LOCAL']).optional()
 })
 
@@ -117,6 +119,10 @@ export async function POST(request: NextRequest) {
       'Brasil'
     ])
 
+    const clientCoords = typeof validatedData.clientLatitude === 'number' && typeof validatedData.clientLongitude === 'number'
+      ? { lat: validatedData.clientLatitude, lng: validatedData.clientLongitude }
+      : undefined
+
     const requestType = (validatedData.preferredDate || validatedData.preferredTime) ? 'SCHEDULING' : 'QUOTE'
 
     let selectedDateTime: Date | null = null
@@ -157,7 +163,7 @@ export async function POST(request: NextRequest) {
           },
         },
         client: {
-          coords: undefined,
+          coords: clientCoords,
           addressString: clientAddressString,
         },
         basePrice: basePriceValue,
