@@ -58,6 +58,27 @@ interface DesktopNavItemProps {
   active?: boolean
 }
 
+type UserType = 'ADMIN' | 'SERVICE_PROVIDER' | 'CLIENT' | undefined
+
+const getDashboardUrl = (t: UserType) => {
+  switch (t) {
+    case 'ADMIN':             return '/admin/dashboard'
+    case 'SERVICE_PROVIDER':  return '/dashboard/profissional'
+    case 'CLIENT':            return '/dashboard/cliente'
+    default:                  return '/entrar'
+  }
+}
+
+const getSettingsUrl = (t: UserType) => {
+  switch (t) {
+    case 'ADMIN':             return '/admin/settings'   // <- corrigido
+    case 'SERVICE_PROVIDER':  return '/dashboard/profissional?tab=settings'
+    case 'CLIENT':            return '/dashboard/cliente?tab=settings'
+    default:                  return '/entrar'
+  }
+}
+
+
 const DesktopNavItem = ({ href, children, active = false }: DesktopNavItemProps) => (
   <Link 
     href={href} 
@@ -101,13 +122,9 @@ export function Header() {
   }
 
   // Determine dashboard URL based on user type
-  const dashboardUrl = session?.user
-    ? session.user.userType === 'ADMIN'
-      ? '/admin/dashboard'
-      : session.user.userType === 'SERVICE_PROVIDER'
-        ? '/dashboard/profissional'
-        : '/dashboard/cliente'
-    : '/entrar'
+  const userType = (session?.user as any)?.userType as UserType
+const dashboardUrl = getDashboardUrl(userType)
+const settingsUrl = getSettingsUrl(userType)
 
   const desktopNavItems = [
     { href: '/', label: 'Início' },
@@ -175,6 +192,8 @@ export function Header() {
                   <MobileNavItem href={'/perfil'} icon={User} onClick={() => setMobileOpen(false)}>Meu Perfil</MobileNavItem>
                   <MobileNavItem href="/favoritos" icon={Heart} onClick={() => setMobileOpen(false)}>Favoritos</MobileNavItem>
                   <MobileNavItem href="/notifications" icon={Bell} onClick={() => setMobileOpen(false)}>Notificações</MobileNavItem>
+                  <MobileNavItem href={settingsUrl} icon={Settings} onClick={() => setMobileOpen(false)}>Configurações</MobileNavItem>
+
                   <div className="border-t border-gray-200 my-2"></div>
                   <Button 
                     variant="ghost" 
@@ -284,7 +303,7 @@ export function Header() {
                     </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem asChild>
-                    <Link href={session?.user?.userType === 'SERVICE_PROVIDER' ? '/dashboard/profissional?tab=settings' : '/dashboard/cliente?tab=settings'}>
+                    <Link href={settingsUrl}>
                       <Settings className="mr-2 h-4 w-4" />
                       <span>Configurações</span>
                     </Link>
