@@ -87,7 +87,7 @@ export async function POST(request: Request) {
     } catch {}
 
     const s = await prisma.systemSettings.findUnique({ where: { key: 'PLAN_MONTHLY_PRICE' } })
-    const monthlyPrice = Number(s?.value || '39.9') || 39.9
+    const monthlyPrice = Number(s?.value || '15.99') || 15.99
     const premiumPlan = await prisma.plan.upsert({
       where: { name: 'Premium' },
       update: {

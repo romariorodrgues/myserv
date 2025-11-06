@@ -32,8 +32,8 @@ export default function AdminSettingsPage() {
     socialFacebook: '',
     socialInstagram: '',
     // Planos
-    planUnlockPrice: '4.90',
-    planMonthlyPrice: '39.90',
+    planUnlockPrice: '2.99',
+    planMonthlyPrice: '15.99',
   })
   const [legalContent, setLegalContent] = useState({
     terms: '',

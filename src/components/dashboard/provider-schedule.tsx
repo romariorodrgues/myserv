@@ -51,6 +51,7 @@ interface Appointment {
   cancelledBy?: string | null
   estimatedPrice?: number | null
   updatedAt?: string
+  unlocked?: boolean
 }
 
 interface ProviderScheduleProps {
@@ -732,6 +733,7 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                     ? (cleanPhone.startsWith('55') ? cleanPhone : `55${cleanPhone}`)
                     : ''
                   const whatsappMessage = encodeURIComponent(`Olá, ${appointment.client.name}! Recebi seu pedido na MyServ e gostaria de combinar os detalhes.`)
+                  const requiresUnlock = appointment.unlocked === false
 
                   return (
                     <div key={appointment.id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
@@ -786,18 +788,28 @@ export function ProviderSchedule({ providerId, initialTab, initialDate }: Provid
                       
                       <div className="flex space-x-2">
                         {(appointment.status === 'PENDING' || appointment.status === 'HOLD') && appointment.type !== 'QUOTE' && (
-                          <>
-                            <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'ACCEPTED')}>
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Aceitar
-                            </Button>
-                            <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'REJECTED')}>
-                              <X className="w-4 h-4 mr-1" />
-                              Recusar
-                            </Button>
-                          </>
+                          <div className="flex flex-col gap-1">
+                            <div className="flex space-x-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={requiresUnlock}
+                                onClick={() => updateAppointmentStatus(appointment.id, 'ACCEPTED')}
+                              >
+                                <CheckCircle className="w-4 h-4 mr-1" />
+                                Aceitar
+                              </Button>
+                              <Button size="sm" variant="outline" onClick={() => updateAppointmentStatus(appointment.id, 'REJECTED')}>
+                                <X className="w-4 h-4 mr-1" />
+                                Recusar
+                              </Button>
+                            </div>
+                            {requiresUnlock && (
+                              <p className="text-xs text-red-600">Desbloqueie a solicitação para aceitar.</p>
+                            )}
+                          </div>
                         )}
-                        {!appointment.client.phone && (
+                        {requiresUnlock && (
                           <Button
                             size="sm"
                             onClick={async () => {

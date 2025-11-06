@@ -185,7 +185,7 @@ const clientSteps = [
   {
     icon: CreditCard,
     title: 'Faça o agendamento',
-    description: 'solicite um orçamento ou agende um serviço com data e horário conforme disponibilidade do profissional. Pague somente após o serviço/orçamento concluído.'
+    description: 'Solicite um orçamento ou agende um serviço com data e horário conforme disponibilidade do profissional. Pague somente após o serviço/orçamento concluído.'
   },
   {
     icon: Star,

@@ -48,7 +48,14 @@ export async function PATCH(
       include: {
         provider: true,
         client: true,
-        service: true
+        service: true,
+        payments: {
+          select: {
+            id: true,
+            status: true,
+            userId: true,
+          }
+        }
       }
     })
 
@@ -60,6 +67,32 @@ export async function PATCH(
         },
         { status: 404 }
       )
+    }
+
+    if (validatedData.status === 'ACCEPTED') {
+      const activeSubscription = await prisma.subscription.findFirst({
+        where: {
+          serviceProvider: { userId: booking.providerId },
+          status: 'ACTIVE',
+          OR: [{ endDate: null }, { endDate: { gte: new Date() } }]
+        }
+      })
+
+      const hasUnlockPayment = booking.payments?.some(
+        (payment) =>
+          payment.userId === booking.providerId &&
+          (payment.status === 'APPROVED' || payment.status === 'COMPLETED' || payment.status === 'PAID')
+      )
+
+      if (!activeSubscription && !hasUnlockPayment) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Desbloqueie esta solicitação antes de aceitar. Pague a taxa por solicitação ou ative o plano mensal.',
+          },
+          { status: 402 }
+        )
+      }
     }
 
     const updateData: any = {

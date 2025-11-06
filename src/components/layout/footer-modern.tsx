@@ -58,13 +58,32 @@ const SocialLink = ({ href, icon: Icon, label }: SocialLinkProps) => (
   <Link 
     href={href} 
     className="w-9 h-9 rounded-full flex items-center justify-center bg-primary/40 hover:bg-secondary transition-colors" 
+    target="_blank"
+    rel="noopener noreferrer"
+    prefetch={false}
     aria-label={label}
   >
     <Icon className="w-4 h-4" />
   </Link>
 )
 
-async function getSettings() {
+interface SettingsResult {
+  email: string
+  phone: string
+  address: string
+  facebook: string | null
+  instagram: string | null
+}
+
+const normalizeExternalUrl = (raw?: string | null): string | null => {
+  if (!raw) return null
+  const value = raw.trim()
+  if (!value) return null
+  if (/^https?:\/\//i.test(value)) return value
+  return `https://${value}`
+}
+
+async function getSettings(): Promise<SettingsResult> {
   try {
     const items = await prisma.systemSettings.findMany({
       where: { key: { in: [
@@ -72,24 +91,24 @@ async function getSettings() {
         'CONTACT_PHONE',
         'CONTACT_ADDRESS',
         'SOCIAL_FACEBOOK_URL',
-        'SOCIAL_INSTAGRAM_URL',
+      'SOCIAL_INSTAGRAM_URL',
       ] } }
     })
-    const map = Object.fromEntries(items.map(i => [i.key, i.value])) as Record<string, string>
+    const map = Object.fromEntries(items.map(i => [i.key, i.value])) as Partial<Record<string, string>>
     return {
       email: map.CONTACT_EMAIL || 'contato@myserv.com.br',
       phone: map.CONTACT_PHONE || '(11) 99999-9999',
       address: map.CONTACT_ADDRESS || 'São Paulo - SP, Brasil',
-      facebook: map.SOCIAL_FACEBOOK_URL || 'https://facebook.com/myserv',
-      instagram: map.SOCIAL_INSTAGRAM_URL || 'https://instagram.com/myserv',
+      facebook: normalizeExternalUrl(map.SOCIAL_FACEBOOK_URL),
+      instagram: normalizeExternalUrl(map.SOCIAL_INSTAGRAM_URL),
     }
   } catch {
     return {
       email: 'contato@myserv.com.br',
       phone: '(11) 99999-9999',
       address: 'São Paulo - SP, Brasil',
-      facebook: 'https://facebook.com/myserv',
-      instagram: 'https://instagram.com/myserv',
+      facebook: null,
+      instagram: null,
     }
   }
 }
@@ -122,10 +141,16 @@ export async function FooterModern() {
               Encontre o serviço que precisa de forma rápida e segura.
             </p>
             {/* Somente Instagram e Facebook neste momento */}
-            <div className="flex space-x-3">
-              <SocialLink href={settings.facebook} icon={Facebook} label="Facebook" />
-              <SocialLink href={settings.instagram} icon={Instagram} label="Instagram" />
-            </div>
+            {Boolean(settings.facebook || settings.instagram) && (
+              <div className="flex space-x-3">
+                {settings.facebook && (
+                  <SocialLink href={settings.facebook} icon={Facebook} label="Facebook" />
+                )}
+                {settings.instagram && (
+                  <SocialLink href={settings.instagram} icon={Instagram} label="Instagram" />
+                )}
+              </div>
+            )}
           </div>
 
           {/* For Clients */}

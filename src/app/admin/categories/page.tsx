@@ -13,7 +13,7 @@ import EmojiPicker, { EMOJI_PRESETS } from '@/components/ui/emoji-picker'
 import { Label } from '@/components/ui/label'
 import CascadingCategoryPicker from '@/components/categories/cascading-category-picker'
 import { Badge } from '@/components/ui/badge'
-import { Loader2, Plus, Pencil, Check, X } from 'lucide-react'
+import { Loader2, Plus, Pencil, Check, X, Trash2 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Separator } from '@/components/ui/separator'
 
@@ -24,12 +24,16 @@ export default function AdminCategoriesPage() {
   const [selectedLeafId, setSelectedLeafId] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({ name: '', description: '', icon: '', requiresDriverLicense: false, allowScheduling: true })
   const parentId = useMemo(() => currentPath.at(-1)?.id ?? null, [currentPath])
 
   const [editing, setEditing] = useState<Cat | null>(null)
   const [editName, setEditName] = useState('')
   const [toggling, setToggling] = useState<string | null>(null)
+  const [pickerRefreshToken, setPickerRefreshToken] = useState(0)
+
+  const refreshCategories = () => setPickerRefreshToken((token) => token + 1)
 
   const handleCreate = async () => {
     if (!form.name.trim()) return
@@ -46,6 +50,7 @@ export default function AdminCategoriesPage() {
       setCreating(false)
       // força recarregar picker mudando o path (no-op)
       setCurrentPath((p) => [...p])
+      refreshCategories()
     } catch (e) {
       console.error(e)
       alert('Erro ao criar categoria')
@@ -65,6 +70,7 @@ export default function AdminCategoriesPage() {
       const data = await res.json()
       if (!res.ok || !data.success) throw new Error(data?.error || 'Erro')
       setCurrentPath((p) => [...p])
+      refreshCategories()
     } catch (e) {
       console.error(e)
       alert('Erro ao atualizar')
@@ -86,6 +92,7 @@ export default function AdminCategoriesPage() {
       if (!res.ok || !data.success) throw new Error(data?.error || 'Erro')
       setEditing(null)
       setCurrentPath((p) => p.map((n) => (n.id === editing.id ? { ...n, name: editName } : n)))
+      refreshCategories()
     } catch (e) {
       console.error(e)
       alert('Erro ao renomear')
@@ -158,6 +165,38 @@ export default function AdminCategoriesPage() {
     }
   }
 
+  const handleDeleteCategory = async () => {
+    const node = currentPath.at(-1)
+    if (!node) return
+
+    if (!node.isLeaf) {
+      alert('Só é possível excluir categorias que sejam folhas e não possuam subcategorias.')
+      return
+    }
+
+    if (!window.confirm(`Tem certeza que deseja excluir a categoria "${node.name}"? Essa ação não pode ser desfeita.`)) {
+      return
+    }
+
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/admin/categories/${node.id}`, { method: 'DELETE' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data.success) throw new Error(data?.error || 'Erro ao excluir categoria')
+      alert('Categoria excluída com sucesso.')
+      setSelectedLeafId(null)
+      setCurrentPath((p) => p.slice(0, -1))
+      setSelectedDetails(null)
+      setEditing(null)
+      refreshCategories()
+    } catch (error) {
+      console.error(error)
+      alert(error instanceof Error ? error.message : 'Erro ao excluir categoria')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
@@ -168,6 +207,7 @@ export default function AdminCategoriesPage() {
       <Card className="mb-6">
         <CardContent className="p-4">
           <CascadingCategoryPicker
+            refreshToken={pickerRefreshToken}
             value={selectedLeafId}
             onChange={(leafId, path) => {
               setSelectedLeafId(leafId)
@@ -259,12 +299,21 @@ export default function AdminCategoriesPage() {
                   {!currentPath.at(-1)?.isActive && <Badge variant="secondary">Inativa</Badge>}
                 </div>
                 {!editing ? (
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     <Button variant="outline" size="sm" onClick={() => { setEditing(currentPath.at(-1)!); setEditName(currentPath.at(-1)!.name) }}>
                       <Pencil className="h-4 w-4 mr-1" /> Renomear
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleToggleActive(currentPath.at(-1)!)} disabled={toggling === currentPath.at(-1)!.id}>
                       {toggling === currentPath.at(-1)!.id ? <Loader2 className="h-4 w-4 animate-spin" /> : currentPath.at(-1)!.isActive ? 'Desativar' : 'Ativar'}
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={handleDeleteCategory}
+                      disabled={deleting || !currentPath.at(-1)?.isLeaf}
+                    >
+                      {deleting ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : <Trash2 className="h-4 w-4 mr-1" />}
+                      Excluir
                     </Button>
                   </div>
                 ) : (

@@ -66,7 +66,7 @@ function RegisterPageContent() {
 
   const [step, setStep] = useState<1 | 2>(1)
   const [selectedPlan, setSelectedPlan] = useState<'FREE' | 'PREMIUM' | null>(null)
-  const [planPrices, setPlanPrices] = useState({ unlock: '4.90', monthly: '39.90' })
+  const [planPrices, setPlanPrices] = useState({ unlock: '2.99', monthly: '15.99' })
   const [formError, setFormError] = useState<string | null>(null)
   const [profileImagePreview, setProfileImagePreview] = useState<string | null>(null)
   const [profileImageDataUrl, setProfileImageDataUrl] = useState<string | null>(null)
@@ -75,16 +75,17 @@ function RegisterPageContent() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const planFeatures: Record<'FREE' | 'PREMIUM', string[]> = {
     FREE: [
-      'Propostas ilimitadas',
-      'Relatórios completos',
-      'Agenda personalizada',
-      'Controle de precificação de serviço',
+      'Cadastro gratuito (pessoa física)',
+      `Desbloqueie cada solicitação por R$ ${planPrices.unlock}`,
+      'Pagamento somente se aceitar o serviço',
+      'Sem mensalidade',
+      'Suporte por chat',
     ],
     PREMIUM: [
-      'Tudo do plano grátis',
       'Contatos desbloqueados automaticamente',
-      'Destaque na busca',
-      'Relatórios básicos',
+      'Aceite solicitações ilimitadas durante todo o mês',
+      'Suporte por chat',
+      'Plano obrigatório para pessoa jurídica',
     ],
   }
 
@@ -214,8 +215,8 @@ function RegisterPageContent() {
         const data = await res.json()
         const s = data.settings || {}
         setPlanPrices({
-          unlock: s.PLAN_UNLOCK_PRICE || '4.90',
-          monthly: s.PLAN_MONTHLY_PRICE || '39.90',
+          unlock: s.PLAN_UNLOCK_PRICE || '2.99',
+          monthly: s.PLAN_MONTHLY_PRICE || '15.99',
         })
       } catch (error) {
         console.warn('Falha ao carregar valores dos planos', error)

@@ -222,19 +222,20 @@ export async function POST(request: NextRequest) {
         create: {
           name: "Premium",
           description: "Plano mensal profissional",
-          price: 39.9,
+          price: 15.99,
           billingCycle: "MONTHLY",
           features: JSON.stringify([
-            "Propostas ilimitadas",
-            "Agenda personalizada",
-            "Gestão de clientes",
+            "Contatos desbloqueados automaticamente",
+            "Solicitações ilimitadas durante todo o mês",
+            "Suporte por chat",
+            "Plano obrigatório para pessoa jurídica",
           ]),
         },
       });
       const s = await prisma.systemSettings.findUnique({
         where: { key: "PLAN_MONTHLY_PRICE" },
       });
-      const unitPrice = Number(s?.value || premiumPlan.price || 39.9) || 39.9;
+      const unitPrice = Number(s?.value || premiumPlan.price || 15.99) || 15.99;
       const itemId = premiumPlan.id;
       const title = "MyServ Plano Mensal Profissional";
 

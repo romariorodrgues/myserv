@@ -15,10 +15,10 @@ async function getPlanSettings() {
     const rows = await prisma.systemSettings.findMany({ where: { key: { in: ['PLAN_UNLOCK_PRICE','PLAN_MONTHLY_PRICE'] } } })
     const map = Object.fromEntries(rows.map(r => [r.key, r.value])) as Record<string, string>
     return {
-      unlock: map.PLAN_UNLOCK_PRICE || '4.90',
-      monthly: map.PLAN_MONTHLY_PRICE || '39.90',
+      unlock: map.PLAN_UNLOCK_PRICE || '2.99',
+      monthly: map.PLAN_MONTHLY_PRICE || '15.99',
     }
-  } catch { return { unlock: '4.90', monthly: '39.90' } }
+  } catch { return { unlock: '2.99', monthly: '15.99' } }
 }
 
 export default async function SejaProfissionalPage() {
@@ -143,11 +143,15 @@ Se você é uma pessoa jurídica cadastre-se com plano mensal e aceite serviços
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-6xl mx-auto">
             <div className="rounded-lg shadow p-6 bg-white border">
               <h3 className="text-xl font-bold mb-1">Grátis • Por solicitação</h3>
-              <p className="text-gray-600 mb-4">Desbloqueie cada solicitação por R$ {prices.unlock}</p>
-              <ul className="space-y-2 mb-6">
-                <li>Receba solicitações</li>
-                <li>Desbloqueio unitário</li>
+              <p className="text-gray-600 mb-4">
+                Ideal para pessoa física: desbloqueie contatos apenas quando fechar negócio.
+              </p>
+              <ul className="space-y-2 mb-6 text-gray-700">
+                <li>Cadastro gratuito (pessoa física)</li>
+                <li>Desbloqueie cada solicitação por R$ {prices.unlock}</li>
+                <li>Pagamento somente se aceitar o serviço</li>
                 <li>Sem mensalidade</li>
+                <li>Suporte por chat</li>
               </ul>
               <Button className="w-full" variant="outline" asChild>
                 <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=FREE">Começar grátis</Link>
@@ -156,10 +160,11 @@ Se você é uma pessoa jurídica cadastre-se com plano mensal e aceite serviços
             <div className="rounded-lg shadow p-6 border-2 border-green-500 bg-green-50">
               <h3 className="text-xl font-bold mb-1">Mensal • Profissional</h3>
               <p className="text-gray-700 mb-4">R$ {prices.monthly}/mês</p>
-              <ul className="space-y-2 mb-6">
-                <li>Contatos desbloqueados automaticamente</li>
-                <li>Perfil completo e avaliações</li>
-                <li>Suporte por e-mail</li>
+              <ul className="space-y-2 mb-6 text-gray-700">
+                <li>Contatos desbloqueados</li>
+                <li>Aceite solicitações o mês todo de forma ilimitada</li>
+                <li>Suporte por chat</li>
+                <li>Plano obrigatório para pessoa jurídica</li>
               </ul>
               <Button className="w-full" asChild>
                 <Link href="/cadastrar?userType=SERVICE_PROVIDER&plan=PREMIUM">Assinar plano mensal</Link>

@@ -12,7 +12,7 @@ import { useEffect, useState } from "react";
 
 export default function PlansSettings() {
   const { plan, subscription } = useVerifyPlan();
-  const [prices, setPrices] = useState({ unlock: '4.90', monthly: '39.90' })
+  const [prices, setPrices] = useState({ unlock: '2.99', monthly: '15.99' })
 
   useEffect(() => {
     (async () => {
@@ -21,8 +21,8 @@ export default function PlansSettings() {
         const data = await res.json()
         const s = data.settings || {}
         setPrices({
-          unlock: s.PLAN_UNLOCK_PRICE || '4.90',
-          monthly: s.PLAN_MONTHLY_PRICE || '39.90',
+          unlock: s.PLAN_UNLOCK_PRICE || '2.99',
+          monthly: s.PLAN_MONTHLY_PRICE || '15.99',
         })
       } catch {}
     })()
@@ -58,23 +58,27 @@ export default function PlansSettings() {
           <div className='p-4 border-border rounded-sm bg-gradient-to-br from-brand-bg to-brand-teal relative hover:scale-105 transition-all min-w-0 md:min-w-96'>
             {plan === 'Start' && <Badge className='absolute top-5 right-5'>Atual</Badge>}
             <h2 className='text-2xl font-bold mb-1 text-brand-navy'>Grátis • Por Solicitação</h2>
-            <p className='text-brand-navy mb-4'>Desbloqueie por R$ {prices.unlock} por solicitação</p>
+            <p className='text-brand-navy mb-4'>Desbloqueie por R$ {prices.unlock} cada vez que aceitar uma solicitação</p>
             <ul>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-40' />
-                <span className='font-semibold text-brand-navy text-base'>Propostas ilimitadas</span>
+                <span className='font-semibold text-brand-navy text-base'>Cadastro gratuito (pessoa física)</span>
               </li>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-40' />
-                <span className='font-semibold text-brand-navy text-base'>Relatorios completos</span>
+                <span className='font-semibold text-brand-navy text-base'>Desbloqueie cada solicitação por R$ {prices.unlock}</span>
               </li>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-40' />
-                <span className='font-semibold text-brand-navy text-base'>Agenda personalizada</span>
+                <span className='font-semibold text-brand-navy text-base'>Pagamento somente se aceitar o serviço</span>
               </li>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-40' />
-                <span className='font-semibold text-brand-navy text-base'>Controle de precificação de serviço</span>
+                <span className='font-semibold text-brand-navy text-base'>Sem mensalidade</span>
+              </li>
+              <li className='flex items-center gap-2'>
+                <Check size={14} className='text-brand-navy opacity-40' />
+                <span className='font-semibold text-brand-navy text-base'>Suporte por chat</span>
               </li>
             </ul>
             <Button disabled={true} variant='outline' className='w-full mt-4 rounded-sm'>Plano atual</Button>
@@ -88,19 +92,19 @@ export default function PlansSettings() {
             <ul>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-70' />
-                <span className='font-semibold text-brand-navy text-base'>Tudo do plano grátis</span>
-              </li>
-              <li className='flex items-center gap-2'>
-                <Check size={14} className='text-brand-navy opacity-70' />
                 <span className='font-semibold text-brand-navy text-base'>Contatos desbloqueados automaticamente</span>
               </li>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-70' />
-                <span className='font-semibold text-brand-navy text-base'>Destaque na busca</span>
+                <span className='font-semibold text-brand-navy text-base'>Aceite solicitações ilimitadas durante todo o mês</span>
               </li>
               <li className='flex items-center gap-2'>
                 <Check size={14} className='text-brand-navy opacity-70' />
-                <span className='font-semibold text-brand-navy text-base'>Relatórios básicos</span>
+                <span className='font-semibold text-brand-navy text-base'>Suporte por chat</span>
+              </li>
+              <li className='flex items-center gap-2'>
+                <Check size={14} className='text-brand-navy opacity-70' />
+                <span className='font-semibold text-brand-navy text-base'>Plano obrigatório para pessoa jurídica</span>
               </li>
             </ul>
             <Button disabled={createPreferenceMutation.isPending} variant='outline' className='w-full mt-4 rounded-sm' onClick={() => createPreferenceMutation.mutate()}>

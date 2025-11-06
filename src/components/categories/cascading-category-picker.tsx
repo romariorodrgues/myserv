@@ -18,9 +18,10 @@ type Props = {
   value: string | null
   onChange: (id: string | null, path: CascCat[]) => void
   className?: string
+  refreshToken?: number | string
 }
 
-export default function CascadingCategoryPicker({ value, onChange, className = '' }: Props) {
+export default function CascadingCategoryPicker({ value, onChange, className = '', refreshToken }: Props) {
   const [levels, setLevels] = useState<CascCat[][]>([])   // colunas (níveis)
   const [path, setPath] = useState<CascCat[]>([])         // trilha selecionada
   const [loading, setLoading] = useState(false)
@@ -73,7 +74,7 @@ export default function CascadingCategoryPicker({ value, onChange, className = '
       mounted = false
       ctrlRef.current?.abort()
     }
-  }, [])
+  }, [refreshToken])
 
   // selecionar nó
   const selectNode = async (node: CascCat, levelIndex: number) => {

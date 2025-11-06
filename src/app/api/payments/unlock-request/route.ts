@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
 
     // preço dinâmico via SystemSettings
     const s = await prisma.systemSettings.findUnique({ where: { key: 'PLAN_UNLOCK_PRICE' } })
-    const price = Number(s?.value || '4.9') || 4.9
+    const price = Number(s?.value || '2.99') || 2.99
 
     const mercadoPagoConfig = getMercadoPagoConfig()
 

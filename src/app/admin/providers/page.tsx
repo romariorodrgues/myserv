@@ -159,7 +159,8 @@ export default function AdminProvidersPage() {
     }
   }
 
-  const pendingProviders = providers.filter(p => !p.isApproved)
+  const pendingProviders = providers.filter(p => !p.isApproved && p.isActive)
+  const rejectedProviders = providers.filter(p => !p.isApproved && !p.isActive)
   const approvedProviders = providers.filter(p => p.isApproved)
 
   if (status === 'loading' || loading) {
@@ -198,7 +199,7 @@ export default function AdminProvidersPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 mb-8">
           <Card className="p-6">
             <div className="flex items-center">
               <Clock className="w-8 h-8 text-yellow-600" />
@@ -221,6 +222,16 @@ export default function AdminProvidersPage() {
           
           <Card className="p-6">
             <div className="flex items-center">
+              <XCircle className="w-8 h-8 text-red-600" />
+              <div className="ml-4">
+                <p className="text-sm text-gray-500">Rejeitados / Inativos</p>
+                <p className="text-2xl font-bold">{rejectedProviders.length}</p>
+              </div>
+            </div>
+          </Card>
+          
+          <Card className="p-6">
+            <div className="flex items-center">
               <Briefcase className="w-8 h-8 text-blue-600" />
               <div className="ml-4">
                 <p className="text-sm text-gray-500">Total de Profissionais</p>
@@ -231,114 +242,191 @@ export default function AdminProvidersPage() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Pending Providers */}
-          <div>
-            <h2 className="text-xl font-semibold mb-4 flex items-center">
-              <Clock className="w-5 h-5 mr-2 text-yellow-600" />
-              Pendentes de Aprovação ({pendingProviders.length})
-            </h2>
-            
-            <div className="space-y-4 max-h-96 overflow-y-auto">
-              {pendingProviders.map((provider) => (
-                <Card key={provider.id} className="p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3">
-                        <Avatar className="h-10 w-10">
-                          <AvatarImage
-                            src={provider.profileImage ? cdnImageUrl(provider.profileImage) : undefined}
-                            alt={provider.name}
-                          />
-                          <AvatarFallback>{getInitials(provider.name)}</AvatarFallback>
-                        </Avatar>
-                        <h3 className="font-semibold text-gray-900">{provider.name}</h3>
-                      </div>
-                      <div className="text-sm text-gray-500 space-y-1 mt-2">
-                        <div className="flex items-center">
-                          <Mail className="w-4 h-4 mr-1" />
-                          {provider.email}
-                        </div>
-                        <div className="flex items-center">
-                          <Phone className="w-4 h-4 mr-1" />
-                          {provider.phone}
-                        </div>
-                        {provider.address && (
-                          <div className="flex items-center">
-                            <MapPin className="w-4 h-4 mr-1" />
-                            {provider.address.city}, {provider.address.state}
-                          </div>
-                        )}
-                        {provider.cpfCnpj && (
-                          <div className="flex items-center">
-                            <span className="w-4 h-4 mr-1">🆔</span>
-                            {provider.cpfCnpj}
-                          </div>
-                        )}
-                      </div>
-                      
-                      {provider.serviceProvider?.services && (
-                        <div className="mt-2">
-                          <p className="text-xs text-gray-600">Serviços oferecidos:</p>
-                          <div className="flex flex-wrap gap-1 mt-1">
-                            {provider.serviceProvider.services.map((service) => (
-                              <span key={service.id} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
-                                {service.service.name}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <p className="text-xs text-gray-500 mt-2">
-                        Cadastrado em: {new Date(provider.createdAt).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    
-                    <div className="flex flex-col space-y-2 ml-4">
-                      <Button
-                        size="sm"
-                        onClick={() => setSelectedProvider(provider)}
-                        variant="outline"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        Ver Detalhes
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={() => handleApproveProvider(provider.id)}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" />
-                        Aprovar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => handleRejectProvider(provider.id)}
-                        className="text-red-600 border-red-600 hover:bg-red-50"
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Rejeitar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setToggleTarget(provider); setToggleReason('') }}
-                      >
-                        {provider.isActive ? 'Desativar' : 'Ativar'}
-                      </Button>
-                    </div>
-                  </div>
-                </Card>
-              ))}
+          <div className="space-y-8">
+            {/* Pending Providers */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <Clock className="w-5 h-5 mr-2 text-yellow-600" />
+                Pendentes de Aprovação ({pendingProviders.length})
+              </h2>
               
-              {pendingProviders.length === 0 && (
-                <div className="text-center py-8">
-                  <Clock className="w-12 h-12 mx-auto text-gray-300 mb-4" />
-                  <p className="text-gray-500">Nenhum profissional aguardando aprovação.</p>
-                </div>
-              )}
-            </div>
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {pendingProviders.map((provider) => (
+                  <Card key={provider.id} className="p-4 hover:shadow-md transition-shadow">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage
+                              src={provider.profileImage ? cdnImageUrl(provider.profileImage) : undefined}
+                              alt={provider.name}
+                            />
+                            <AvatarFallback>{getInitials(provider.name)}</AvatarFallback>
+                          </Avatar>
+                          <h3 className="font-semibold text-gray-900">{provider.name}</h3>
+                        </div>
+                        <div className="text-sm text-gray-500 space-y-1 mt-2">
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 mr-1" />
+                            {provider.email}
+                          </div>
+                          <div className="flex items-center">
+                            <Phone className="w-4 h-4 mr-1" />
+                            {provider.phone}
+                          </div>
+                          {provider.address && (
+                            <div className="flex items-center">
+                              <MapPin className="w-4 h-4 mr-1" />
+                              {provider.address.city}, {provider.address.state}
+                            </div>
+                          )}
+                          {provider.cpfCnpj && (
+                            <div className="flex items-center">
+                              <span className="w-4 h-4 mr-1">🆔</span>
+                              {provider.cpfCnpj}
+                            </div>
+                          )}
+                        </div>
+                        
+                        {provider.serviceProvider?.services && (
+                          <div className="mt-2">
+                            <p className="text-xs text-gray-600">Serviços oferecidos:</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {provider.serviceProvider.services.map((service) => (
+                                <span key={service.id} className="px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                                  {service.service.name}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        
+                        <p className="text-xs text-gray-500 mt-2">
+                          Cadastrado em: {new Date(provider.createdAt).toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                      
+                      <div className="flex flex-col space-y-2 ml-4">
+                        <Button
+                          size="sm"
+                          onClick={() => setSelectedProvider(provider)}
+                          variant="outline"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Ver Detalhes
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={() => handleApproveProvider(provider.id)}
+                          className="bg-green-600 hover:bg-green-700"
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1" />
+                          Aprovar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleRejectProvider(provider.id)}
+                          className="text-red-600 border-red-600 hover:bg-red-50"
+                        >
+                          <XCircle className="w-4 h-4 mr-1" />
+                          Rejeitar
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setToggleTarget(provider); setToggleReason('') }}
+                        >
+                          {provider.isActive ? 'Desativar' : 'Ativar'}
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+                
+                {pendingProviders.length === 0 && (
+                  <div className="text-center py-8">
+                    <Clock className="w-12 h-12 mx-auto text-gray-300 mb-4" />
+                    <p className="text-gray-500">Nenhum profissional aguardando aprovação.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Rejected Providers */}
+            <section>
+              <h2 className="text-xl font-semibold mb-4 flex items-center">
+                <XCircle className="w-5 h-5 mr-2 text-red-600" />
+                Rejeitados / Inativos ({rejectedProviders.length})
+              </h2>
+              
+              <div className="space-y-4 max-h-96 overflow-y-auto">
+                {rejectedProviders.map((provider) => (
+                  <Card key={provider.id} className="p-4 border border-red-100 bg-red-50/40">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-10 w-10">
+                            <AvatarImage
+                              src={provider.profileImage ? cdnImageUrl(provider.profileImage) : undefined}
+                              alt={provider.name}
+                            />
+                            <AvatarFallback>{getInitials(provider.name)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{provider.name}</h3>
+                            <span className="inline-flex items-center gap-1 text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full mt-1">
+                              <XCircle className="w-3 h-3" />
+                              Rejeitado
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-500 space-y-1 mt-2">
+                          <div className="flex items-center">
+                            <Mail className="w-4 h-4 mr-1" />
+                            {provider.email}
+                          </div>
+                          <div className="flex items-center">
+                            <Phone className="w-4 h-4 mr-1" />
+                            {provider.phone}
+                          </div>
+                          {provider.address && (
+                            <div className="flex items-center">
+                              <MapPin className="w-4 h-4 mr-1" />
+                              {provider.address.city}, {provider.address.state}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                      
+                      <div className="flex flex-col space-y-2 ml-4">
+                        <Button
+                          size="sm"
+                          onClick={() => setSelectedProvider(provider)}
+                          variant="outline"
+                        >
+                          <Eye className="w-4 h-4 mr-1" />
+                          Ver Detalhes
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-blue-600 hover:bg-blue-700 text-white"
+                          onClick={() => { setToggleTarget(provider); setToggleReason('') }}
+                        >
+                          Reativar
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                ))}
+
+                {rejectedProviders.length === 0 && (
+                  <div className="text-center py-6 text-sm text-gray-500">
+                    Nenhum profissional rejeitado até o momento.
+                  </div>
+                )}
+              </div>
+            </section>
           </div>
 
           {/* Provider Details Modal */}
