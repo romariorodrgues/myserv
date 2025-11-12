@@ -7,6 +7,7 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
+import { unstable_noStore as noStore } from 'next/cache'
 import { 
   Mail, 
   Phone, 
@@ -84,6 +85,7 @@ const normalizeExternalUrl = (raw?: string | null): string | null => {
 }
 
 async function getSettings(): Promise<SettingsResult> {
+  noStore()
   try {
     const items = await prisma.systemSettings.findMany({
       where: { key: { in: [

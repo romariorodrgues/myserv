@@ -17,7 +17,7 @@ export default function PlansSettings() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch('/api/system-settings')
+        const res = await fetch('/api/system-settings', { cache: 'no-store' })
         const data = await res.json()
         const s = data.settings || {}
         setPrices({

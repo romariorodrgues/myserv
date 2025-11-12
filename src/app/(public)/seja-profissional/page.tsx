@@ -9,8 +9,10 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Users, DollarSign, Calendar, TrendingUp, Star, Shield, Clock } from 'lucide-react'
 import { prisma } from '@/lib/prisma'
+import { unstable_noStore as noStore } from 'next/cache'
 
 async function getPlanSettings() {
+  noStore()
   try {
     const rows = await prisma.systemSettings.findMany({ where: { key: { in: ['PLAN_UNLOCK_PRICE','PLAN_MONTHLY_PRICE'] } } })
     const map = Object.fromEntries(rows.map(r => [r.key, r.value])) as Record<string, string>
