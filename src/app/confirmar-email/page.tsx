@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 
 type VerificationState = 'idle' | 'loading' | 'success' | 'error' | 'expired' | 'missing'
 
-export default function ConfirmEmailPage() {
+function ConfirmEmailContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const token = searchParams.get('token')
@@ -129,5 +129,26 @@ export default function ConfirmEmailPage() {
         {renderActions()}
       </div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
+      <div className="max-w-lg w-full bg-white rounded-2xl shadow-xl p-10 space-y-6 text-center">
+        <div className="flex items-center justify-center">
+          <div className="h-10 w-10 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin" />
+        </div>
+        <p className="text-gray-600">Carregando...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function ConfirmEmailPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ConfirmEmailContent />
+    </Suspense>
   )
 }

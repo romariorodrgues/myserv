@@ -1,14 +1,14 @@
 'use client'
 
+import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 
 type ResetState = 'idle' | 'loading' | 'success' | 'error' | 'missing'
 
-export default function ResetPasswordPage() {
+function ResetPasswordContent() {
   const searchParams = useSearchParams()
   const token = searchParams.get('token')
 
@@ -166,5 +166,26 @@ export default function ResetPasswordPage() {
         )}
       </div>
     </div>
+  )
+}
+
+function LoadingFallback() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-sky-100 px-4 py-16">
+      <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 space-y-4 text-center">
+        <div className="flex items-center justify-center">
+          <div className="h-10 w-10 border-4 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+        </div>
+        <p className="text-gray-600">Carregando...</p>
+      </div>
+    </div>
+  )
+}
+
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <ResetPasswordContent />
+    </Suspense>
   )
 }
