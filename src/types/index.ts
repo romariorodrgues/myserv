@@ -106,6 +106,8 @@ export interface ClientProfileData {
   email: string
   phone?: string
   cpfCnpj: string
+  emailVerified?: boolean
+  phoneVerified?: boolean
   description?: string
   userType: UserType
   profileImage?: string | null
@@ -160,6 +162,14 @@ export interface User {
   userType: UserType
   isActive: boolean
   isApproved: boolean
+  emailVerified: boolean
+  emailVerifiedAt?: Date | null
+  phoneVerified: boolean
+  phoneVerifiedAt?: Date | null
+  approvalStatus?: string
+  rejectionReason?: string | null
+  rejectedAt?: Date | null
+  reviewRequestedAt?: Date | null
   gender?: Gender
   maritalStatus?: MaritalStatus
   description?: string

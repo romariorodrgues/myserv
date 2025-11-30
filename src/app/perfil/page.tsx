@@ -7,11 +7,12 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { Settings, Heart, History, HelpCircle, LogOut, Edit, Camera, LayoutDashboard, Users } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { fullSignOut } from '@/lib/full-sign-out'
 
 export default function PerfilPage() {
   const { data: session } = useSession()
@@ -309,7 +310,7 @@ export default function PerfilPage() {
               </div>
 
               <div className="border-t pt-4">
-                <Button variant="ghost" onClick={() => signOut()} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                <Button variant="ghost" onClick={() => fullSignOut()} className="text-red-600 hover:text-red-700 hover:bg-red-50">
                   <LogOut className="h-4 w-4 mr-2" />
                   Sair da Conta
                 </Button>

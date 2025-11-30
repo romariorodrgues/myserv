@@ -10,7 +10,7 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { 
   Menu, User, LogOut, 
@@ -118,7 +118,8 @@ export function Header() {
   }, [])
 
   const handleSignOut = async () => {
-    await signOut({ callbackUrl: '/' })
+    const { fullSignOut } = await import('@/lib/full-sign-out')
+    await fullSignOut()
   }
 
   // Determine dashboard URL based on user type
@@ -150,9 +151,9 @@ const settingsUrl = getSettingsUrl(userType)
     }`}> 
       <div className="relative h-20 w-full grid grid-cols-3 items-center px-2 md:px-6">
         {/* Mobile Navigation */}
-        <div className="col-start-1 flex md:hidden">
+        <div className="col-start-1 flex lg:hidden">
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-          <SheetTrigger asChild className="md:hidden">
+          <SheetTrigger asChild className="lg:hidden">
             <Button variant="ghost" size="icon" aria-label="Menu">
               <Menu className="h-6 w-6" />
             </Button>
@@ -215,32 +216,22 @@ const settingsUrl = getSettingsUrl(userType)
         </Sheet>
         </div>
         {/* Logo */}
-        <div className="mx-auto md:mx-0">
+        <div className="relative flex justify-center lg:justify-start overflow-hidden">
           <Link href="/" className="flex items-center gap-2 group">
-            {/* <div className="relative h-10 w-10 drop-shadow-lg">
-              <Image
-                src="/brand/icone.png"
-                alt="MyServ Logo"
-                fill
-                sizes="(max-width: 768px) 32px, 40px"
-                className="object-contain scale-100 group-hover:scale-110 transition-transform duration-300"
-                priority
-              />
-            </div> */}
-            <div className="absolute left-1/2 -translate-x-1/2 sm:left-0 sm:translate-x-0 h-40 w-40">
+            <div className="relative h-40 w-52">
               <Image
                 src="/brand/logotipo.png"
                 alt="MyServ"
                 fill
-                sizes="(max-width: 768px) 100px, 128px"
-                className="object-contain opacity-90 group-hover:opacity-100 transition-opacity duration-300"
+                sizes="(max-width: 768px) 110px, 140px"
+                className="object-contain object-center opacity-90 group-hover:opacity-100 transition-opacity duration-300"
                 priority
               />
             </div>
           </Link>
         </div>
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center space-x-2">
+        <nav className="hidden lg:flex items-center space-x-2">
           {desktopNavItems.map((item) => (
             <DesktopNavItem
               key={item.href}

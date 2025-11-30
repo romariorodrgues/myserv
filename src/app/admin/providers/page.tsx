@@ -33,6 +33,9 @@ interface ServiceProvider {
   phone: string
   isApproved: boolean
   isActive: boolean
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
+  rejectionReason?: string | null
+  reviewRequestedAt?: string | null
   profileImage?: string | null
   createdAt: string
   description?: string
@@ -159,9 +162,12 @@ export default function AdminProvidersPage() {
     }
   }
 
-  const pendingProviders = providers.filter(p => !p.isApproved && p.isActive)
-  const rejectedProviders = providers.filter(p => !p.isApproved && !p.isActive)
-  const approvedProviders = providers.filter(p => p.isApproved)
+  const resolveApprovalStatus = (provider: ServiceProvider) =>
+    provider.approvalStatus ?? (provider.isApproved ? 'APPROVED' : 'PENDING')
+
+  const pendingProviders = providers.filter(p => resolveApprovalStatus(p) === 'PENDING')
+  const rejectedProviders = providers.filter(p => resolveApprovalStatus(p) === 'REJECTED')
+  const approvedProviders = providers.filter(p => resolveApprovalStatus(p) === 'APPROVED')
 
   if (status === 'loading' || loading) {
     return (
@@ -471,7 +477,25 @@ export default function AdminProvidersPage() {
                         {selectedProvider.maritalStatus && (
                           <p><strong>Estado civil:</strong> {selectedProvider.maritalStatus}</p>
                         )}
-                        <p><strong>Status:</strong> {selectedProvider.isActive ? 'Ativo' : 'Desativado'} {selectedProvider.isApproved ? '(Aprovado)' : '(Pendente)'}</p>
+                        <p>
+                          <strong>Status:</strong> {selectedProvider.isActive ? 'Ativo' : 'Desativado'} -{' '}
+                          {resolveApprovalStatus(selectedProvider) === 'APPROVED'
+                            ? 'Aprovado'
+                            : resolveApprovalStatus(selectedProvider) === 'REJECTED'
+                              ? 'Recusado'
+                              : 'Pendente'}
+                        </p>
+                        {resolveApprovalStatus(selectedProvider) === 'REJECTED' && selectedProvider.rejectionReason && (
+                          <p className="text-sm text-red-600">
+                            <strong>Motivo informado:</strong> {selectedProvider.rejectionReason}
+                          </p>
+                        )}
+                        {selectedProvider.reviewRequestedAt && (
+                          <p className="text-sm text-gray-500">
+                            Último pedido de reavaliação:{' '}
+                            {new Date(selectedProvider.reviewRequestedAt).toLocaleString('pt-BR')}
+                          </p>
+                        )}
                         {selectedProvider.description && (
                           <p><strong>Descrição:</strong> {selectedProvider.description}</p>
                         )}

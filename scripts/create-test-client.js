@@ -23,7 +23,12 @@ async function createTestClient() {
         name: 'Cliente Teste Silva',
         phone: '(11) 99999-8888',
         isActive: true,
-        isApproved: true
+        isApproved: true,
+        approvalStatus: 'APPROVED',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        phoneVerified: true,
+        phoneVerifiedAt: new Date(),
       },
       create: {
         email: 'cliente.teste@myserv.dev',
@@ -34,6 +39,11 @@ async function createTestClient() {
         userType: 'CLIENT',
         isActive: true,
         isApproved: true,
+        approvalStatus: 'APPROVED',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        phoneVerified: true,
+        phoneVerifiedAt: new Date(),
         address: {
           create: {
             street: 'Rua das Flores',

@@ -24,6 +24,7 @@ import {
   User
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ProviderSchedule } from '@/components/dashboard/provider-schedule'
@@ -40,6 +41,7 @@ import React from 'react'
 import { TermsConsentPrompt } from '@/components/legal/terms-consent'
 import { SupportChatWidgetWrapper } from '@/components/chat/SupportChatWidgetWrapper'
 import { ProviderReviewModal } from '@/components/dashboard/provider-review-modal'
+import { toast } from 'sonner'
 
 const formatCurrency = (value?: number | null) =>
   typeof value === 'number' && Number.isFinite(value)
@@ -87,12 +89,13 @@ interface ProviderBooking {
 type TDashboardTab = 'overview' | 'schedule' | 'history' | 'metrics' | 'pricing' | 'settings'
 
 function ProviderDashboardContent() {
-  const { data: session, status } = useSession()
+  const { data: session, status, update } = useSession()
   const router = useRouter()
   const searchParams = useSearchParams()
   const [avgRating, setAvgRating] = useState<number>(0)
   const [totalReviews, setTotalReviews] = useState<number>(0)
   const [activeTab, setActiveTab] = useState<TDashboardTab>('overview')
+  const [requestingReview, setRequestingReview] = useState(false)
   const scheduleSubParam = searchParams.get('sub')
   const scheduleInitialTab = (['schedule', 'appointments', 'settings'] as const).includes((scheduleSubParam as any))
     ? (scheduleSubParam as 'schedule' | 'appointments' | 'settings')
@@ -144,6 +147,14 @@ function ProviderDashboardContent() {
   const hasProfileImage = Boolean((session?.user as any)?.profileImage || (session?.user as any)?.image)
 
   useEffect(() => {
+    setVerificationEmail(session?.user?.email || '')
+  }, [session?.user?.email])
+
+  useEffect(() => {
+    setVerificationPhone((session?.user as any)?.phone || '')
+  }, [session?.user])
+
+  useEffect(() => {
     if (status === 'loading') return; // Sessão ainda está carregando
     
     const currentSession = session /* || mockSession; */
@@ -158,8 +169,16 @@ function ProviderDashboardContent() {
       return;
     }
 
-    // Gate: perfil em análise
-    if (!currentSession.user.isApproved) {
+    const sessionApprovalStatus =
+      ((currentSession.user as any)?.approvalStatus as string | undefined) ??
+      (currentSession.user.isApproved ? 'APPROVED' : 'PENDING')
+
+    if (!((currentSession.user as any).emailVerified || (currentSession.user as any).phoneVerified)) {
+      setActiveTab('overview')
+      return
+    }
+
+    if (currentSession.user.userType === 'SERVICE_PROVIDER' && sessionApprovalStatus !== 'APPROVED') {
       setActiveTab('overview')
       return
     }
@@ -224,6 +243,12 @@ function ProviderDashboardContent() {
   const [pendingProviderReviews, setPendingProviderReviews] = useState(0)
   const [providerPendingItems, setProviderPendingItems] = useState<Array<{ id: string; client: { id: string; name: string; profileImage?: string | null; ratingAverage?: number | null; ratingCount?: number }; serviceName: string }>>([])
   const [providerReviewBookingId, setProviderReviewBookingId] = useState<string | null>(null)
+  const [verificationEmail, setVerificationEmail] = useState(session?.user?.email || '')
+  const [resendingVerification, setResendingVerification] = useState(false)
+  const [verificationPhone, setVerificationPhone] = useState((session?.user as any)?.phone || '')
+  const [phoneCode, setPhoneCode] = useState('')
+  const [sendingPhoneCode, setSendingPhoneCode] = useState(false)
+  const [verifyingPhoneCode, setVerifyingPhoneCode] = useState(false)
   const openScheduleFor = (id: string) => {
     setSchedMap((m) => ({ ...m, [id]: m[id] || { date: new Date().toISOString().split('T')[0], time: '' } }))
   }
@@ -255,6 +280,297 @@ function ProviderDashboardContent() {
 
   }, [searchParams, status])
 
+  const approvalStatus =
+    ((session?.user as any)?.approvalStatus as string | undefined) ??
+    (session?.user?.isApproved ? 'APPROVED' : 'PENDING')
+  const isRejected = approvalStatus === 'REJECTED'
+  const emailVerified = session ? ((session.user as any)?.emailVerified !== false) : true
+  const phoneVerified = session ? ((session.user as any)?.phoneVerified !== false) : true
+  const contactVerified = emailVerified || phoneVerified
+  const pendingContactVerification =
+    session?.user?.userType === 'SERVICE_PROVIDER' && !contactVerified
+  const underReview =
+    session?.user?.userType === 'SERVICE_PROVIDER' && !pendingContactVerification && approvalStatus !== 'APPROVED'
+
+  const handleReviewRequest = useCallback(async () => {
+    if (!isRejected || requestingReview) return
+    try {
+      setRequestingReview(true)
+      const response = await fetch('/api/service-providers/review-request', {
+        method: 'POST'
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Não foi possível reenviar a solicitação de aprovação.')
+      }
+      toast.success('Solicitação reenviada! Avisaremos quando o novo parecer for emitido.')
+      if (session && update) {
+        await update({
+          ...session,
+          user: {
+            ...session.user,
+            isApproved: false,
+            approvalStatus: 'PENDING'
+          }
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao solicitar nova análise.'
+      toast.error(message)
+    } finally {
+      setRequestingReview(false)
+    }
+  }, [isRejected, requestingReview, session, update])
+
+  const goToSettings = useCallback(() => {
+    setActiveTab('settings')
+    router.push('/dashboard/profissional?tab=settings')
+  }, [router])
+
+  const handleResendVerificationEmail = useCallback(async () => {
+    if (!session) return
+    try {
+      setResendingVerification(true)
+      const payload: Record<string, string> = {}
+      if (verificationEmail && verificationEmail !== session.user.email) {
+        payload.email = verificationEmail
+      }
+      const response = await fetch('/api/auth/email/resend', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Não foi possível reenviar o e-mail.')
+      }
+      toast.success('Enviamos um novo e-mail de confirmação.')
+      if (data.user && update) {
+        await update({
+          ...session,
+          user: {
+            ...session.user,
+            email: data.user.email,
+            emailVerified: data.user.emailVerified,
+          },
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao reenviar e-mail.'
+      toast.error(message)
+    } finally {
+      setResendingVerification(false)
+    }
+  }, [session, update, verificationEmail])
+
+  const handleSendPhoneVerification = useCallback(async () => {
+    if (!verificationPhone.trim()) {
+      toast.error('Informe um telefone válido.')
+      return
+    }
+    try {
+      setSendingPhoneCode(true)
+      const response = await fetch('/api/auth/phone/send-code', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ phone: verificationPhone }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Não foi possível enviar o código.')
+      }
+      toast.success('Enviamos o código pelo WhatsApp.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao enviar o código.'
+      toast.error(message)
+    } finally {
+      setSendingPhoneCode(false)
+    }
+  }, [verificationPhone])
+
+  const handleVerifyPhoneCode = useCallback(async () => {
+    if (!phoneCode.trim()) {
+      toast.error('Informe o código recebido.')
+      return
+    }
+    if (!session) return
+    try {
+      setVerifyingPhoneCode(true)
+      const response = await fetch('/api/auth/phone/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ code: phoneCode }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Não foi possível validar o código.')
+      }
+      toast.success('Telefone confirmado com sucesso!')
+      setPhoneCode('')
+      if (update) {
+        await update({
+          ...session,
+          user: {
+            ...session.user,
+            phoneVerified: true,
+            phone: verificationPhone,
+          },
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao validar o código.'
+      toast.error(message)
+    } finally {
+      setVerifyingPhoneCode(false)
+    }
+  }, [phoneCode, session, update, verificationPhone])
+
+  const reviewCard = (
+    <div className="max-w-3xl mx-auto py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>{isRejected ? 'Perfil recusado' : 'Perfil em análise'}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-gray-700 mb-4">
+            {isRejected
+              ? 'Seu cadastro foi analisado e encontramos pendências. Revise seus dados e documentos para aumentar as chances de aprovação.'
+              : 'Seu cadastro como prestador está em revisão. Em até 72h você deve receber uma resposta.'}
+          </p>
+          <p className="text-gray-600 mb-6">
+            {isRejected
+              ? 'Acesse Configurações para completar ou corrigir as informações e, quando estiver pronto, solicite uma nova avaliação.'
+              : 'Acesse Configurações para completar seu perfil (foto, dados) e acelerar a aprovação.'}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={goToSettings}>Ir para Configurações</Button>
+            {isRejected && (
+              <Button
+                variant="outline"
+                disabled={requestingReview}
+                onClick={handleReviewRequest}
+              >
+                {requestingReview ? 'Enviando...' : 'Solicitar nova análise'}
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const emailVerificationCard = (
+    <div className="max-w-3xl mx-auto py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>Confirme seu e-mail</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <p className="text-gray-700 mb-2">
+              Antes de liberar seu perfil para análise precisamos confirmar o e-mail cadastrado.
+            </p>
+            <p className="text-gray-600">
+              O link de confirmação expira em até 72h. Você pode atualizar o e-mail abaixo se digitou errado.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700" htmlFor="verificationEmail">
+              E-mail para confirmação
+            </label>
+            <Input
+              id="verificationEmail"
+              type="email"
+              value={verificationEmail}
+              onChange={(event) => setVerificationEmail(event.target.value)}
+              placeholder="seu@email.com"
+            />
+            <p className="text-xs text-gray-500">
+              Se você alterar o e-mail, enviaremos o link para o novo endereço.
+            </p>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={handleResendVerificationEmail} disabled={resendingVerification}>
+              {resendingVerification ? 'Enviando...' : 'Reenviar e-mail'}
+            </Button>
+            <Button variant="outline" onClick={goToSettings}>
+              Editar pelo perfil completo
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
+  const phoneVerificationCard = (
+    <div className="max-w-3xl mx-auto py-10">
+      <Card>
+        <CardHeader>
+          <CardTitle>Valide seu telefone</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div>
+            <p className="text-gray-700 mb-2">
+              Caso você tenha digitado o e-mail errado, conseguimos confirmar sua identidade pelo telefone.
+            </p>
+            <p className="text-gray-600">
+              Enviaremos um código por WhatsApp. Depois de confirmar, você consegue atualizar o e-mail com segurança.
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700" htmlFor="verificationPhone">
+              Telefone com DDD
+            </label>
+            <Input
+              id="verificationPhone"
+              type="tel"
+              value={verificationPhone}
+              onChange={(event) => setVerificationPhone(event.target.value)}
+              placeholder="(11) 99999-0000"
+            />
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Button onClick={handleSendPhoneVerification} disabled={sendingPhoneCode}>
+              {sendingPhoneCode ? 'Enviando...' : 'Enviar código'}
+            </Button>
+            <Button variant="outline" onClick={goToSettings}>
+              Ajustar telefone nas configurações
+            </Button>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700" htmlFor="phoneCode">
+              Código recebido
+            </label>
+            <Input
+              id="phoneCode"
+              value={phoneCode}
+              onChange={(event) => setPhoneCode(event.target.value)}
+              placeholder="000000"
+              maxLength={6}
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button variant="secondary" onClick={handleVerifyPhoneCode} disabled={verifyingPhoneCode || !phoneCode}>
+              {verifyingPhoneCode ? 'Validando...' : 'Confirmar telefone'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+
   if (!session && status === 'unauthenticated') {
     router.push('/entrar')
     return
@@ -268,8 +584,6 @@ function ProviderDashboardContent() {
   if (!session) {
     return null
   }
-
-  const underReview = session.user.userType === 'SERVICE_PROVIDER' && !session.user.isApproved
 
   if (isLoading || isFetching) {
     return (
@@ -304,6 +618,47 @@ function ProviderDashboardContent() {
     { id: 'pricing', label: 'Serviços', icon: DollarSign },
     { id: 'settings', label: 'Configurações', icon: Settings }
   ]
+
+  if (pendingContactVerification && activeTab !== 'settings') {
+    return (
+      <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8 space-y-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-brand-navy">Dashboard do Prestador</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
+              Olá, {currentSession?.user?.name || 'Prestador'}! Confirme seus dados de contato para continuar.
+            </p>
+          </div>
+        </div>
+
+        <div className="border-b">
+          <nav className="flex flex-wrap gap-2 sm:gap-4 overflow-x-auto pb-1">
+            {tabs.map((tab) => {
+              const Icon = tab.icon
+              const isActiveTab = activeTab === tab.id
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as typeof activeTab)}
+                  className={`flex items-center justify-center gap-2 min-w-[130px] px-2 py-2 border-b-2 font-medium text-sm transition-colors rounded-t-md ${
+                    isActiveTab
+                      ? 'border-primary text-primary'
+                      : 'border-transparent text-muted-foreground hover:text-foreground hover:border-gray-300'
+                  }`}
+                >
+                  <Icon className="h-4 w-4" />
+                  <span className="whitespace-nowrap">{tab.label}</span>
+                </button>
+              )
+            })}
+          </nav>
+        </div>
+
+        {!emailVerified && emailVerificationCard}
+        {!phoneVerified && phoneVerificationCard}
+      </div>
+    )
+  }
 
   if (underReview && activeTab !== 'settings') {
     return (
@@ -340,20 +695,7 @@ function ProviderDashboardContent() {
           </nav>
         </div>
 
-        <div className="max-w-3xl mx-auto py-10">
-          <Card>
-            <CardHeader>
-              <CardTitle>Perfil em análise</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Seu cadastro como prestador está em revisão. Em até 72h você deve receber uma resposta.</p>
-              <p className="text-gray-600 mb-6">Acesse Configurações para completar seu perfil (foto, dados) e acelerar a aprovação.</p>
-              <div className="flex gap-2">
-                <Button onClick={() => setActiveTab('settings')}>Ir para Configurações</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        {reviewCard}
       </div>
     )
   }
@@ -415,20 +757,7 @@ function ProviderDashboardContent() {
 
       {/* Tab Content */}
       {underReview && activeTab !== 'settings' ? (
-        <div className="max-w-3xl mx-auto py-10">
-          <Card>
-            <CardHeader>
-              <CardTitle>Perfil em análise</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-gray-700 mb-4">Seu cadastro como prestador está em revisão. Em até 72h você deve receber uma resposta.</p>
-              <p className="text-gray-600 mb-6">Acesse Configurações para completar seu perfil (foto, dados) e acelerar a aprovação.</p>
-              <div className="flex gap-2">
-                <Button onClick={() => router.push('/dashboard/profissional?tab=settings')}>Ir para Configurações</Button>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        reviewCard
       ) : activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Stats Cards */}

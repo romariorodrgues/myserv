@@ -5,6 +5,9 @@ import { PaymentMethod, PaymentStatus, UserTypeValues } from "@/types";
 import { Plan } from "@prisma/client";
 import { Payment } from "mercadopago";
 import { NextRequest, NextResponse } from "next/server";
+import { EmailService } from '@/lib/email-service'
+import { generateEmailVerificationToken, getEmailVerificationExpiryDate } from '@/lib/email-verification'
+import { issuePhoneVerificationCode } from '@/lib/phone-verification'
 
 interface MercadoPagoWebhookNotification {
   id: number;
@@ -130,6 +133,9 @@ export async function POST(request: NextRequest) {
             await prisma.user.update({ where: { id: existingUser.id }, data: updateData })
             await prisma.pendingProviderRegistration.delete({ where: { id: pending.id } })
           } else {
+            const verificationToken = generateEmailVerificationToken()
+            const verificationExpiresAt = getEmailVerificationExpiryDate()
+            const verificationSentAt = new Date()
             const createdUser = await prisma.user.create({
               data: {
                 name: pending.name,
@@ -139,12 +145,16 @@ export async function POST(request: NextRequest) {
                 userType: pending.userType,
                 password: pending.passwordHash,
                 isApproved: false,
+                approvalStatus: 'PENDING',
                 gender: pending.gender,
                 maritalStatus: pending.maritalStatus,
                 dateOfBirth: pending.dateOfBirth,
                 profileImage: pendingProfileImage,
                 termsAcceptedAt: new Date(),
                 termsVersion: pendingTermsVersion,
+                emailVerificationToken: verificationToken,
+                emailVerificationExpiresAt: verificationExpiresAt,
+                emailVerificationSentAt: verificationSentAt,
               },
             })
 
@@ -165,6 +175,26 @@ export async function POST(request: NextRequest) {
             }
 
             resolvedUserId = createdUser.id
+
+            try {
+              await EmailService.sendEmailVerificationEmail({
+                email: createdUser.email,
+                name: createdUser.name,
+                token: verificationToken,
+              })
+            } catch (emailError) {
+              console.error('[payments webhook] email verification dispatch failed', emailError)
+            }
+
+            try {
+              await issuePhoneVerificationCode({
+                userId: createdUser.id,
+                phone: pending.phone,
+                name: createdUser.name,
+              })
+            } catch (phoneError) {
+              console.error('[payments webhook] phone verification dispatch failed', phoneError)
+            }
 
             await prisma.pendingProviderRegistration.delete({ where: { id: pending.id } })
           }

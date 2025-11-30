@@ -81,6 +81,9 @@ async function createBaseFixture() {
         userType: type,
         isActive: true,
         isApproved: true,
+        approvalStatus: 'APPROVED',
+        emailVerified: true,
+        phoneVerified: true,
       },
     })
     created.users.push(user.id)

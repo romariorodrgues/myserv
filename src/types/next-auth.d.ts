@@ -11,8 +11,12 @@ declare module "next-auth" {
     user: {
       id: string
       userType: UserType
+      phone?: string | null
       isApproved: boolean
       isActive: boolean
+      emailVerified: boolean
+      phoneVerified: boolean
+      approvalStatus?: string | null
       termsVersion: string | null
       termsAcceptedAt: string | null
       deactivatedAt: string | null
@@ -21,8 +25,12 @@ declare module "next-auth" {
 
   interface User {
     userType: UserType
+    phone?: string | null
     isApproved: boolean
     isActive: boolean
+    emailVerified: boolean
+    phoneVerified: boolean
+    approvalStatus?: string | null
     termsVersion: string | null
     termsAcceptedAt: string | null
     deactivatedAt: string | null
@@ -32,8 +40,12 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     userType: UserType
+    phone?: string | null
     isApproved: boolean
     isActive: boolean
+    emailVerified: boolean
+    phoneVerified: boolean
+    approvalStatus?: string | null
     termsVersion?: string | null
     termsAcceptedAt?: string | null
     deactivatedAt?: string | null

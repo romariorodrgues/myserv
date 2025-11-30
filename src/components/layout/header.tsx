@@ -9,7 +9,8 @@
 
 import Link from 'next/link'
 import { useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
+import { fullSignOut } from '@/lib/full-sign-out'
 import { Menu, X, Search, User, LogOut, Settings, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,7 +22,7 @@ export function Header() {
   const { data: session } = useSession()
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/' })
+    fullSignOut()
   }
 
   const getDashboardUrl = () => {

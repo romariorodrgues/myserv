@@ -116,6 +116,11 @@ async function createTestProviders() {
           userType: providerData.userType,
           isActive: providerData.isActive,
           isApproved: providerData.isApproved,
+          approvalStatus: providerData.isApproved ? 'APPROVED' : 'PENDING',
+          emailVerified: true,
+          emailVerifiedAt: new Date(),
+          phoneVerified: true,
+          phoneVerifiedAt: new Date(),
           description: providerData.description
         }
       })

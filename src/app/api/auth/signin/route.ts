@@ -45,14 +45,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if service provider is approved
-    if (user.userType === 'SERVICE_PROVIDER' && !user.isApproved) {
-      return NextResponse.json(
-        { error: 'Conta em análise. Aguarde aprovação.' },
-        { status: 403 }
-      )
-    }
-
     // Verify password
     const isPasswordValid = await compare(validatedData.password, user.password)
 

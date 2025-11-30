@@ -5,6 +5,9 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@prisma/client"
 import GoogleMapsServerService from "@/lib/maps-server";
 import { ClientProfileData } from "@/types";
+import { EmailService } from '@/lib/email-service'
+import { generateEmailVerificationToken, getEmailVerificationExpiryDate, isVerificationExpired } from '@/lib/email-verification'
+import { issuePhoneVerificationCode, normalizePhone } from '@/lib/phone-verification'
 
 export async function GET() {
   const session = await getServerSession(authOptions);
@@ -44,6 +47,7 @@ export async function GET() {
       email: session.user.email ?? '',
       phone: session.user.phone ?? '',
       cpfCnpj: '',
+      emailVerified: (session.user as any)?.emailVerified ?? false,
       description: '',
       userType: session.user.userType,
       profileImage: (session.user as any).profileImage ?? (session.user as any).image ?? '',
@@ -84,11 +88,12 @@ export async function GET() {
     : null
   const clientRatingCount = clientRatingStats._count.providerReviewRating ?? 0
 
-  const responseData: ClientProfileData = {
-    id: user.id,
-    name: user.name,
-    email: user.email,
-    phone: user.phone,
+    const responseData: ClientProfileData = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      emailVerified: user.emailVerified,
+      phone: user.phone,
     cpfCnpj: user.cpfCnpj,
     description: user.description ?? "",
     userType: user.userType,
@@ -140,10 +145,27 @@ export async function PUT(req: Request) {
   }
 
   const body: Partial<ClientProfileData & { profileImageKey?: string | null }> = await req.json();
+  const normalizedEmail = body.email ? body.email.trim().toLowerCase() : undefined
+  if (normalizedEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return NextResponse.json({ error: 'Informe um e-mail válido.' }, { status: 400 })
+  }
+  const sanitizedPhone = body.phone ? normalizePhone(body.phone) : undefined
+  if (sanitizedPhone && sanitizedPhone.length < 10) {
+    return NextResponse.json({ error: 'Informe um telefone válido.' }, { status: 400 })
+  }
 
   const existingUser = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, userType: true },
+    select: {
+      id: true,
+      userType: true,
+      email: true,
+      emailVerified: true,
+      emailVerificationExpiresAt: true,
+      phone: true,
+      phoneVerified: true,
+      phoneVerificationExpiresAt: true,
+    },
   });
 
   if (!existingUser) {
@@ -161,6 +183,41 @@ export async function PUT(req: Request) {
         profileVisibility: 'PUBLIC' as const,
       }
     : undefined
+
+  let shouldSendVerificationEmail = false
+  let verificationToken: string | null = null
+  let verificationExpiresAt: Date | null = null
+  const phoneChanged = Boolean(sanitizedPhone && sanitizedPhone !== existingUser.phone)
+
+  if (normalizedEmail && normalizedEmail !== existingUser.email) {
+    let conflicting = await prisma.user.findFirst({
+      where: { email: normalizedEmail },
+      select: {
+        id: true,
+        emailVerified: true,
+        emailVerificationExpiresAt: true,
+      }
+    })
+
+    if (conflicting) {
+      if (!conflicting.emailVerified && isVerificationExpired(conflicting.emailVerificationExpiresAt)) {
+        try {
+          await prisma.user.delete({ where: { id: conflicting.id } })
+          conflicting = null
+        } catch (cleanupError) {
+          console.error('[profile] failed to cleanup expired email owner', cleanupError)
+        }
+      }
+    }
+
+    if (conflicting) {
+      return NextResponse.json({ error: 'Já existe uma conta com este e-mail.' }, { status: 409 })
+    }
+
+    verificationToken = generateEmailVerificationToken()
+    verificationExpiresAt = getEmailVerificationExpiryDate()
+    shouldSendVerificationEmail = true
+  }
 
   if (body.address) {
     const parts = [
@@ -190,14 +247,21 @@ export async function PUT(req: Request) {
         where: { id: existingUser.id },
         data: {
           name: body.name,
-          phone: body.phone,
-          email: body.email,
+          email: normalizedEmail ?? undefined,
           profileImage:
             body.profileImageKey !== undefined
               ? body.profileImageKey
               : body.profileImage ?? undefined,
           description: body.description ?? undefined,
           cpfCnpj: body.cpfCnpj,
+          ...(shouldSendVerificationEmail
+            ? {
+                emailVerified: false,
+                emailVerificationToken: verificationToken,
+                emailVerificationExpiresAt: verificationExpiresAt!,
+                emailVerificationSentAt: new Date(),
+              }
+            : {}),
           address: body.address
             ? {
                 upsert: {
@@ -279,6 +343,18 @@ export async function PUT(req: Request) {
       }
     });
 
+    if (phoneChanged && sanitizedPhone) {
+      try {
+        await issuePhoneVerificationCode({
+          userId: existingUser.id,
+          phone: sanitizedPhone,
+          name: session.user.name ?? 'Usuário',
+        })
+      } catch (phoneError) {
+        console.error('[profile] phone verification dispatch failed', phoneError)
+      }
+    }
+
     const updatedUser = await prisma.user.findUnique({
       where: { id: session.user.id },
       include: {
@@ -310,10 +386,24 @@ export async function PUT(req: Request) {
       updatedUser?.serviceProvider?.activePlan?.name ??
       "Start";
 
+    if (shouldSendVerificationEmail && verificationToken && normalizedEmail) {
+      try {
+        await EmailService.sendEmailVerificationEmail({
+          email: normalizedEmail,
+          name: updatedUser?.name ?? 'Usuário',
+          token: verificationToken,
+        })
+      } catch (emailError) {
+        console.error('[profile] email verification dispatch failed', emailError)
+      }
+    }
+
     const responseData: ClientProfileData = {
       id: updatedUser!.id,
       name: updatedUser!.name,
       email: updatedUser!.email,
+      emailVerified: updatedUser!.emailVerified,
+      phoneVerified: updatedUser!.phoneVerified,
       phone: updatedUser!.phone,
       cpfCnpj: updatedUser!.cpfCnpj,
       description: updatedUser!.description ?? "",

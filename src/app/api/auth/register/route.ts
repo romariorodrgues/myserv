@@ -9,6 +9,9 @@ import { Preference } from "mercadopago";
 import { getMercadoPagoConfig } from "@/lib/mercadopago";
 import { getCurrentTermsVersion } from '@/lib/legal'
 import { parseImageDataUrl, saveProfileImage } from '@/lib/profile-image'
+import { EmailService } from '@/lib/email-service'
+import { generateEmailVerificationToken, getEmailVerificationExpiryDate } from '@/lib/email-verification'
+import { issuePhoneVerificationCode } from '@/lib/phone-verification'
 
 const UserTypeArray = Object.values(UserTypeValues) as [
   UserType,
@@ -112,14 +115,33 @@ export async function POST(request: NextRequest) {
     }
 
     // Verifica duplicidade
-    const existingUser = await prisma.user.findFirst({
+    let existingUser = await prisma.user.findFirst({
       where: {
         OR: [
           { email: validatedData.email },
           { cpfCnpj: validatedData.cpfCnpj },
         ],
       },
+      select: {
+        id: true,
+        emailVerified: true,
+        emailVerificationExpiresAt: true,
+      }
     });
+
+    if (
+      existingUser &&
+      !existingUser.emailVerified &&
+      existingUser.emailVerificationExpiresAt &&
+      existingUser.emailVerificationExpiresAt.getTime() < Date.now()
+    ) {
+      try {
+        await prisma.user.delete({ where: { id: existingUser.id } })
+        existingUser = null
+      } catch (cleanupError) {
+        console.error('[register] failed to cleanup expired unverified user', cleanupError)
+      }
+    }
 
     if (existingUser) {
       return NextResponse.json(
@@ -308,6 +330,10 @@ export async function POST(request: NextRequest) {
 
     await ensureUserTermsColumns();
 
+    const verificationToken = generateEmailVerificationToken()
+    const verificationExpiresAt = getEmailVerificationExpiryDate()
+    const verificationSentAt = new Date()
+
     if (!profileImagePath) {
       profileImagePath = await saveProfileImage(profileImageBuffer)
     }
@@ -330,6 +356,9 @@ export async function POST(request: NextRequest) {
           termsAcceptedAt: new Date(),
           termsVersion: currentTermsVersion,
           profileImage: profileImagePath,
+          emailVerificationToken: verificationToken,
+          emailVerificationExpiresAt: verificationExpiresAt,
+          emailVerificationSentAt: verificationSentAt,
         },
       });
     } catch (err) {
@@ -362,15 +391,37 @@ export async function POST(request: NextRequest) {
 
     }
 
+    try {
+      await EmailService.sendEmailVerificationEmail({
+        email: user.email,
+        name: user.name,
+        token: verificationToken,
+      })
+    } catch (emailError) {
+      console.error('[register] email verification dispatch failed', emailError)
+    }
+
+    try {
+      await issuePhoneVerificationCode({
+        userId: user.id,
+        phone: validatedData.phone,
+        name: validatedData.name,
+      })
+    } catch (phoneError) {
+      console.error('[register] phone verification dispatch failed', phoneError)
+    }
+
     const { password: _password, ...userWithoutSensitiveData } = user;
+
+    const successMessage =
+      validatedData.userType === UserTypeValues.CLIENT
+        ? "Cadastro realizado! Verifique o e-mail enviado para confirmar sua conta."
+        : "Cadastro recebido! Confirme seu e-mail para liberar a análise do perfil."
 
     return NextResponse.json(
       {
         success: true,
-        message:
-          validatedData.userType === UserTypeValues.CLIENT
-            ? "Conta criada com sucesso! Você já pode fazer login."
-            : "Cadastro realizado! Sua conta será analisada e aprovada em até 24 horas.",
+        message: successMessage,
         user: userWithoutSensitiveData,
       },
       { status: 201 }

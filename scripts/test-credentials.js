@@ -64,7 +64,12 @@ async function testCredentials() {
       update: {
         password: hashedPassword,
         isActive: true,
-        isApproved: true
+        isApproved: true,
+        approvalStatus: 'APPROVED',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        phoneVerified: true,
+        phoneVerifiedAt: new Date(),
       },
       create: {
         email: 'cliente.funcional@myserv.dev',
@@ -75,6 +80,11 @@ async function testCredentials() {
         userType: 'CLIENT',
         isActive: true,
         isApproved: true,
+        approvalStatus: 'APPROVED',
+        emailVerified: true,
+        emailVerifiedAt: new Date(),
+        phoneVerified: true,
+        phoneVerifiedAt: new Date(),
         address: {
           create: {
             street: 'Rua de Teste Funcional',

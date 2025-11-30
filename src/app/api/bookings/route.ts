@@ -199,11 +199,12 @@ export async function POST(request: NextRequest) {
           phone: validatedData.clientPhone,
           cpfCnpj: `temp-${Date.now()}`, // Unique temporary CPF
           password: 'temp_password', // Will be changed by user
-          userType: 'CLIENT',
-          isActive: true,
-          isApproved: true
-        }
-      })
+        userType: 'CLIENT',
+        isActive: true,
+        isApproved: true,
+        approvalStatus: 'APPROVED'
+      }
+    })
     }
 
     // Load provider schedule settings

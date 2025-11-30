@@ -226,6 +226,26 @@ Finalize seu pagamento para concluir o processo.
     })
   }
 
+  static async sendPhoneVerificationCode(params: { phone: string; code: string; name?: string }): Promise<boolean> {
+    const formattedPhone = this.formatPhoneNumber(params.phone)
+    const message = `🔐 *Verificação de Telefone - MyServ*
+
+Olá ${params.name || 'Usuário'}!
+
+Use o código abaixo para confirmar seu telefone:
+👉 *${params.code}*
+
+Este código expira em poucos minutos. Se você não solicitou, ignore esta mensagem.
+
+---
+*MyServ - Segurança para você continuar usando a plataforma*`
+
+    return this.sendMessage({
+      to: formattedPhone,
+      message,
+    })
+  }
+
   /**
    * Send welcome message to new users
    */

@@ -80,6 +80,9 @@ async function setupSearchFixtures() {
         userType: 'PROVIDER',
         isActive: true,
         isApproved: true,
+        approvalStatus: 'APPROVED',
+        emailVerified: true,
+        phoneVerified: true,
       },
     })
     created.userIds.push(user.id)

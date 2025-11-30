@@ -36,6 +36,8 @@ interface User {
   userType: 'CLIENT' | 'SERVICE_PROVIDER' | 'ADMIN'
   isActive: boolean
   isApproved: boolean
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED'
+  rejectionReason?: string | null
   createdAt: string
   address?: {
     city: string
@@ -227,15 +229,21 @@ export default function AdminUsersPage() {
     }
   }
 
+  const resolveApprovalStatus = (user: User) =>
+    user.approvalStatus ?? (user.isApproved ? 'APPROVED' : 'PENDING')
+
   const filteredUsers = users.filter(user => {
+    const approvalStatus = resolveApprovalStatus(user)
+
     const matchesSearch = user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          user.email.toLowerCase().includes(searchTerm.toLowerCase())
     
     const matchesType = filterType === 'ALL' || user.userType === filterType
     
     const matchesStatus = filterStatus === 'ALL' ||
-      (filterStatus === 'APPROVED' && user.isApproved) ||
-      (filterStatus === 'PENDING' && !user.isApproved && user.userType === 'SERVICE_PROVIDER') ||
+      (filterStatus === 'APPROVED' && approvalStatus === 'APPROVED') ||
+      (filterStatus === 'PENDING' && approvalStatus === 'PENDING' && user.userType === 'SERVICE_PROVIDER') ||
+      (filterStatus === 'REJECTED' && approvalStatus === 'REJECTED' && user.userType === 'SERVICE_PROVIDER') ||
       (filterStatus === 'ACTIVE' && user.isActive) ||
       (filterStatus === 'INACTIVE' && !user.isActive)
     
@@ -272,11 +280,17 @@ export default function AdminUsersPage() {
   }
 
   const getStatusBadge = (user: User) => {
+    const approvalStatus = resolveApprovalStatus(user)
+
     if (!user.isActive) {
       return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Inativo</span>
     }
     
-    if (user.userType === 'SERVICE_PROVIDER' && !user.isApproved) {
+    if (user.userType === 'SERVICE_PROVIDER' && approvalStatus === 'REJECTED') {
+      return <span className="px-2 py-1 text-xs bg-red-50 text-red-700 rounded-full">Recusado</span>
+    }
+
+    if (user.userType === 'SERVICE_PROVIDER' && approvalStatus !== 'APPROVED') {
       return <span className="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded-full">Pendente</span>
     }
     
@@ -341,7 +355,7 @@ export default function AdminUsersPage() {
               <div className="ml-4">
                 <p className="text-sm text-gray-500">Profissionais Aprovados</p>
                 <p className="text-2xl font-bold">
-                  {users.filter(u => u.userType === 'SERVICE_PROVIDER' && u.isApproved).length}
+                  {users.filter(u => u.userType === 'SERVICE_PROVIDER' && resolveApprovalStatus(u) === 'APPROVED').length}
                 </p>
               </div>
             </div>
@@ -353,7 +367,7 @@ export default function AdminUsersPage() {
               <div className="ml-4">
                 <p className="text-sm text-gray-500">Aguardando Aprovação</p>
                 <p className="text-2xl font-bold">
-                  {users.filter(u => u.userType === 'SERVICE_PROVIDER' && !u.isApproved).length}
+                  {users.filter(u => u.userType === 'SERVICE_PROVIDER' && resolveApprovalStatus(u) === 'PENDING').length}
                 </p>
               </div>
             </div>
@@ -409,6 +423,7 @@ export default function AdminUsersPage() {
               <option value="INACTIVE">Inativos</option>
               <option value="APPROVED">Aprovados</option>
               <option value="PENDING">Pendentes</option>
+              <option value="REJECTED">Rejeitados</option>
             </select>
           </div>
         </Card>
@@ -440,8 +455,13 @@ export default function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                {filteredUsers.map((user) => {
+                  const userStatus = resolveApprovalStatus(user)
+                  const canApprove = user.userType === 'SERVICE_PROVIDER' && userStatus !== 'APPROVED'
+                  const canReject = user.userType === 'SERVICE_PROVIDER' && userStatus === 'PENDING'
+
+                  return (
+                    <tr key={user.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <div className="text-sm font-medium text-gray-900">{user.name}</div>
@@ -464,7 +484,12 @@ export default function AdminUsersPage() {
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      {getStatusBadge(user)}
+                      <div className="flex flex-col gap-1">
+                        {getStatusBadge(user)}
+                        {userStatus === 'REJECTED' && user.rejectionReason && (
+                          <span className="text-xs text-red-600">Motivo: {user.rejectionReason}</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {user.address && (
@@ -479,26 +504,26 @@ export default function AdminUsersPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex flex-wrap items-center gap-2">
-                        {user.userType === 'SERVICE_PROVIDER' && !user.isApproved && (
-                          <>
-                            <Button
-                              size="sm"
-                              onClick={() => handleApproveUser(user.id)}
-                              className="bg-green-600 hover:bg-green-700"
-                            >
-                              <CheckCircle className="w-4 h-4 mr-1" />
-                              Aprovar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleRejectUser(user.id)}
-                              className="text-red-600 border-red-600 hover:bg-red-50"
-                            >
-                              <XCircle className="w-4 h-4 mr-1" />
-                              Rejeitar
-                            </Button>
-                          </>
+                        {canApprove && (
+                          <Button
+                            size="sm"
+                            onClick={() => handleApproveUser(user.id)}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            Aprovar
+                          </Button>
+                        )}
+                        {canReject && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRejectUser(user.id)}
+                            className="text-red-600 border-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Rejeitar
+                          </Button>
                         )}
 
                         <Button
@@ -521,8 +546,9 @@ export default function AdminUsersPage() {
                         </Button>
                       </div>
                     </td>
-                  </tr>
-                ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

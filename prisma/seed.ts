@@ -28,6 +28,11 @@ async function main() {
       userType: 'ADMIN',
       isActive: true,
       isApproved: true,
+      approvalStatus: 'APPROVED',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
     },
   })
 
@@ -45,6 +50,11 @@ async function main() {
       userType: 'CLIENT',
       isActive: true,
       isApproved: true,
+      approvalStatus: 'APPROVED',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
     },
   })
 
@@ -97,6 +107,11 @@ await prisma.clientPrivacy.upsert({
       userType: 'SERVICE_PROVIDER',
       isActive: true,
       isApproved: true,
+      approvalStatus: 'APPROVED',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
     },
   })
 
@@ -196,6 +211,11 @@ await prisma.clientPrivacy.upsert({
       userType: 'PROVIDER',
       isActive: true,
       isApproved: true,
+      approvalStatus: 'APPROVED',
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+      phoneVerified: true,
+      phoneVerifiedAt: new Date(),
     },
   })
 

@@ -7,6 +7,8 @@
 
 import nodemailer from 'nodemailer'
 import { NotificationData } from './whatsapp-service'
+import { buildEmailVerificationLink } from './email-verification'
+import { buildPasswordResetLink } from './password-reset'
 
 export interface EmailData {
   to: string
@@ -36,8 +38,10 @@ export class EmailService {
         return false
       }
 
+      const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER
+
       await this.transporter.sendMail({
-        from: `"MyServ" <${process.env.SMTP_USER}>`,
+        from: `"MyServ" <${fromEmail}>`,
         to: data.to,
         subject: data.subject,
         text: data.text,
@@ -117,6 +121,46 @@ export class EmailService {
         content,
         'Acessar Plataforma',
         process.env.NEXTAUTH_URL
+      )
+    })
+  }
+
+  static async sendEmailVerificationEmail(params: { email: string; name: string; token: string }): Promise<boolean> {
+    const content = `
+      <p>Olá, <strong>${params.name}</strong>!</p>
+      <p>Recebemos um pedido para confirmar seu e-mail no MyServ. Para concluir o cadastro, clique no botão abaixo.</p>
+      <p><strong>Validade:</strong> o link expira em 72 horas por segurança.</p>
+      <p>Se você não solicitou este cadastro, pode ignorar este e-mail.</p>
+    `
+
+    return this.sendEmail({
+      to: params.email,
+      subject: 'MyServ - Confirme seu e-mail',
+      html: this.generateTemplate(
+        'Confirmação de e-mail',
+        content,
+        'Confirmar e-mail',
+        buildEmailVerificationLink(params.token)
+      )
+    })
+  }
+
+  static async sendPasswordResetEmail(params: { email: string; name: string; token: string }): Promise<boolean> {
+    const content = `
+      <p>Olá, <strong>${params.name}</strong>.</p>
+      <p>Recebemos um pedido para redefinir sua senha no MyServ. Para continuar, clique no botão abaixo e crie uma nova senha.</p>
+      <p><strong>Validade:</strong> o link expira em 60 minutos para sua segurança.</p>
+      <p>Se você não solicitou esta alteração, ignore este e-mail. Sua senha permanecerá a mesma.</p>
+    `
+
+    return this.sendEmail({
+      to: params.email,
+      subject: 'MyServ - Redefinir sua senha',
+      html: this.generateTemplate(
+        'Redefinição de senha',
+        content,
+        'Criar nova senha',
+        buildPasswordResetLink(params.token)
       )
     })
   }

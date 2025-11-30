@@ -45,14 +45,27 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Conta desativada. Entre em contato com o suporte.")
         }
 
+        if (!user.emailVerified && user.emailVerificationExpiresAt && user.emailVerificationExpiresAt.getTime() < Date.now()) {
+          try {
+            await prisma.user.delete({ where: { id: user.id } })
+          } catch (cleanupError) {
+            console.error('[auth] failed to delete expired unverified user', cleanupError)
+          }
+          throw new Error("E-mail não confirmado dentro do prazo. Refaça seu cadastro.")
+        }
+
         return {
           id: user.id,
           email: user.email,
+          phone: user.phone,
           name: user.name,
           userType: user.userType as UserType,
           profileImage: user.profileImage,
           isApproved: user.isApproved,
           isActive: user.isActive,
+          emailVerified: user.emailVerified,
+          phoneVerified: (user as any).phoneVerified ?? false,
+          approvalStatus: (user as any).approvalStatus ?? (user.isApproved ? 'APPROVED' : 'PENDING'),
           address: user.address,
           termsVersion: user.termsVersion ?? null,
           termsAcceptedAt: user.termsAcceptedAt?.toISOString() ?? null,
@@ -74,6 +87,10 @@ export const authOptions: NextAuthOptions = {
         token.userType = user.userType
         token.isApproved = user.isApproved
         token.isActive = (user as any).isActive
+        ;(token as any).phone = (user as any).phone ?? null
+        ;(token as any).emailVerified = (user as any).emailVerified ?? false
+        ;(token as any).phoneVerified = (user as any).phoneVerified ?? false
+        ;(token as any).approvalStatus = (user as any).approvalStatus ?? (user.isApproved ? 'APPROVED' : 'PENDING')
         token.profileImage = user.profileImage
         token.address = user.address
         ;(token as any).termsVersion = (user as any).termsVersion
@@ -95,6 +112,10 @@ export const authOptions: NextAuthOptions = {
                 isActive: true,
                 profileImage: true,
                 address: true,
+                approvalStatus: true,
+                emailVerified: true,
+                phoneVerified: true,
+                phone: true,
               },
             })
             ;(token as any).statusLastChecked = Date.now()
@@ -103,6 +124,10 @@ export const authOptions: NextAuthOptions = {
               token.isActive = fresh.isActive
               token.profileImage = fresh.profileImage
               token.address = fresh.address
+              ;(token as any).approvalStatus = fresh.approvalStatus ?? (fresh.isApproved ? 'APPROVED' : 'PENDING')
+              ;(token as any).emailVerified = fresh.emailVerified
+              ;(token as any).phoneVerified = fresh.phoneVerified
+              ;(token as any).phone = fresh.phone
             }
           } catch (statusError) {
             console.error('[auth][jwt] status refresh error', statusError)
@@ -123,8 +148,14 @@ export const authOptions: NextAuthOptions = {
         if (updatedUser.userType) token.userType = updatedUser.userType
         if (typeof updatedUser.isApproved === 'boolean') token.isApproved = updatedUser.isApproved
         if (typeof updatedUser.isActive === 'boolean') token.isActive = updatedUser.isActive
+        if (typeof (updatedUser as any).emailVerified === 'boolean') (token as any).emailVerified = (updatedUser as any).emailVerified
+        if (typeof (updatedUser as any).phoneVerified === 'boolean') (token as any).phoneVerified = (updatedUser as any).phoneVerified
+        if (typeof (updatedUser as any).approvalStatus === 'string' || (updatedUser as any).approvalStatus === null) {
+          ;(token as any).approvalStatus = (updatedUser as any).approvalStatus
+        }
         if (updatedUser.profileImage !== undefined) token.profileImage = updatedUser.profileImage
         if (updatedUser.address !== undefined) token.address = updatedUser.address
+        if ((updatedUser as any).phone !== undefined) (token as any).phone = (updatedUser as any).phone
         ;(token as any).termsVersion = updatedUser.termsVersion ?? (token as any).termsVersion ?? null
         ;(token as any).termsAcceptedAt = updatedUser.termsAcceptedAt ?? (token as any).termsAcceptedAt ?? null
         ;(token as any).deactivatedAt = updatedUser.deactivatedAt ?? (token as any).deactivatedAt ?? null
@@ -137,6 +168,10 @@ export const authOptions: NextAuthOptions = {
         session.user.userType = token.userType as UserType
         session.user.isApproved = token.isApproved as boolean
         ;(session.user as any).isActive = token.isActive as boolean
+        ;(session.user as any).emailVerified = (token as any).emailVerified ?? false
+        ;(session.user as any).phoneVerified = (token as any).phoneVerified ?? false
+        ;(session.user as any).phone = (token as any).phone ?? null
+        ;(session.user as any).approvalStatus = (token as any).approvalStatus ?? (token.isApproved ? 'APPROVED' : 'PENDING')
         session.user.profileImage = token.profileImage as string | null
         session.user.address = token.address as any
         ;(session.user as any).termsVersion = (token as any).termsVersion ?? null

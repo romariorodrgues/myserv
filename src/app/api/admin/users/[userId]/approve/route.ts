@@ -45,11 +45,22 @@ export async function PATCH(
       )
     }
 
+    if (!user.emailVerified) {
+      return NextResponse.json(
+        { error: 'O usuário precisa confirmar o e-mail antes da aprovação.' },
+        { status: 400 }
+      )
+    }
+
     // Aprovar o usuário
     const updatedUser = await prisma.user.update({
       where: { id: userId },
       data: { 
         isApproved: true,
+        approvalStatus: 'APPROVED',
+        rejectionReason: null,
+        rejectedAt: null,
+        reviewRequestedAt: null,
         isActive: true
       }
     })

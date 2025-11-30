@@ -32,6 +32,21 @@ export async function PATCH(
     }
 
     const { userId } = params
+    let rejectionReason: string | undefined
+
+    if (request.headers.get('content-type')?.includes('application/json')) {
+      try {
+        const body = await request.json()
+        if (body && typeof body.reason === 'string') {
+          const trimmed = body.reason.trim()
+          if (trimmed.length > 0) {
+            rejectionReason = trimmed
+          }
+        }
+      } catch (parseError) {
+        console.warn('Rejection reason parse error', parseError)
+      }
+    }
 
     // Verificar se o usuário existe
     const user = await prisma.user.findUnique({
@@ -50,7 +65,11 @@ export async function PATCH(
       where: { id: userId },
       data: { 
         isApproved: false,
-        isActive: false
+        approvalStatus: 'REJECTED',
+        rejectionReason: rejectionReason ?? user.rejectionReason ?? null,
+        rejectedAt: new Date(),
+        reviewRequestedAt: null,
+        isActive: true
       }
     })
 
@@ -59,9 +78,13 @@ export async function PATCH(
       data: {
         userId: userId,
         type: 'SYSTEM',
-        title: 'Conta Rejeitada',
-        message: 'Sua solicitação de cadastro como profissional foi rejeitada. Entre em contato com o suporte para mais informações.',
-        isRead: false
+        title: 'Perfil de profissional recusado',
+        message: 'Encontramos pendências no seu cadastro. Atualize seus dados e solicite uma nova análise para liberar seus serviços.',
+        isRead: false,
+        data: {
+          kind: 'PROVIDER_REJECTED',
+          url: '/dashboard/profissional?tab=settings'
+        }
       }
     })
 

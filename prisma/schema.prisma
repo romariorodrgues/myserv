@@ -18,6 +18,22 @@ model User {
   userType         String
   isActive         Boolean             @default(true)
   isApproved       Boolean             @default(false)
+  approvalStatus   String              @default("PENDING")
+  rejectionReason  String?
+  rejectedAt       DateTime?
+  reviewRequestedAt DateTime?
+  emailVerified    Boolean             @default(false)
+  emailVerifiedAt  DateTime?
+  emailVerificationToken String?       @unique
+  emailVerificationExpiresAt DateTime?
+  emailVerificationSentAt DateTime?
+  phoneVerified      Boolean             @default(false)
+  phoneVerifiedAt    DateTime?
+  phoneVerificationCode String?
+  phoneVerificationExpiresAt DateTime?
+  phoneVerificationSentAt DateTime?
+  passwordResetToken  String?          @unique
+  passwordResetExpiresAt DateTime?
   deactivatedAt    DateTime?
   termsAcceptedAt  DateTime?
   termsVersion     String?

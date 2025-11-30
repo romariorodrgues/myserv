@@ -226,6 +226,19 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
       return
     }
 
+    const redirectUrl =
+      typeof dataAny?.data?.url === 'string'
+        ? dataAny.data.url
+        : typeof dataAny?.data?.redirectTo === 'string'
+          ? dataAny.data.redirectTo
+          : undefined
+
+    if (redirectUrl) {
+      router.push(redirectUrl)
+      setIsOpen(false)
+      return
+    }
+
     const isProvider = session?.user?.userType === 'SERVICE_PROVIDER'
     const bookingId = dataAny?.data?.bookingId as string | undefined
     const date = dataAny?.data?.date as string | undefined

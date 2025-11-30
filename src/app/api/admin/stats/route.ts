@@ -73,7 +73,7 @@ export async function GET() {
       prisma.user.count({ 
         where: {
           userType: 'SERVICE_PROVIDER',
-          isApproved: false
+          approvalStatus: 'PENDING'
         } 
       }),
 

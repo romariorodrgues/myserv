@@ -10,7 +10,8 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import { useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
+import { fullSignOut } from '@/lib/full-sign-out'
 import { Menu, X, Search, User, LogOut, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,7 +26,7 @@ export function Header() {
   const profileImage = rawProfileImage ? cdnImageUrl(rawProfileImage) : null
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/' })
+    fullSignOut()
   }
 
   const getDashboardUrl = () => {

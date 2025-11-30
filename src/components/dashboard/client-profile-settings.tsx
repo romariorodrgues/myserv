@@ -20,7 +20,8 @@ import { ProfileImageUploadCompact } from '@/components/upload/profile-image-upl
 import { toast } from 'sonner'
 import { updateMyProfile } from '@/lib/api/update-my-profile'
 import type { ClientProfileData } from '@/types'
-import { signOut, useSession } from 'next-auth/react'
+import { useSession } from 'next-auth/react'
+import { fullSignOut } from '@/lib/full-sign-out'
 
 
 // No props expected for this component
@@ -189,7 +190,7 @@ const [passwordData, setPasswordData] = useState({
       toast.success('Conta desativada. Sentiremos sua falta!')
       setShowDeactivateModal(false)
       setDeactivateReason('')
-      await signOut({ callbackUrl: '/' })
+      await fullSignOut()
     } catch (error) {
       console.error('Error deactivating account:', error)
       toast.error(error instanceof Error ? error.message : 'Erro ao desativar conta')
