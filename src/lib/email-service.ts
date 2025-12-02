@@ -5,6 +5,7 @@
  * Handles email notifications and communications
  */
 
+import axios from 'axios'
 import nodemailer from 'nodemailer'
 import { NotificationData } from './whatsapp-service'
 import { buildEmailVerificationLink } from './email-verification'
@@ -18,6 +19,9 @@ export interface EmailData {
 }
 
 export class EmailService {
+  // Resend API key (prefer HTTP API para evitar bloqueios de porta)
+  private static resendApiKey = process.env.RESEND_API_KEY || process.env.SMTP_PASSWORD
+
   private static transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: parseInt(process.env.SMTP_PORT || '587'),
@@ -26,12 +30,60 @@ export class EmailService {
       user: process.env.SMTP_USER,
       pass: process.env.SMTP_PASSWORD,
     },
+    // Evita travar requisições quando o provedor bloqueia a porta SMTP
+    connectionTimeout: 5000,
+    greetingTimeout: 5000,
+    socketTimeout: 5000,
   })
+
+  /**
+   * Send email via Resend HTTP API (preferencial, contorna bloqueio SMTP)
+   */
+  private static async sendViaResendApi(data: EmailData): Promise<boolean> {
+    if (!this.resendApiKey) {
+      return false
+    }
+
+    try {
+      const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER
+      if (!fromEmail) {
+        console.warn('Resend API configured but SMTP_FROM/SMTP_USER missing')
+        return false
+      }
+
+      const response = await axios.post(
+        'https://api.resend.com/emails',
+        {
+          from: fromEmail,
+          to: data.to,
+          subject: data.subject,
+          html: data.html,
+          text: data.text,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${this.resendApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: 5000,
+        }
+      )
+
+      return response.status >= 200 && response.status < 300
+    } catch (error) {
+      console.error('Resend API send error:', error)
+      return false
+    }
+  }
 
   /**
    * Send email
    */
   private static async sendEmail(data: EmailData): Promise<boolean> {
+    // Tenta via API (Resend) primeiro para evitar bloqueios de SMTP
+    const apiSent = await this.sendViaResendApi(data)
+    if (apiSent) return true
+
     try {
       if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
         console.warn('Email not configured')
