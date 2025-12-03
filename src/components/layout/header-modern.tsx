@@ -16,7 +16,7 @@ import {
   Menu, User, LogOut, 
   Settings, Bell, Heart, ChevronDown,
   Home, Search as SearchIcon, HelpCircle,
-  Briefcase, UserPlus, LayoutDashboard
+  Briefcase, UserPlus, LayoutDashboard, MessageCircle
 } from 'lucide-react'
 import { NotificationDropdown } from '@/components/notifications/real-time-notifications'
 import { usePathname } from 'next/navigation'
@@ -104,6 +104,7 @@ export function Header() {
   const isAuthenticated = status === 'authenticated'
   const [mobileOpen, setMobileOpen] = useState(false)
   const pathname = usePathname()
+  const [adminChatCount, setAdminChatCount] = useState(0)
   const rawProfileImage = (session?.user as any)?.profileImage || (session?.user as any)?.image || null
   const profileImage = rawProfileImage ? cdnImageUrl(rawProfileImage) : null
   
@@ -122,6 +123,34 @@ export function Header() {
     await fullSignOut()
   }
 
+  // Poll para contagem de chats de suporte (admin)
+  useEffect(() => {
+    const userType = (session?.user as any)?.userType as UserType
+    if (userType !== 'ADMIN') return
+
+    let cancelled = false
+    const fetchCount = async () => {
+      try {
+        const res = await fetch('/api/chat/admin/count')
+        const data = await res.json().catch(() => ({}))
+        if (!cancelled && data?.success) {
+          setAdminChatCount(data.counts?.unread ?? data.counts?.open ?? 0)
+        }
+      } catch (err) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('Falha ao carregar contagem de chats', err)
+        }
+      }
+    }
+
+    fetchCount()
+    const interval = setInterval(fetchCount, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [session?.user])
+
   // Determine dashboard URL based on user type
   const userType = (session?.user as any)?.userType as UserType
 const dashboardUrl = getDashboardUrl(userType)
@@ -132,7 +161,10 @@ const settingsUrl = getSettingsUrl(userType)
     { href: '/pesquisa', label: 'Pesquisar' },
     { href: '/como-funciona', label: 'Como Funciona' },
     { href: '/seja-profissional', label: 'Seja um Profissional' },
-    ...(isAuthenticated ? [{ href: dashboardUrl, label: 'Dashboard' }] : [])
+    ...(isAuthenticated ? [{ href: dashboardUrl, label: 'Dashboard' }] : []),
+    ...(isAuthenticated && userType === 'ADMIN'
+      ? [{ href: '/admin/chat', label: 'Chat de Suporte' as const, icon: MessageCircle }]
+      : []),
   ]
 
   // Get user initials for avatar fallback
