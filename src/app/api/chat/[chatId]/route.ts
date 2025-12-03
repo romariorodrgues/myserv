@@ -7,7 +7,7 @@ import { socketService } from '@/lib/socket'
 
 // Schema para atualizar chat
 const updateChatSchema = z.object({
-  status: z.enum(['OPEN', 'IN_PROGRESS', 'CLOSED']).optional(),
+  status: z.enum(['OPEN', 'IN_PROGRESS', 'WAITING_USER', 'CLOSED']).optional(),
   priority: z.enum(['LOW', 'MEDIUM', 'HIGH', 'URGENT']).optional()
 })
 

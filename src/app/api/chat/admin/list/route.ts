@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     // Construir filtros
     const whereClause: any = {}
     
-    if (status && status !== 'all' && ['OPEN', 'IN_PROGRESS', 'CLOSED'].includes(status)) {
+    if (status && status !== 'all' && ['OPEN', 'IN_PROGRESS', 'WAITING_USER', 'CLOSED'].includes(status)) {
       whereClause.status = status
     }
 
@@ -61,6 +61,21 @@ export async function GET(request: NextRequest) {
         }
       ]
     }
+
+    // Auto close: chats em WAITING_USER sem atividade há 3 dias
+    const waitingTtlMs = 3 * 24 * 60 * 60 * 1000
+    const waitingDeadline = new Date(Date.now() - waitingTtlMs)
+    await prisma.supportChat.updateMany({
+      where: {
+        status: 'WAITING_USER',
+        updatedAt: { lte: waitingDeadline },
+      },
+      data: {
+        status: 'CLOSED',
+        closedAt: new Date(),
+        closedBy: 'system:auto-close',
+      },
+    })
 
     // Buscar chats com paginação
     const chats = await prisma.supportChat.findMany({
@@ -146,6 +161,7 @@ export async function GET(request: NextRequest) {
       total: totalChats,
       open: stats.find(s => s.status === 'OPEN')?._count.id || 0,
       inProgress: stats.find(s => s.status === 'IN_PROGRESS')?._count.id || 0,
+      waitingUser: stats.find(s => s.status === 'WAITING_USER')?._count.id || 0,
       closed: stats.find(s => s.status === 'CLOSED')?._count.id || 0
     }
 

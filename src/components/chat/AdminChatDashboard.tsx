@@ -37,6 +37,8 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [admins, setAdmins] = useState<Array<{ id: string; name: string; email: string }>>([])
+  const [selectedAdminId, setSelectedAdminId] = useState<string>('')
   const searchParams = useSearchParams()
   const targetChatId = searchParams?.get('chatId') ?? null
 
@@ -122,6 +124,23 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     }
   }, [selectedChat, messages.length])
 
+  // Carregar lista de admins (para transferências futuras)
+  useEffect(() => {
+    const loadAdmins = async () => {
+      try {
+        const res = await fetch('/api/admin/users')
+        const data = await res.json().catch(() => ({}))
+        if (res.ok && data?.data) {
+          const onlyAdmins = data.data.filter((u: any) => u.userType === 'ADMIN' && u.isActive !== false)
+          setAdmins(onlyAdmins.map((u: any) => ({ id: u.id, name: u.name || 'Admin', email: u.email })))
+        }
+      } catch (err) {
+        console.error('Erro ao carregar admins', err)
+      }
+    }
+    loadAdmins()
+  }, [])
+
   // Polling para lista de chats (admin)
   useEffect(() => {
     const pollChats = async () => {
@@ -173,7 +192,15 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
       const response = await fetch(`/api/chat/admin/list?${params}`)
       if (response.ok) {
         const data = await response.json()
-        setChats(data.chats || [])
+        const mapped = (data.chats || []).map((chat: any) => {
+          const activeAssign = chat.assignments?.[0]
+          return {
+            ...chat,
+            assignedToId: activeAssign?.adminId || null,
+            assignedTo: activeAssign?.admin || null,
+          }
+        })
+        setChats(mapped)
       }
     } catch (error) {
       console.error('Erro ao carregar chats:', error)
@@ -221,8 +248,29 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     }
   }
 
-  // Assign chat to admin
-  const assignChat = async (chatId: string) => {
+  const refreshSelectedChat = async (chatId: string) => {
+    try {
+      const res = await fetch(`/api/chat/${chatId}`)
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data?.chat) {
+        const activeAssign = data.chat.assignments?.[0]
+        const mapped = {
+          ...data.chat,
+          assignedToId: activeAssign?.adminId || null,
+          assignedTo: activeAssign?.admin || null,
+        }
+        setSelectedChat(mapped)
+        setChats((prev) =>
+          prev.map((c) => (c.id === chatId ? mapped : c))
+        )
+      }
+    } catch (err) {
+      console.error('Erro ao atualizar chat selecionado', err)
+    }
+  }
+
+  // Assign/transfer chat
+  const assignChat = async (chatId: string, adminId?: string | null) => {
     try {
       const response = await fetch(`/api/chat/${chatId}/assign`, {
         method: 'POST',
@@ -230,19 +278,30 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          adminId: session?.user?.id
+          adminId: adminId || session?.user?.id
         })
       })
 
       if (response.ok) {
-        loadChats()
-        if (selectedChat?.id === chatId) {
-          const data = await response.json()
-          setSelectedChat(data.chat)
-        }
+        await loadChats()
+        await refreshSelectedChat(chatId)
       }
     } catch (error) {
       console.error('Erro ao atribuir chat:', error)
+    }
+  }
+
+  const unassignChat = async (chatId: string) => {
+    try {
+      const response = await fetch(`/api/chat/${chatId}/assign`, {
+        method: 'DELETE',
+      })
+      if (response.ok) {
+        await loadChats()
+        await refreshSelectedChat(chatId)
+      }
+    } catch (error) {
+      console.error('Erro ao remover atribuição:', error)
     }
   }
 
@@ -340,6 +399,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     switch (status) {
       case 'OPEN': return 'bg-blue-500'
       case 'IN_PROGRESS': return 'bg-yellow-500'
+      case 'WAITING_USER': return 'bg-purple-500'
       case 'CLOSED': return 'bg-gray-500'
       default: return 'bg-gray-500'
     }
@@ -349,6 +409,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     switch (status) {
       case 'OPEN': return 'Aberto'
       case 'IN_PROGRESS': return 'Em Atendimento'
+      case 'WAITING_USER': return 'Aguardando usuário'
       case 'CLOSED': return 'Fechado'
       default: return status
     }
@@ -426,6 +487,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
               <option value="all">Todos os Status</option>
               <option value="OPEN">Aberto</option>
               <option value="IN_PROGRESS">Em Atendimento</option>
+              <option value="WAITING_USER">Aguardando usuário</option>
               <option value="CLOSED">Fechado</option>
             </select>
           </div>
@@ -489,11 +551,11 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                   <p className="text-sm text-gray-500">
                     Cliente: {selectedChat.user?.name} • {selectedChat.user?.email}
                   </p>
-                  {selectedChat.assignedTo && (
-                    <p className="text-sm text-gray-500">
-                      Atribuído a: {selectedChat.assignedTo.name}
-                    </p>
-                  )}
+                  <p className="text-sm text-gray-500">
+                    {selectedChat.assignedTo
+                      ? `Atribuído a: ${selectedChat.assignedTo.name}`
+                      : 'Não atribuído'}
+                  </p>
                 </div>
                 <div className="flex gap-2">
                   <Badge className={getStatusColor(selectedChat.status)}>
@@ -506,16 +568,50 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
               </div>
 
               {/* Ações do admin */}
-              <div className="flex gap-2 mt-3">
-                {!selectedChat.assignedToId && (
+              <div className="flex flex-wrap items-center gap-2 mt-3">
+                <Button
+                  size="sm"
+                  onClick={() => assignChat(selectedChat.id, session?.user?.id)}
+                  disabled={selectedChat.assignedToId === session?.user?.id}
+                >
+                  <User className="h-4 w-4 mr-1" />
+                  Atribuir a mim
+                </Button>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    className="p-2 border rounded-md text-sm"
+                    value={selectedAdminId}
+                    onChange={(e) => setSelectedAdminId(e.target.value)}
+                  >
+                    <option value="">Transferir para...</option>
+                    {admins.map((adm) => (
+                      <option key={adm.id} value={adm.id}>
+                        {adm.name}
+                      </option>
+                    ))}
+                  </select>
                   <Button
                     size="sm"
-                    onClick={() => assignChat(selectedChat.id)}
+                    variant="outline"
+                    disabled={!selectedAdminId}
+                    onClick={() => {
+                      if (selectedAdminId) assignChat(selectedChat.id, selectedAdminId)
+                    }}
                   >
                     <User className="h-4 w-4 mr-1" />
-                    Atribuir a Mim
+                    Transferir
                   </Button>
-                )}
+                  {selectedChat.assignedToId && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => unassignChat(selectedChat.id)}
+                    >
+                      Remover atribuição
+                    </Button>
+                  )}
+                </div>
                 
                 {selectedChat.status === 'OPEN' && (
                   <Button
@@ -528,7 +624,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                   </Button>
                 )}
                 
-                {(selectedChat.status === 'OPEN' || selectedChat.status === 'IN_PROGRESS') && (
+                {(selectedChat.status === 'OPEN' || selectedChat.status === 'IN_PROGRESS' || selectedChat.status === 'WAITING_USER') && (
                   <Button
                     size="sm"
                     variant="outline"

@@ -166,14 +166,6 @@ export async function POST(
       return NextResponse.json({ error: 'Chat not found' }, { status: 404 })
     }
 
-    // Verificar se o chat não está fechado
-    if (chat.status === 'CLOSED') {
-      return NextResponse.json(
-        { error: 'Cannot send message to closed chat' },
-        { status: 400 }
-      )
-    }
-
     // Verificar se é admin
     const user = await prisma.user.findUnique({
       where: { id: session.user.id }
@@ -197,13 +189,21 @@ export async function POST(
       }
     })
 
-    // Atualizar status do chat se necessário
-    let chatUpdateData: any = {
-      updatedAt: new Date()
+    // Atualizar status do chat conforme remetente
+    const chatUpdateData: any = {
+      updatedAt: new Date(),
     }
 
-    if (isFromAdmin && chat.status === 'OPEN') {
-      chatUpdateData.status = 'IN_PROGRESS'
+    if (isFromAdmin) {
+      chatUpdateData.status = 'WAITING_USER'
+    } else {
+      if (chat.status === 'CLOSED' || chat.status === 'WAITING_USER') {
+        chatUpdateData.status = 'IN_PROGRESS'
+        chatUpdateData.closedAt = null
+        chatUpdateData.closedBy = null
+      } else if (chat.status === 'OPEN') {
+        chatUpdateData.status = 'IN_PROGRESS'
+      }
     }
 
     await prisma.supportChat.update({

@@ -11,7 +11,7 @@ export async function GET(_req: NextRequest) {
 
   const [openCount, pendingUnread] = await Promise.all([
     prisma.supportChat.count({
-      where: { status: { in: ['OPEN', 'IN_PROGRESS'] } },
+      where: { status: { in: ['OPEN', 'IN_PROGRESS', 'WAITING_USER'] } },
     }),
     prisma.supportMessage.count({
       where: {
