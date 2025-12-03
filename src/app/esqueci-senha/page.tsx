@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import Link from 'next/link'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type RequestState = 'idle' | 'loading' | 'success' | 'error'
 
@@ -68,13 +67,35 @@ export default function ForgotPasswordPage() {
           </p>
         </div>
 
-        <Tabs value={mode} onValueChange={(v) => setMode(v as 'email' | 'phone')} className="w-full">
-          <TabsList className="grid grid-cols-2">
-            <TabsTrigger value="email">E-mail</TabsTrigger>
-            <TabsTrigger value="phone">Telefone</TabsTrigger>
-          </TabsList>
+        <div className="flex gap-2">
+          <Button
+            type="button"
+            variant={mode === 'email' ? 'default' : 'outline'}
+            className="w-full"
+            onClick={() => {
+              setMode('email')
+              setMessage('')
+              setState('idle')
+            }}
+          >
+            E-mail
+          </Button>
+          <Button
+            type="button"
+            variant={mode === 'phone' ? 'default' : 'outline'}
+            className="w-full"
+            onClick={() => {
+              setMode('phone')
+              setMessage('')
+              setState('idle')
+            }}
+          >
+            Telefone
+          </Button>
+        </div>
 
-          <TabsContent value="email" className="mt-4">
+        {mode === 'email' && (
+          <div className="mt-4">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700" htmlFor="email">
@@ -108,9 +129,11 @@ export default function ForgotPasswordPage() {
                 {state === 'loading' ? 'Enviando...' : 'Enviar link de recuperação'}
               </Button>
             </form>
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="phone" className="mt-4">
+        {mode === 'phone' && (
+          <div className="mt-4">
             <form className="space-y-4" onSubmit={handleSubmit}>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-gray-700" htmlFor="phone">
@@ -144,8 +167,8 @@ export default function ForgotPasswordPage() {
                 {state === 'loading' ? 'Enviando...' : 'Enviar link por WhatsApp'}
               </Button>
             </form>
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
 
         <div className="text-center text-sm text-gray-600 space-y-1">
           <p>
