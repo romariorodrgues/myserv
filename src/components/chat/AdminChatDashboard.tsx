@@ -421,10 +421,10 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
 
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'LOW': return 'Baixa'
-      case 'MEDIUM': return 'Média'
-      case 'HIGH': return 'Alta'
-      case 'URGENT': return 'Urgente'
+      case 'LOW': return 'Prioridade: baixa'
+      case 'MEDIUM': return 'Prioridade: média'
+      case 'HIGH': return 'Prioridade: alta'
+      case 'URGENT': return 'Prioridade: urgente'
       default: return priority
     }
   }
@@ -470,7 +470,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
           <h2 className="text-lg font-semibold mb-3 sm:mb-4">Dashboard de Suporte</h2>
           
           {/* Abas de agrupamento */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-3">
             {[
               { key: 'all', label: 'Todos', icon: MessageCircle },
               { key: 'awaiting', label: 'Aguardando', icon: Clock },
@@ -481,7 +481,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                 key={tab.key}
                 variant={tabFilter === tab.key ? 'default' : 'outline'}
                 size="sm"
-                className="flex items-center justify-center gap-2 text-xs sm:text-sm whitespace-nowrap"
+                className="flex items-center justify-center gap-1 px-2 py-2 text-[11px] md:text-xs leading-tight whitespace-normal text-center min-h-[36px]"
                 onClick={() => setTabFilter(tab.key as typeof tabFilter)}
               >
                 <tab.icon className="h-4 w-4" />

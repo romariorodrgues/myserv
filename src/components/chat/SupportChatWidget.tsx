@@ -165,6 +165,7 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     switch (status) {
       case 'OPEN': return 'bg-blue-500'
       case 'IN_PROGRESS': return 'bg-yellow-500'
+      case 'WAITING_USER': return 'bg-purple-500'
       case 'CLOSED': return 'bg-gray-500'
       default: return 'bg-gray-500'
     }
@@ -174,6 +175,7 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
     switch (status) {
       case 'OPEN': return 'Aberto'
       case 'IN_PROGRESS': return 'Em Atendimento'
+      case 'WAITING_USER': return 'Aguardando resposta'
       case 'CLOSED': return 'Fechado'
       default: return status
     }
