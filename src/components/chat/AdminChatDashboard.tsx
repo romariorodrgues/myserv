@@ -39,6 +39,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [admins, setAdmins] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [selectedAdminId, setSelectedAdminId] = useState<string>('')
+  const [tabFilter, setTabFilter] = useState<'all' | 'awaiting' | 'inprogress' | 'mine'>('all')
   const searchParams = useSearchParams()
   const targetChatId = searchParams?.get('chatId') ?? null
 
@@ -449,6 +450,14 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const filteredChats = chats.filter(chat => {
     if (statusFilter !== 'all' && chat.status !== statusFilter) return false
     if (searchTerm && !chat.title.toLowerCase().includes(searchTerm.toLowerCase())) return false
+
+    if (tabFilter === 'awaiting') {
+      if (!(chat.status === 'OPEN' && !chat.assignedToId)) return false
+    } else if (tabFilter === 'inprogress') {
+      if (!(['IN_PROGRESS', 'WAITING_USER'].includes(chat.status))) return false
+    } else if (tabFilter === 'mine') {
+      if (!(chat.assignedToId && chat.assignedToId === session?.user?.id && chat.status !== 'CLOSED')) return false
+    }
     return true
   })
 
@@ -467,6 +476,22 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
         <div className="p-4 border-b">
           <h2 className="text-lg font-semibold mb-4">Dashboard de Suporte</h2>
           
+          {/* Abas de agrupamento */}
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            <Button variant={tabFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('all')}>
+              Todos
+            </Button>
+            <Button variant={tabFilter === 'awaiting' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('awaiting')}>
+              Aguardando
+            </Button>
+            <Button variant={tabFilter === 'inprogress' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('inprogress')}>
+              Em atendimento
+            </Button>
+            <Button variant={tabFilter === 'mine' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('mine')}>
+              Meus
+            </Button>
+          </div>
+
           {/* Filtros */}
           <div className="space-y-2">
             <div className="relative">
@@ -612,6 +637,12 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                     </Button>
                   )}
                 </div>
+
+                {selectedChat.status === 'WAITING_USER' && (
+                  <Badge className="bg-purple-100 text-purple-800 border border-purple-200">
+                    Aguardando resposta do usuário
+                  </Badge>
+                )}
                 
                 {selectedChat.status === 'OPEN' && (
                   <Button
