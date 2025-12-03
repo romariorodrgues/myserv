@@ -15,6 +15,7 @@ import { AuthProvider } from "@/components/providers/auth-provider";
 import { Toaster } from "sonner";
 import { ClientLayoutWrapper } from "@/components/layout/client-layout-wrapper";
 import ReactQueryProvider from "@/lib/react-query";
+import { ChatToastListener } from "@/components/chat/ChatToastListener";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -106,6 +107,7 @@ export default function RootLayout({
             <MobileNavigation />
             
             {/* Support chat desativado nesta release */}
+            <ChatToastListener />
             
             <Toaster 
               position="top-right"
