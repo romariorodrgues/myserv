@@ -42,12 +42,10 @@ export class WhatsAppService {
         return false
       }
 
-      // Suporte a novo formato v5.chatpro.com.br/{instance_id}/api/v1/send_message
-      const useV5 = this.baseUrl.includes('v5.chatpro.com.br')
-      const endpoint = useV5 ? `${this.baseUrl}/api/v1/send_message` : `${this.baseUrl}/send-message`
-      const payload = useV5
-        ? { number: data.to, message: data.message }
-        : { phone: data.to, message: data.message, type: data.type || 'text' }
+      // ChatPro comum (ex.: https://sua-instancia.chatpro.com.br/api/sendMessage)
+      // e fallback legacy (/send-message)
+      const endpoint = `${this.baseUrl}/api/sendMessage`
+      const payload = { to: data.to, message: data.message }
 
       const response = await axios.post(endpoint, payload, {
         headers: {
