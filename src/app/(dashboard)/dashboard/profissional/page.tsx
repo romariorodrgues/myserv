@@ -285,7 +285,8 @@ function ProviderDashboardContent() {
     (session?.user?.isApproved ? 'APPROVED' : 'PENDING')
   const isRejected = approvalStatus === 'REJECTED'
   const emailVerified = session ? ((session.user as any)?.emailVerified !== false) : true
-  const contactVerified = emailVerified
+  const phoneVerified = session ? ((session.user as any)?.phoneVerified !== false) : true
+  const contactVerified = emailVerified || phoneVerified
   const pendingContactVerification =
     session?.user?.userType === 'SERVICE_PROVIDER' && !contactVerified
   const underReview =
