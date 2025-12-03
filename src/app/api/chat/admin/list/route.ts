@@ -58,6 +58,24 @@ export async function GET(request: NextRequest) {
               mode: 'insensitive'
             }
           }
+        },
+        {
+          user: {
+            email: {
+              contains: search,
+              mode: 'insensitive'
+            }
+          }
+        },
+        {
+          messages: {
+            some: {
+              content: {
+                contains: search,
+                mode: 'insensitive'
+              }
+            }
+          }
         }
       ]
     }
