@@ -322,7 +322,7 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
           
           {/* Badge de notificação */}
           {unreadChatsCount > 0 && (
-            <Badge className="absolute -top-1 -right-1 h-5 w-5 p-0 flex items-center justify-center bg-brand-teal text-white text-[10px] border-2 border-white animate-bounce">
+            <Badge className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 h-5 w-5 p-0 flex items-center justify-center bg-brand-teal text-white text-[10px] border-2 border-white rounded-full animate-bounce">
               {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
             </Badge>
           )}
