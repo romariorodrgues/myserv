@@ -16,7 +16,6 @@ import {
   CheckCircle,
   XCircle,
   Search,
-  Filter,
   Send
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
@@ -36,10 +35,10 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const [newMessage, setNewMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
   const [admins, setAdmins] = useState<Array<{ id: string; name: string; email: string }>>([])
   const [selectedAdminId, setSelectedAdminId] = useState<string>('')
   const [tabFilter, setTabFilter] = useState<'all' | 'awaiting' | 'inprogress' | 'mine'>('all')
+  const [showClosed, setShowClosed] = useState(false)
   const searchParams = useSearchParams()
   const targetChatId = searchParams?.get('chatId') ?? null
 
@@ -147,9 +146,6 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     const pollChats = async () => {
       try {
         const params = new URLSearchParams()
-        if (statusFilter !== 'all') {
-          params.append('status', statusFilter)
-        }
         if (searchTerm) {
           params.append('search', searchTerm)
         }
@@ -176,16 +172,13 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     return () => {
       clearInterval(pollInterval)
     }
-  }, [statusFilter, searchTerm, chats.length])
+  }, [searchTerm, chats.length])
 
   // Load admin chats
   const loadChats = async () => {
     try {
       setLoading(true)
       const params = new URLSearchParams()
-      if (statusFilter !== 'all') {
-        params.append('status', statusFilter)
-      }
       if (searchTerm) {
         params.append('search', searchTerm)
       }
@@ -362,7 +355,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
     if (session?.user) {
       loadChats()
     }
-  }, [session, statusFilter, searchTerm])
+  }, [session, searchTerm])
 
   useEffect(() => {
     if (selectedChat) {
@@ -448,7 +441,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   }
 
   const filteredChats = chats.filter(chat => {
-    if (statusFilter !== 'all' && chat.status !== statusFilter) return false
+    if (!showClosed && chat.status === 'CLOSED') return false
     if (searchTerm && !chat.title.toLowerCase().includes(searchTerm.toLowerCase())) return false
 
     if (tabFilter === 'awaiting') {
@@ -470,26 +463,32 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   }
 
   return (
-    <div className={`h-screen flex ${className}`}>
+    <div className={`min-h-screen flex flex-col lg:flex-row ${className}`}>
       {/* Sidebar com lista de chats */}
-      <div className="w-1/3 border-r bg-gray-50">
-        <div className="p-4 border-b">
-          <h2 className="text-lg font-semibold mb-4">Dashboard de Suporte</h2>
+      <div className="w-full lg:w-1/3 border-r bg-gray-50">
+        <div className="p-3 sm:p-4 border-b">
+          <h2 className="text-lg font-semibold mb-3 sm:mb-4">Dashboard de Suporte</h2>
           
           {/* Abas de agrupamento */}
-          <div className="grid grid-cols-4 gap-2 mb-3">
-            <Button variant={tabFilter === 'all' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('all')}>
-              Todos
-            </Button>
-            <Button variant={tabFilter === 'awaiting' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('awaiting')}>
-              Aguardando
-            </Button>
-            <Button variant={tabFilter === 'inprogress' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('inprogress')}>
-              Em atendimento
-            </Button>
-            <Button variant={tabFilter === 'mine' ? 'default' : 'outline'} size="sm" onClick={() => setTabFilter('mine')}>
-              Meus
-            </Button>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
+            {[
+              { key: 'all', label: 'Todos', icon: MessageCircle },
+              { key: 'awaiting', label: 'Aguardando', icon: Clock },
+              { key: 'inprogress', label: 'Em atendimento', icon: Send },
+              { key: 'mine', label: 'Meus', icon: User },
+            ].map((tab) => (
+              <Button
+                key={tab.key}
+                variant={tabFilter === tab.key ? 'default' : 'outline'}
+                size="sm"
+                className="flex items-center justify-center gap-2 text-xs sm:text-sm whitespace-nowrap"
+                onClick={() => setTabFilter(tab.key as typeof tabFilter)}
+              >
+                <tab.icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+              </Button>
+            ))}
           </div>
 
           {/* Filtros */}
@@ -503,23 +502,24 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                 className="pl-10"
               />
             </div>
-            
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full p-2 border rounded-md"
-            >
-              <option value="all">Todos os Status</option>
-              <option value="OPEN">Aberto</option>
-              <option value="IN_PROGRESS">Em Atendimento</option>
-              <option value="WAITING_USER">Aguardando usuário</option>
-              <option value="CLOSED">Fechado</option>
-            </select>
+
+            <div className="flex items-center justify-between text-xs text-gray-600 bg-white border rounded-md px-3 py-2">
+              <span className="mr-2">Incluir fechados</span>
+              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
+                <span className="text-[11px] text-gray-500">{showClosed ? 'Sim' : 'Não'}</span>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={showClosed}
+                  onChange={(e) => setShowClosed(e.target.checked)}
+                />
+              </label>
+            </div>
           </div>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          <div className="p-4 space-y-2">
+        <ScrollArea className="h-[50vh] lg:h-[calc(100vh-200px)]">
+          <div className="p-3 sm:p-4 space-y-2">
             {loading ? (
               <div className="text-center text-gray-500">Carregando...</div>
             ) : filteredChats.length === 0 ? (
@@ -533,25 +533,25 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                   }`}
                   onClick={() => setSelectedChat(chat)}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <h4 className="font-medium text-sm">{chat.title}</h4>
-                      <p className="text-xs text-gray-500 mt-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm leading-tight line-clamp-2">{chat.title}</h4>
+                      <p className="text-xs text-gray-500 mt-1 line-clamp-1">
                         por {chat.user?.name}
                       </p>
-                      <p className="text-xs text-gray-400 mt-1">
+                      <p className="text-[11px] text-gray-400 mt-1">
                         {formatTime(chat.updatedAt)}
                       </p>
                     </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <Badge className={getStatusColor(chat.status)}>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <Badge className={`${getStatusColor(chat.status)} text-[11px]`}>
                         {getStatusLabel(chat.status)}
                       </Badge>
-                      <Badge className={getPriorityColor(chat.priority)}>
+                      <Badge className={`${getPriorityColor(chat.priority)} text-[11px]`}>
                         {getPriorityLabel(chat.priority)}
                       </Badge>
                       {chat._count?.messages > 0 && (
-                        <span className="text-xs text-gray-500">
+                        <span className="text-[11px] text-gray-500">
                           {chat._count.messages} msgs
                         </span>
                       )}
@@ -565,7 +565,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
       </div>
 
       {/* Área principal do chat */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col min-h-[50vh]">
         {selectedChat ? (
           <>
             {/* Header do chat */}

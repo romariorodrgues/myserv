@@ -162,9 +162,6 @@ const settingsUrl = getSettingsUrl(userType)
     { href: '/como-funciona', label: 'Como Funciona' },
     { href: '/seja-profissional', label: 'Seja um Profissional' },
     ...(isAuthenticated ? [{ href: dashboardUrl, label: 'Dashboard' }] : []),
-    ...(isAuthenticated && userType === 'ADMIN'
-      ? [{ href: '/admin/chat', label: 'Chat de Suporte' as const, icon: MessageCircle }]
-      : []),
   ]
 
   // Get user initials for avatar fallback
@@ -178,6 +175,7 @@ const settingsUrl = getSettingsUrl(userType)
   }
 
   return (
+    <>
     <header className={`sticky top-0 z-50 w-full transition-all duration-300 shadow-lg bg-gradient-to-br from-brand-bg via-white to-brand-teal/10 ${
       isScrolled ? 'backdrop-blur-md' : ''
     }`}> 
@@ -362,5 +360,21 @@ const settingsUrl = getSettingsUrl(userType)
         </div>
       </div>
     </header>
+
+    {isAuthenticated && userType === 'ADMIN' && (
+      <Link
+        href="/admin/chat"
+        className="fixed bottom-20 right-4 md:bottom-6 z-[60] flex items-center gap-2 rounded-full bg-gradient-to-r from-brand-teal to-primary text-white shadow-xl px-4 py-3 hover:translate-y-[-2px] transition-transform duration-200"
+      >
+        <MessageCircle className="h-5 w-5" />
+        <span className="hidden sm:inline text-sm font-semibold">Chat de Suporte</span>
+        {adminChatCount > 0 && (
+          <span className="ml-1 h-6 min-w-[24px] px-2 rounded-full bg-white/20 text-white text-xs font-bold flex items-center justify-center">
+            {adminChatCount > 99 ? '99+' : adminChatCount}
+          </span>
+        )}
+      </Link>
+    )}
+    </>
   )
 }
