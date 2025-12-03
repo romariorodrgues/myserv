@@ -78,19 +78,15 @@ export async function GET(
 
     const hasMore = offset + messages.length < totalMessages
 
-    // Se o usuário for o cliente (não admin), marcar mensagens do admin como lidas
-    if (!isAdmin) {
-      await prisma.supportMessage.updateMany({
-        where: {
-          chatId,
-          isFromAdmin: true,
-          readAt: null,
-        },
-        data: {
-          readAt: new Date(),
-        },
-      })
-    }
+    // Marcar mensagens como lidas conforme o perfil
+    await prisma.supportMessage.updateMany({
+      where: {
+        chatId,
+        readAt: null,
+        ...(isAdmin ? { isFromAdmin: false } : { isFromAdmin: true }),
+      },
+      data: { readAt: new Date() },
+    })
 
     return NextResponse.json({
       messages,
