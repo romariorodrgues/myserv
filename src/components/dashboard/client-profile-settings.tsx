@@ -34,6 +34,10 @@ export function ClientProfileSettings() {
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [profileData, setProfileData] = useState<ClientProfileData | null>(null)
+  const [verificationPhone, setVerificationPhone] = useState('')
+  const [phoneCode, setPhoneCode] = useState('')
+  const [sendingPhoneCode, setSendingPhoneCode] = useState(false)
+  const [verifyingPhoneCode, setVerifyingPhoneCode] = useState(false)
 
 
 
@@ -84,6 +88,13 @@ const [passwordData, setPasswordData] = useState({
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
   const [deactivateReason, setDeactivateReason] = useState('')
   const [deactivating, setDeactivating] = useState(false)
+  const phoneVerified = session ? ((session.user as any)?.phoneVerified !== false) : false
+
+  useEffect(() => {
+    if (session?.user?.phone) {
+      setVerificationPhone(session.user.phone)
+    }
+  }, [session?.user?.phone])
 
   const updateAddress = useCallback((changes: Partial<NonNullable<ClientProfileData['address']>>) => {
     setProfileData((prev) => {
@@ -122,6 +133,68 @@ const [passwordData, setPasswordData] = useState({
       toast.error('Erro ao salvar perfil. Tente novamente.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSendPhoneVerification = async () => {
+    if (!verificationPhone.trim()) {
+      toast.error('Informe um telefone com DDD.')
+      return
+    }
+    try {
+      setSendingPhoneCode(true)
+      const response = await fetch('/api/auth/phone/send-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: verificationPhone }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Não foi possível enviar o código.')
+      }
+      setProfileData((prev) => (prev ? { ...prev, phone: verificationPhone } : prev))
+      toast.success('Código enviado por WhatsApp.')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao enviar código.'
+      toast.error(message)
+    } finally {
+      setSendingPhoneCode(false)
+    }
+  }
+
+  const handleVerifyPhoneCode = async () => {
+    if (!phoneCode.trim()) {
+      toast.error('Digite o código recebido.')
+      return
+    }
+    try {
+      setVerifyingPhoneCode(true)
+      const response = await fetch('/api/auth/phone/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: phoneCode }),
+      })
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || 'Código inválido ou expirado.')
+      }
+      toast.success('Telefone confirmado com sucesso!')
+      setPhoneCode('')
+      setProfileData((prev) => (prev ? { ...prev, phone: verificationPhone } : prev))
+      if (update && session?.user) {
+        await update({
+          user: {
+            ...session.user,
+            phoneVerified: true,
+            phone: verificationPhone,
+          },
+        }).catch((err) => console.error('Erro ao atualizar sessão:', err))
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erro ao validar o código.'
+      toast.error(message)
+    } finally {
+      setVerifyingPhoneCode(false)
     }
   }
 
@@ -1154,16 +1227,66 @@ if (loading || !profileData) {
 
       {/* Security Tab */}
       {activeTab === 'security' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Shield className="w-5 h-5" />
-              <span>Segurança da Conta</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <h3 className="text-lg font-medium">Alterar Senha</h3>
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Shield className="w-5 h-5" />
+            <span>Segurança da Conta</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-3">
+            <h3 className="text-lg font-medium">Telefone (opcional)</h3>
+            <p className="text-sm text-gray-600">
+              Use um telefone verificado para receber códigos de recuperação e avisos importantes via WhatsApp.
+            </p>
+            <div className="grid gap-3 md:grid-cols-[1.5fr_1fr] md:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="verificationPhone">Telefone com DDD</Label>
+                <Input
+                  id="verificationPhone"
+                  type="tel"
+                  value={verificationPhone}
+                  onChange={(event) => setVerificationPhone(event.target.value)}
+                  placeholder="11999999999"
+                />
+                <p className="text-xs text-gray-500">
+                  Status: {phoneVerified ? 'Verificado' : 'Não verificado'}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleSendPhoneVerification} disabled={sendingPhoneCode} className="w-full">
+                  {sendingPhoneCode ? 'Enviando...' : 'Enviar código'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-[1.5fr_1fr] md:items-end">
+              <div className="space-y-2">
+                <Label htmlFor="phoneCode">Código recebido</Label>
+                <Input
+                  id="phoneCode"
+                  value={phoneCode}
+                  onChange={(event) => setPhoneCode(event.target.value)}
+                  placeholder="000000"
+                  maxLength={6}
+                />
+              </div>
+              <Button
+                variant="secondary"
+                onClick={handleVerifyPhoneCode}
+                disabled={verifyingPhoneCode || !phoneCode}
+                className="w-full"
+              >
+                {verifyingPhoneCode ? 'Validando...' : 'Confirmar telefone'}
+              </Button>
+            </div>
+          </div>
+
+          <Separator />
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-medium">Alterar Senha</h3>
               
               <div className="space-y-4">
                 <div className="space-y-2">

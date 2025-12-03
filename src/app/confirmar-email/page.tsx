@@ -71,6 +71,9 @@ function ConfirmEmailContent() {
           <Button asChild className="flex-1">
             <Link href="/entrar">Ir para o login</Link>
           </Button>
+          <Button variant="outline" className="flex-1" asChild>
+            <Link href="/dashboard/cliente?tab=settings">Adicionar telefone (opcional)</Link>
+          </Button>
           <Button variant="outline" className="flex-1" onClick={() => router.push('/dashboard/profissional?tab=settings')}>
             Abrir dashboard
           </Button>

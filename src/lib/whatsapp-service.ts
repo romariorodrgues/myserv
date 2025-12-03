@@ -247,6 +247,29 @@ Este código expira em poucos minutos. Se você não solicitou, ignore esta mens
   }
 
   /**
+   * Send password reset link via WhatsApp
+   */
+  static async sendPasswordResetCode(params: { phone: string; name?: string; link: string }): Promise<boolean> {
+    const formattedPhone = this.formatPhoneNumber(params.phone)
+    const message = `🔑 *Redefinição de Senha - MyServ*
+
+Olá ${params.name || 'Usuário'}!
+
+Recebemos um pedido para redefinir sua senha. Acesse o link abaixo para criar uma nova:
+👉 ${params.link}
+
+Se você não solicitou, ignore esta mensagem.
+
+---
+*MyServ - Segurança para você continuar usando a plataforma*`
+
+    return this.sendMessage({
+      to: formattedPhone,
+      message,
+    })
+  }
+
+  /**
    * Send welcome message to new users
    */
   static async sendWelcomeMessage(data: NotificationData): Promise<boolean> {
