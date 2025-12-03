@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { useSession } from 'next-auth/react'
 import { useSocket } from '@/hooks/use-socket'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,7 +16,9 @@ import {
   CheckCircle,
   XCircle,
   Search,
-  Send
+  Send,
+  Filter,
+  UserPlus
 } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
@@ -39,6 +41,10 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const [selectedAdminId, setSelectedAdminId] = useState<string>('')
   const [tabFilter, setTabFilter] = useState<'all' | 'awaiting' | 'inprogress' | 'mine'>('all')
   const [showClosed, setShowClosed] = useState(false)
+  const [unreadOnly, setUnreadOnly] = useState(false)
+  const [userFilter, setUserFilter] = useState('')
+  const [showFilters, setShowFilters] = useState(false)
+  const searchInputRef = useRef<HTMLInputElement | null>(null)
   const searchParams = useSearchParams()
   const targetChatId = searchParams?.get('chatId') ?? null
 
@@ -421,10 +427,10 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
 
   const getPriorityLabel = (priority: string) => {
     switch (priority) {
-      case 'LOW': return 'Prioridade: baixa'
-      case 'MEDIUM': return 'Prioridade: média'
-      case 'HIGH': return 'Prioridade: alta'
-      case 'URGENT': return 'Prioridade: urgente'
+      case 'LOW': return 'Baixa'
+      case 'MEDIUM': return 'Média'
+      case 'HIGH': return 'Alta'
+      case 'URGENT': return 'Urgente'
       default: return priority
     }
   }
@@ -442,7 +448,25 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
 
   const filteredChats = chats.filter(chat => {
     if (!showClosed && chat.status === 'CLOSED') return false
-    if (searchTerm && !chat.title.toLowerCase().includes(searchTerm.toLowerCase())) return false
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      const hit =
+        chat.title?.toLowerCase().includes(term) ||
+        chat.user?.name?.toLowerCase().includes(term) ||
+        chat.user?.email?.toLowerCase().includes(term)
+      if (!hit) return false
+    }
+
+    if (userFilter) {
+      const term = userFilter.toLowerCase()
+      const hit =
+        chat.user?.name?.toLowerCase().includes(term) ||
+        chat.user?.email?.toLowerCase().includes(term)
+      if (!hit) return false
+    }
+
+    if (unreadOnly && (chat._count?.messages ?? 0) === 0) return false
 
     if (tabFilter === 'awaiting') {
       if (!(chat.status === 'OPEN' && !chat.assignedToId)) return false
@@ -461,6 +485,19 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
       </div>
     )
   }
+
+  const unreadByTab = useMemo(() => {
+    const base = { all: 0, awaiting: 0, inprogress: 0, mine: 0 }
+    chats.forEach((chat) => {
+      const unread = chat._count?.messages ?? 0
+      if (unread <= 0) return
+      base.all += unread
+      if (chat.status === 'OPEN' && !chat.assignedToId) base.awaiting += unread
+      if (['IN_PROGRESS', 'WAITING_USER'].includes(chat.status)) base.inprogress += unread
+      if (chat.assignedToId && chat.assignedToId === session?.user?.id && chat.status !== 'CLOSED') base.mine += unread
+    })
+    return base
+  }, [chats, session?.user?.id])
 
   return (
     <div className={`min-h-screen flex flex-col lg:flex-row ${className}`}>
@@ -487,6 +524,11 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                 <tab.icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{tab.label}</span>
                 <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
+                {unreadByTab[tab.key as keyof typeof unreadByTab] > 0 && (
+                  <span className="ml-1 inline-flex items-center justify-center rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-semibold px-2">
+                    {unreadByTab[tab.key as keyof typeof unreadByTab]}
+                  </span>
+                )}
               </Button>
             ))}
           </div>
@@ -496,6 +538,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
+                ref={searchInputRef}
                 placeholder="Buscar chats..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -503,20 +546,138 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
               />
             </div>
 
-            <div className="flex items-center justify-between text-xs text-gray-600 bg-white border rounded-md px-3 py-2">
-              <span className="mr-2">Incluir fechados</span>
-              <label className="inline-flex items-center gap-2 cursor-pointer select-none">
-                <span className="text-[11px] text-gray-500">{showClosed ? 'Sim' : 'Não'}</span>
-                <input
-                  type="checkbox"
-                  className="h-4 w-4"
-                  checked={showClosed}
-                  onChange={(e) => setShowClosed(e.target.checked)}
-                />
-              </label>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" className="flex-1 justify-start gap-2" onClick={() => setShowFilters(true)}>
+                <Filter className="h-4 w-4" />
+                Filtros
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => {
+                  setTabFilter('all')
+                  setUnreadOnly(true)
+                  setShowClosed(false)
+                }}
+              >
+                Conversas não lidas
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                title="Iniciar contato"
+                onClick={() => {
+                  if (searchInputRef.current) searchInputRef.current.focus()
+                }}
+              >
+                <UserPlus className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
+
+        {showFilters && (
+          <div className="px-3 sm:px-4 py-3 border-b bg-white">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-gray-700">Filtros</span>
+              <Button variant="ghost" size="sm" onClick={() => setShowFilters(false)}>
+                Fechar
+              </Button>
+            </div>
+
+            <div className="space-y-3 text-sm text-gray-700">
+              <div>
+                <p className="font-medium mb-2">Situação</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { key: 'all', label: 'Todas' },
+                    { key: 'inprogress', label: 'Em atendimento' },
+                    { key: 'awaiting', label: 'Aguardando' },
+                    { key: 'closed', label: 'Finalizadas' },
+                  ].map((opt) => (
+                    <label key={opt.key} className="flex items-center gap-2 text-xs bg-gray-50 border rounded px-2 py-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="status-filter"
+                        className="h-3 w-3"
+                        checked={
+                          opt.key === 'all'
+                            ? tabFilter === 'all' && showClosed
+                            : opt.key === 'closed'
+                              ? showClosed && tabFilter === 'all'
+                              : tabFilter === opt.key
+                        }
+                        onChange={() => {
+                          if (opt.key === 'closed') {
+                            setShowClosed(true)
+                            setTabFilter('all')
+                          } else {
+                            setTabFilter(opt.key as typeof tabFilter)
+                            setShowClosed(opt.key === 'all' ? showClosed : false)
+                          }
+                        }}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>Somente não lidas</span>
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs">
+                  <span className="text-[11px] text-gray-500">{unreadOnly ? 'Sim' : 'Não'}</span>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={unreadOnly}
+                    onChange={(e) => setUnreadOnly(e.target.checked)}
+                  />
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <span>Incluir fechados</span>
+                <label className="inline-flex items-center gap-2 cursor-pointer select-none text-xs">
+                  <span className="text-[11px] text-gray-500">{showClosed ? 'Sim' : 'Não'}</span>
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4"
+                    checked={showClosed}
+                    onChange={(e) => setShowClosed(e.target.checked)}
+                  />
+                </label>
+              </div>
+
+              <div className="space-y-1">
+                <p className="font-medium">Usuários</p>
+                <UiInput
+                  placeholder="Buscar por nome ou e-mail"
+                  value={userFilter}
+                  onChange={(e) => setUserFilter(e.target.value)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <Button size="sm" className="flex-1" onClick={() => setShowFilters(false)}>
+                  Aplicar
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    setUnreadOnly(false)
+                    setShowClosed(false)
+                    setUserFilter('')
+                  }}
+                >
+                  Limpar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <ScrollArea className="h-[50vh] lg:h-[calc(100vh-200px)]">
           <div className="p-3 sm:p-4 space-y-2">
