@@ -42,9 +42,8 @@ export class WhatsAppService {
         return false
       }
 
-      // ChatPro comum (ex.: https://sua-instancia.chatpro.com.br/api/sendMessage)
-      // e fallback legacy (/send-message)
-      const endpoint = `${this.baseUrl}/api/sendMessage`
+      // ChatPro comum (ex.: https://chatpro.com.br/api/sendMessage) ou instância dedicada
+      const endpoint = `${this.baseUrl}/sendMessage`.replace('//sendMessage', '/api/sendMessage')
       const payload = { to: data.to, message: data.message }
 
       const response = await axios.post(endpoint, payload, {
