@@ -259,11 +259,44 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
 
   const isAuthenticated = status === 'authenticated' && !!session?.user?.id
   const userType = (session.user as any)?.userType
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0)
 
-  // Contar chats não resolvidos
-  const unreadChatsCount = Array.isArray(chats) ? chats.filter(chat => 
-    chat.status === 'OPEN' || chat.status === 'IN_PROGRESS'
-  ).length : 0
+  // Polling de mensagens não lidas (lado cliente)
+  useEffect(() => {
+    if (!isAuthenticated) return
+    let cancelled = false
+    const fetchUnread = async () => {
+      try {
+        const res = await fetch('/api/chat/unread-count')
+        const data = await res.json().catch(() => ({}))
+        if (!cancelled && data?.success) {
+          setUnreadMessagesCount(data.unread ?? 0)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    fetchUnread()
+    const interval = setInterval(fetchUnread, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isAuthenticated])
+
+  // Bump ao receber mensagem do admin via socket
+  useEffect(() => {
+    if (!socket || userType === 'ADMIN') return
+    const handler = (message: any) => {
+      if (message?.isFromAdmin) {
+        setUnreadMessagesCount((prev) => prev + 1)
+      }
+    }
+    socket.on('message-received', handler)
+    return () => {
+      socket.off('message-received', handler)
+    }
+  }, [socket, userType])
 
   // Botão flutuante
   const floatingButtonClasses = useMemo(() => {
@@ -311,7 +344,7 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
             onClick={() => setIsOpen(true)}
             size="icon"
             className={`h-14 w-14 rounded-full bg-brand-cyan hover:bg-brand-cyan/90 shadow-lg hover:shadow-xl transition-all duration-300 border border-white/20 ${
-              unreadChatsCount > 0 ? 'animate-pulse' : ''
+              unreadMessagesCount > 0 ? 'animate-pulse' : ''
             }`}
             title="Chat de Suporte"
             style={{ boxShadow: '0 10px 30px rgba(0,0,0,0.12)' }}
@@ -321,9 +354,9 @@ export function SupportChatWidget({ initialMessage }: SupportChatWidgetProps) {
           </Button>
           
           {/* Badge de notificação */}
-          {unreadChatsCount > 0 && (
+          {unreadMessagesCount > 0 && (
             <Badge className="absolute top-0 right-0 translate-x-1/3 -translate-y-1/3 h-5 w-5 p-0 flex items-center justify-center bg-brand-teal text-white text-[10px] border-2 border-white rounded-full animate-bounce">
-              {unreadChatsCount > 9 ? '9+' : unreadChatsCount}
+              {unreadMessagesCount > 9 ? '9+' : unreadMessagesCount}
             </Badge>
           )}
         </div>
