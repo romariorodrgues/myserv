@@ -45,6 +45,7 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
   const [userFilter, setUserFilter] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const searchInputRef = useRef<HTMLInputElement | null>(null)
+  const showPriority = false
   const searchParams = useSearchParams()
   const targetChatId = searchParams?.get('chatId') ?? null
 
@@ -708,9 +709,11 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                       <Badge className={`${getStatusColor(chat.status)} text-[11px]`}>
                         {getStatusLabel(chat.status)}
                       </Badge>
-                      <Badge className={`${getPriorityColor(chat.priority)} text-[11px]`}>
-                        {getPriorityLabel(chat.priority)}
-                      </Badge>
+                      {showPriority && (
+                        <Badge className={`${getPriorityColor(chat.priority)} text-[11px]`}>
+                          {getPriorityLabel(chat.priority)}
+                        </Badge>
+                      )}
                       {chat._count?.messages > 0 && (
                         <span className="text-[11px] text-gray-500">
                           {chat._count.messages} msgs
@@ -731,11 +734,11 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
           <>
             {/* Header do chat */}
             <div className="p-4 border-b bg-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold">{selectedChat.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    Cliente: {selectedChat.user?.name} • {selectedChat.user?.email}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold">{selectedChat.title}</h3>
+                    <p className="text-sm text-gray-500">
+                      Cliente: {selectedChat.user?.name} • {selectedChat.user?.email}
                   </p>
                   <p className="text-sm text-gray-500">
                     {selectedChat.assignedTo
@@ -747,9 +750,11 @@ export function AdminChatDashboard({ className }: AdminChatDashboardProps) {
                   <Badge className={getStatusColor(selectedChat.status)}>
                     {getStatusLabel(selectedChat.status)}
                   </Badge>
-                  <Badge className={getPriorityColor(selectedChat.priority)}>
-                    {getPriorityLabel(selectedChat.priority)}
-                  </Badge>
+                  {showPriority && (
+                    <Badge className={getPriorityColor(selectedChat.priority)}>
+                      {getPriorityLabel(selectedChat.priority)}
+                    </Badge>
+                  )}
                 </div>
               </div>
 
