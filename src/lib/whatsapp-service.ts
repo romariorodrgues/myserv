@@ -42,21 +42,20 @@ export class WhatsAppService {
         return false
       }
 
-      const response = await axios.post(
-        `${this.baseUrl}/send-message`,
-        {
-          phone: data.to,
-          message: data.message,
-          type: data.type || 'text'
+      // Suporte a novo formato v5.chatpro.com.br/{instance_id}/api/v1/send_message
+      const useV5 = this.baseUrl.includes('v5.chatpro.com.br')
+      const endpoint = useV5 ? `${this.baseUrl}/api/v1/send_message` : `${this.baseUrl}/send-message`
+      const payload = useV5
+        ? { number: data.to, message: data.message }
+        : { phone: data.to, message: data.message, type: data.type || 'text' }
+
+      const response = await axios.post(endpoint, payload, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
         },
-        {
-          headers: {
-            'Authorization': `Bearer ${this.apiKey}`,
-            'Content-Type': 'application/json'
-          },
-          timeout: 10000
-        }
-      )
+        timeout: 10000,
+      })
 
       return response.status === 200
     } catch (error) {
