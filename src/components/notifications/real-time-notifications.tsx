@@ -29,6 +29,8 @@ import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useNotifications, Notification, useNotificationCount } from '@/hooks/use-notifications'
 import { useSession } from 'next-auth/react'
+import { useSocket } from '@/hooks/use-socket'
+import Link from 'next/link'
 
 interface NotificationDropdownProps {
   className?: string
@@ -190,6 +192,9 @@ function NotificationItem({ notification, onMarkAsRead, onDelete, onClick }: Not
 // Notification dropdown for header
 export function NotificationDropdown({ className = '' }: NotificationDropdownProps) {
   const { data: session } = useSession()
+  const socket = useSocket()
+  const isAdmin = (session?.user as any)?.userType === 'ADMIN'
+  const [adminChatCount, setAdminChatCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   
@@ -270,6 +275,41 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
+  // Admin chat count polling
+  useEffect(() => {
+    if (!isAdmin) return
+    let cancelled = false
+    const fetchCount = async () => {
+      try {
+        const res = await fetch('/api/chat/admin/count')
+        const data = await res.json().catch(() => ({}))
+        if (!cancelled && data?.success) {
+          setAdminChatCount(data.counts?.unread ?? data.counts?.open ?? 0)
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    fetchCount()
+    const interval = setInterval(fetchCount, 15000)
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
+  }, [isAdmin])
+
+  // Socket bump for admin chat
+  useEffect(() => {
+    if (!isAdmin || !socket) return
+    const handler = () => {
+      setAdminChatCount((prev) => prev + 1)
+    }
+    socket.on('message-received', handler)
+    return () => {
+      socket.off('message-received', handler)
+    }
+  }, [isAdmin, socket])
+
   useEffect(() => {
     if (isOpen) {
       refresh()
@@ -282,6 +322,8 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
 
   if (!session) return null
 
+  const totalUnread = (unreadCount || 0) + (isAdmin ? adminChatCount : 0)
+
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <Button
@@ -290,15 +332,15 @@ export function NotificationDropdown({ className = '' }: NotificationDropdownPro
         onClick={() => setIsOpen(!isOpen)}
         className="relative h-10 w-10 p-0"
       >
-        {(unreadCount || count) > 0 ? (
+        {totalUnread > 0 ? (
           <BellDot className="h-5 w-5" />
         ) : (
           <Bell className="h-5 w-5" />
         )}
         
-        {(unreadCount || count) > 0 && (
+        {totalUnread > 0 && (
           <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
-            {(unreadCount || count) > 99 ? '99+' : (unreadCount || count)}
+            {totalUnread > 99 ? '99+' : totalUnread}
           </span>
         )}
       </Button>
