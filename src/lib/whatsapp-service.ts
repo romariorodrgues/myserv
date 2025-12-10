@@ -42,13 +42,15 @@ export class WhatsAppService {
         return false
       }
 
-      // ChatPro comum (ex.: https://chatpro.com.br/api/sendMessage) ou instância dedicada
-      const endpoint = `${this.baseUrl}/sendMessage`.replace('//sendMessage', '/api/sendMessage')
-      const payload = { to: data.to, message: data.message }
+      // ChatPro v5: base URL já deve apontar para .../api/v1
+      // Envio de texto simples
+      const endpoint = `${this.baseUrl}/send_message`
+      const payload = { number: data.to, message: data.message }
 
       const response = await axios.post(endpoint, payload, {
         headers: {
-          Authorization: `Bearer ${this.apiKey}`,
+          // V5 exige o token direto no header, sem prefixo Bearer
+          Authorization: this.apiKey,
           'Content-Type': 'application/json',
         },
         timeout: 10000,
